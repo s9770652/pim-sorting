@@ -25,7 +25,7 @@ void print_array(T arr[], uint32_t len);
  * @param len Up to which element to check the order (exclusive).
  * @returns `1` if the array is sorted, elsewise `0`.
 **/
-int is_sorted(T arr[], uint32_t len);
+bool is_sorted(T arr[], uint32_t len);
 
 /**
  * @fn is_uniform
@@ -36,6 +36,6 @@ int is_sorted(T arr[], uint32_t len);
  * @param len Up to which element to check the mean and variance.
  * @returns `1` if the mean and variance deviate at most 10 % from the ideal, elsewise `0`.
 **/
-int is_uniform(T arr[], uint32_t len, T upper_bound);
+bool is_uniform(T arr[], uint32_t len, T upper_bound);
 
 #endif  // _CHECKERS_H_

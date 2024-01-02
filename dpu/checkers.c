@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
 
@@ -17,16 +18,16 @@ void print_array(T arr[], uint32_t len) {
     printf("\n");
 }
 
-int is_sorted(T arr[], uint32_t len) {
+bool is_sorted(T arr[], uint32_t len) {
     for (uint32_t i = 1; i < len; i++) {
         if (arr[i-1] > arr[i]) {
-            return 0;
+            return false;
         }
     }
-    return 1;
+    return true;
 }
 
-int is_uniform(T arr[], uint32_t len, T upper_bound) {
+bool is_uniform(T arr[], uint32_t len, T upper_bound) {
     T* count = mem_alloc(upper_bound << DIV);
     for (T i = 0; i < upper_bound; i++) {
         count[i] = 0;
