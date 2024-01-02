@@ -28,11 +28,11 @@ int main(void) {
     alloc_dpus(&set, &nr_dpus);
 
     struct Params p;
-    p.length = 6144;
+    p.length = 6143;
     p.upper_bound = 8;
     dpu_arguments_t input_arguments = {
         p.length,
-        ((p.length * sizeof(T)) % 8) != 0 ? roundup(p.length * sizeof(T), 8) : p.length * sizeof(T),
+        ROUND_UP_POW2(p.length * sizeof(T), 8),
         p.upper_bound
     };
     DPU_FOREACH(set, dpu) {

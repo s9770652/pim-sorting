@@ -28,7 +28,8 @@ typedef struct {
 #define ANSI_COLOR_GREEN   "\x1b[32m"
 #define ANSI_COLOR_RESET   "\x1b[0m"
 
-#define divceil(n, m) (((n)-1) / (m) + 1)
-#define roundup(n, m) ((n / m) * m + m)
+#define DIV_CEIL(n, m) (((n)-1) / (m) + 1)
+#define ROUND_UP(n, m) ((((n) + (m) - 1) / (m)) * (m))
+#define ROUND_UP_POW2(n, m) (((n) + (m) - 1) & -(m))
 
 #endif  // _COMMON_H_
