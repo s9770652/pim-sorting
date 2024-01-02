@@ -4,8 +4,8 @@
 #include <mram.h>
 #include <sysdef.h>
 
-#include "random.h"
 #include "../support/common.h"
+#include "random.h"
 
 struct xorshift seed_xs(T seed) {
     assert(seed > 0);

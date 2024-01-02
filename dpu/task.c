@@ -1,13 +1,13 @@
 #include <stdio.h>
 
 #include <alloc.h>
+#include <barrier.h>
 #include <defs.h>
 #include <mram.h>
-#include <barrier.h>
 
 #include "../support/common.h"
-#include "random.h"
 #include "checkers.h"
+#include "random.h"
 
 __host dpu_arguments_t DPU_INPUT_ARGUMENTS;
 
@@ -29,9 +29,9 @@ BARRIER_INIT(wait_for_reset, NR_TASKLETS);
 
 int main() {
     const thread_id_t tid = me();
-    if (tid == 0) {
+        if (tid == 0) {
         mem_reset();
-        // printf("input length: %d\n", DPU_INPUT_ARGUMENTS.length);
+                // printf("input length: %d\n", DPU_INPUT_ARGUMENTS.length);
         // printf("input size: %d\n", DPU_INPUT_ARGUMENTS.size);
         // printf("BLOCK_SIZE: %d\n", BLOCK_SIZE);
         // printf("HEAPPOINTER: %p\n", DPU_MRAM_HEAP_POINTER);
@@ -50,7 +50,7 @@ int main() {
     // Initialize a local cache to store the MRAM block.
     T *cache_A = (T *) mem_alloc(BLOCK_SIZE);
 
-    rngs[tid] = seed_xs(tid + 0b100111010);  // The binary number is arbitrarily chosen to introduce some 1s to improve the seed.
+        rngs[tid] = seed_xs(tid + 0b100111010);  // The binary number is arbitrarily chosen to introduce some 1s to improve the seed.
     for (uint32_t byte_index = base_tasklet; byte_index < size; byte_index += BLOCK_SIZE * NR_TASKLETS) {
         // bound checking
         uint32_t l_size_bytes = (byte_index + BLOCK_SIZE >= size) ? (size - byte_index) : BLOCK_SIZE;
@@ -62,20 +62,20 @@ int main() {
         // print_array(cache_A, l_size_bytes >> DIV);
         mram_write(cache_A, (__mram_ptr void*)(mram_base_addr_A + byte_index), l_size_bytes);
     }
-
+    
     if (tid == 0) {
-        T *cache_B = (T *) mem_alloc(size);
+                T *cache_B = (T *) mem_alloc(size);
         for (uint32_t byte_index = 0; byte_index < size; byte_index += BLOCK_SIZE) {
             uint32_t l_size_bytes = (byte_index + BLOCK_SIZE >= size) ? (size - byte_index) : BLOCK_SIZE;
             mram_read((__mram_ptr void*)(mram_base_addr_A + byte_index), (void *)(cache_B + (byte_index >> DIV)), l_size_bytes);
         }
-        // print_array(cache_B, input_length);
+                // print_array(cache_B, input_length);
         insertion_sort(cache_B, length);
-        // print_array(cache_B, input_length);
+                // print_array(cache_B, input_length);
         if (is_sorted(cache_B, length) && is_uniform(cache_B, length, DPU_INPUT_ARGUMENTS.upper_bound)) {
-            printf("O.K.!\n");
+        printf("O.K.!\n");
         } else {
-            printf("K.O...\n");
+        printf("K.O...\n");
         }
     }
     return 0;
