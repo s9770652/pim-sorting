@@ -8,8 +8,6 @@
 #include "../support/common.h"
 #include "../support/params.h"
 
-// #define DPU_BINARY "./bin/sorting_dpu"
-
 static void free_dpus(struct dpu_set_t set) {
     DPU_ASSERT(dpu_free(set));
 }
@@ -20,16 +18,14 @@ static void alloc_dpus(struct dpu_set_t *set, uint32_t *nr_dpus) {
     DPU_ASSERT(dpu_get_nr_dpus(*set, nr_dpus));
 }
 
-int main(void) {
+int main(int argc, char** argv) {
     assert(BL <= 8);  // `mram_read` can read at most 256 = 1 << 8 bytes at a time.
 
     struct dpu_set_t set, dpu;
     uint32_t nr_dpus;
     alloc_dpus(&set, &nr_dpus);
 
-    struct Params p;
-    p.length = 6143;
-    p.upper_bound = 8;
+    struct Params p = input_params(argc, argv);
     dpu_arguments_t input_arguments = {
         p.length,
         ROUND_UP_POW2(p.length * sizeof(T), 8),
