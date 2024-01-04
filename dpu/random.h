@@ -26,8 +26,10 @@ struct xorshift {
 /**
  * @fn seed_xs
  * @brief Sets the initial word of state.
+ * 
  * @param seed The initial word of state. Must be positive.
  *             More 1s in the binary representation are better.
+ * 
  * @returns A seeded state.
 **/
 struct xorshift seed_xs(T seed);
@@ -35,7 +37,9 @@ struct xorshift seed_xs(T seed);
 /**
  * @fn gen_xs
  * @brief The XorShift generator generates a 32-bit / 64-bit uniformly drawn random number.
+ * 
  * @param rng Word of state.
+ * 
  * @returns A uniformly drawn integer beween `1` and `0xFF...FF`.
 **/
 T gen_xs(struct xorshift *rng);
@@ -43,8 +47,10 @@ T gen_xs(struct xorshift *rng);
 /**
  * @fn rr
  * @brief RoundReject uniformly draws an integer by rounding `s` to the next highest power of 2 and using rejection sampling.
+ * 
  * @param s The upper limit (exclusive) of the range to draw from.
  * @param state The state from which to take the random integer.
+ * 
  * @returns A uniformly drawn integer between `0` and `s-1`.
 **/
 T rr(const T s, struct xorshift* state);
