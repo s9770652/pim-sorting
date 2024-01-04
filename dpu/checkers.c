@@ -3,9 +3,20 @@
 #include <stdint.h>
 
 #include <alloc.h>
+#include <perfcounter.h>
 
 #include "../support/common.h"
 #include "checkers.h"
+
+void get_time(perfcounter_t *cycles, char *label) {
+    perfcounter_t cycles_total = 0, cycles_max = 0;
+    for (unsigned t = 0; t < NR_TASKLETS; t++) {
+        cycles_total += cycles[t];
+        cycles_max = cycles_max < cycles[t] ? cycles[t] : cycles_max;
+    }
+    printf("time (%s): %f s | %f s\n",
+            label, (double)cycles_max / CLOCKS_PER_SEC, (double)cycles_total / CLOCKS_PER_SEC);
+}
 
 void print_array(T arr[], uint32_t len) {
     for (uint32_t i = 0; i < len; i++) {
