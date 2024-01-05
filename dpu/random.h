@@ -28,7 +28,7 @@ struct xorshift {
  * @brief Sets the initial word of state.
  * 
  * @param seed The initial word of state. Must be positive.
- *             More 1s in the binary representation are better.
+ * More 1s in the binary representation are better.
  * 
  * @returns A seeded state.
 **/

@@ -11,25 +11,6 @@
 #include "../support/common.h"
 
 /**
- * @def LOOP_ON_MRAM
- * @brief Loop header for looping over an MRAM array to write to / read from.
- * It calucates the byte offsets (`bi`) and length of blocks (`lsb`) for all involved tasklets.
- * 
- * @param bi Current byte offset. Will be set automatically. Initially `1 * bt`.
- * @param bt Offset of first block of the respective tasklet. Must be a multiple of `bs`.
- * @param s Size of the MRAM array. Must be aligned on 8 bytes.
- * @param bs Maximum size of the blocks read at once.
- * @param nr Number of tasklets.
- * @param lsb Size of current block. Never greater than `bs`.
-**/
-#define LOOP_ON_MRAM(bi, bt, s, bs, nr, lsb)                      \
-for (                                                             \
-    bi = (bt), lsb = (bi + (bs) >= (s)) ? ((s)-bi) : (bs);        \
-    bi < (s);                                                     \
-    bi += (bs) * (nr), lsb = (bi + (bs) >= (s)) ? ((s)-bi) : (bs) \
-)
-
-/**
  * @fn get_time
  * @brief Prints the maximum duration and total time of an array of cycle counts.
  * 
