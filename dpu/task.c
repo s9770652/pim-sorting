@@ -24,7 +24,7 @@ perfcounter_t cycles[NR_TASKLETS];  // Used to measure the time for each tasklet
 #endif
 #if CHECK_ORDER
 bool sorted = true;
-MUTEX_INIT(sorting_mutex);
+MUTEX_INIT(sorted_mutex);
 #endif
 
 void insertion_sort(T arr[], int len) {
@@ -114,9 +114,9 @@ int main() {
         }
         mram_read(&elements[i], cache, curr_size);
         if (!is_sorted(cache, curr_size >> DIV) || (i > 0 && elements[i-1] > cache[0])) {
-            mutex_lock(sorting_mutex);
+            mutex_lock(sorted_mutex);
             sorted = false;
-            mutex_unlock(sorting_mutex);
+            mutex_unlock(sorted_mutex);
             break;
         }
     }
