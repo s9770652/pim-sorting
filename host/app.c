@@ -19,7 +19,7 @@ static void alloc_dpus(struct dpu_set_t *set, uint32_t *nr_dpus) {
 }
 
 int main(int argc, char** argv) {
-    assert(BL <= 8);  // `mram_read` can read at most 256 = 1 << 8 bytes at a time.
+    assert(BL <= 11);  // `mram_read` can read at most 2048 = 1 << 11 bytes at a time.
 
     struct dpu_set_t set, dpu;
     uint32_t nr_dpus;
