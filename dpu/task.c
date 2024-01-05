@@ -60,13 +60,13 @@ int main() {
 
     /* Compute addresses and boundaries of arrays in WRAM and MRAM. */
     // input length per DPU in number of elements
-    uint32_t length = DPU_INPUT_ARGUMENTS.length;
+    const uint32_t length = DPU_INPUT_ARGUMENTS.length;
     // input length such that the size is aligned on 8 bytes
-    uint32_t length_aligned = ROUND_UP_POW2(length << DIV, 8) >> DIV;
+    const uint32_t length_aligned = ROUND_UP_POW2(length << DIV, 8) >> DIV;
     // maxmium length of each block
-    uint32_t block_length = BLOCK_SIZE >> DIV;
-    // start of the tasklet's first processing block in MRAM
-    uint32_t offset = (tid << BLOCK_SIZE_LOG2) >> DIV;
+    const uint32_t block_length = BLOCK_SIZE >> DIV;
+    // // start of the tasklet's first processing block in MRAM
+    const uint32_t offset = (tid * block_length) >> DIV;
 
     /* Write random numbers onto the MRAM. */
     rngs[tid] = seed_xs(tid + 0b100111010);  // The binary number is arbitrarily chosen to introduce some 1s to improve the seed.

@@ -19,7 +19,8 @@ static void alloc_dpus(struct dpu_set_t *set, uint32_t *nr_dpus) {
 }
 
 int main(int argc, char** argv) {
-    assert(BL <= 11);  // `mram_read` can read at most 2048 = 1 << 11 bytes at a time.
+    assert(BLOCK_SIZE <= 2048);  // `mram_read` can read at most 2048 = 1 << 11 bytes at a time.
+    assert(!(BLOCK_SIZE % 8));  // Accesses to MRAM must be aligned on 8 bytes.
 
     struct dpu_set_t set, dpu;
     uint32_t nr_dpus;

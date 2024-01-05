@@ -3,7 +3,7 @@ HOST_DIR := host
 BUILDDIR ?= bin
 
 TYPE ?= UINT32
-BL ?= 8
+BLOCK_SIZE ?= 1024
 NR_DPUS ?= 1
 NR_TASKLETS ?= 1
 
@@ -24,8 +24,8 @@ DPU_SOURCES := $(wildcard ${DPU_DIR}/*.c)
 __dirs := $(shell mkdir -p ${BUILDDIR})
 
 COMMON_FLAGS := -Wall -Wextra -g -I${COMMON_INCLUDES}
-HOST_FLAGS := ${COMMON_FLAGS} -std=c11 -O3 `dpu-pkg-config --cflags --libs dpu` -DNR_TASKLETS=${NR_TASKLETS} -DNR_DPUS=${NR_DPUS} -DBL=${BL} -D${TYPE} -DDPU_BINARY=\"./${DPU_TARGET}\"
-DPU_FLAGS := ${COMMON_FLAGS} -O2 -DNR_TASKLETS=${NR_TASKLETS} -DBL=${BL} -D${TYPE}
+HOST_FLAGS := ${COMMON_FLAGS} -std=c11 -O3 `dpu-pkg-config --cflags --libs dpu` -DNR_TASKLETS=${NR_TASKLETS} -DNR_DPUS=${NR_DPUS} -DBLOCK_SIZE=${BLOCK_SIZE} -D${TYPE} -DDPU_BINARY=\"./${DPU_TARGET}\"
+DPU_FLAGS := ${COMMON_FLAGS} -O2 -DNR_TASKLETS=${NR_TASKLETS} -DBLOCK_SIZE=${BLOCK_SIZE} -D${TYPE}
 
 all: ${HOST_TARGET} ${DPU_TARGET}
 

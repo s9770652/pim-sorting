@@ -10,13 +10,6 @@
 #define DIV 3  // Shift right to divide by sizeof(T).
 #endif
 
-// Transfer Size Between MRAM and WRAM (<= 2048)
-#ifndef BL
-#define BL 8
-#endif
-#define BLOCK_SIZE_LOG2 BL
-#define BLOCK_SIZE (1 << BLOCK_SIZE_LOG2)
-
 // Structures used by both the host and the dpu to communicate information
 typedef struct {
     uint32_t length;  // number of elements to sort
