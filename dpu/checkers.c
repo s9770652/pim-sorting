@@ -1,4 +1,3 @@
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
 
@@ -14,17 +13,21 @@ void get_time(perfcounter_t *cycles, char *label) {
         cycles_total += cycles[t];
         cycles_max = cycles_max < cycles[t] ? cycles[t] : cycles_max;
     }
-    printf("time (%s): %f s | %f s\n",
-            label, (double)cycles_max / CLOCKS_PER_SEC, (double)cycles_total / CLOCKS_PER_SEC);
+    printf(
+        "time (%s):\t%8.2f ms | %8.2f ms\n",
+        label,
+        (double)cycles_max / CLOCKS_PER_SEC * 1000,
+        (double)cycles_total / CLOCKS_PER_SEC * 1000
+    );
 }
 
 void print_array(T arr[], uint32_t len) {
     for (uint32_t i = 0; i < len; i++) {
-        #if UINT32
+#if UINT32
         printf("%d ", arr[i]);
-        #else
+#else
         printf("%lu ", arr[i]);
-        #endif
+#endif
     }
     printf("\n");
 }
