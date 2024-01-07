@@ -8,6 +8,8 @@
  * The use of these functions is only intented for development purposes.
 **/
 
+#include <perfcounter.h>
+
 #include "../support/common.h"
 
 /**

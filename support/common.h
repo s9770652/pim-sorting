@@ -21,6 +21,7 @@ typedef struct {
 #define ANSI_COLOR_GREEN   "\x1b[32m"
 #define ANSI_COLOR_RESET   "\x1b[0m"
 
+// Computes `n` : `m` rounded up.
 #define DIV_CEIL(n, m) (((n)-1) / (m) + 1)
 // Rounds `n` up to the next highest multiple of `m` if not already a multiple.
 #define ROUND_UP(n, m) ((((n) + (m) - 1) / (m)) * (m))

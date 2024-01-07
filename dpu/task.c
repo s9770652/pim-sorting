@@ -11,14 +11,14 @@
 #include "checkers.h"
 #include "random.h"
 
-#define LOAD_INTO_WRAM ((1024 * 50) >> DIV)  // maximum number of elements loaded into WRAM
+// maximum number of elements loaded into MRAM
 #define LOAD_INTO_MRAM ((1024 * 1024 * 50) >> DIV)
 #define PERF 1
 #define CHECK_ORDER 1
 
 __host dpu_arguments_t DPU_INPUT_ARGUMENTS;
-T __mram_noinit elements[LOAD_INTO_MRAM];
-static struct xorshift rngs[NR_TASKLETS];  // Contains the seeds for each tasklet.
+T __mram_noinit elements[LOAD_INTO_MRAM];  // array of random numbers
+static struct xorshift rngs[NR_TASKLETS];  // Contains the seed for each tasklet.
 #if PERF
 perfcounter_t cycles[NR_TASKLETS];  // Used to measure the time for each tasklet.
 #endif
@@ -27,19 +27,11 @@ bool sorted = true;
 MUTEX_INIT(sorted_mutex);
 #endif
 
-void insertion_sort(T arr[], int len) {
-    for (int i = 1; i < len; i++) {
-        T to_sort = arr[i];
-        int j = i;
-        while ((j > 0) && (arr[j-1] > to_sort)) {
-            arr[j] = arr[j - 1];
-            j--;
-        }
-        arr[j] = to_sort;
-    }
-}
-
 BARRIER_INIT(omni_barrier, NR_TASKLETS);
+
+inline uint32_t align(uint32_t to_align) {
+    return ROUND_UP_POW2(to_align << DIV, 8) >> DIV;
+}
 
 int main() {
     const thread_id_t tid = me();
@@ -48,13 +40,12 @@ int main() {
 #if PERF
         perfcounter_config(COUNT_CYCLES, true);
 #endif
-        printf("input length: %d\n", DPU_INPUT_ARGUMENTS.length);
-        printf("input size: %d\n", DPU_INPUT_ARGUMENTS.size);
-        printf("BLOCK_SIZE: %d\n", BLOCK_SIZE);
-        printf("HEAPPOINTER: %p\n", DPU_MRAM_HEAP_POINTER);
-        printf("T in MRAM: %d\n", LOAD_INTO_MRAM);
-        printf("free in MRAM: %d\n", 1024*1024*64 - (uint32_t)DPU_MRAM_HEAP_POINTER);
-        printf("more T in MRAM: %d\n", (1024*1024*64 - (uint32_t)DPU_MRAM_HEAP_POINTER) >> DIV);
+        // printf("input length: %d\n", DPU_INPUT_ARGUMENTS.length);
+        // printf("BLOCK_SIZE: %d\n", BLOCK_SIZE);
+        // printf("HEAPPOINTER: %p\n", DPU_MRAM_HEAP_POINTER);
+        // printf("T in MRAM: %d\n", LOAD_INTO_MRAM);
+        // printf("free in MRAM: %d\n", 1024*1024*64 - (uint32_t)DPU_MRAM_HEAP_POINTER);
+        // printf("more T in MRAM: %d\n", (1024*1024*64 - (uint32_t)DPU_MRAM_HEAP_POINTER) >> DIV);
     }
     barrier_wait(&omni_barrier);
 
@@ -62,11 +53,16 @@ int main() {
     // input length per DPU in number of elements
     const uint32_t length = DPU_INPUT_ARGUMENTS.length;
     // input length such that the size is aligned on 8 bytes
-    const uint32_t length_aligned = ROUND_UP_POW2(length << DIV, 8) >> DIV;
+    const uint32_t length_aligned = align(length);
     // maxmium length of each block
     const uint32_t block_length = BLOCK_SIZE >> DIV;
-    // // start of the tasklet's first processing block in MRAM
-    const uint32_t offset = (tid * block_length) >> DIV;
+    // maximum number of elements in the subarray filled by each tasklet
+    const uint32_t part_length = align(DIV_CEIL(length, NR_TASKLETS));
+    // start of the tasklet's subarray
+    const uint32_t part_start = tid * part_length;
+    // end of the tasklet's subarray
+    const uint32_t part_end = (tid == NR_TASKLETS - 1) ? length : part_start + part_length;
+    const uint32_t part_end_aligned = align(part_end);
 
     /* Write random numbers onto the MRAM. */
     rngs[tid] = seed_xs(tid + 0b100111010);  // The binary number is arbitrarily chosen to introduce some 1s to improve the seed.
@@ -74,15 +70,18 @@ int main() {
     cycles[tid] = perfcounter_get();
 #endif
     // Initialize a local cache to store one MRAM block.
-    __dma_aligned T *cache = (T *) mem_alloc(BLOCK_SIZE);
-    uint32_t curr_size = BLOCK_SIZE;
-    for (uint32_t i = offset; i < length; i += block_length * NR_TASKLETS) {
-        if (i + block_length > length_aligned) {
-            curr_size = (length_aligned - i) << DIV;
+    T *cache = mem_alloc(BLOCK_SIZE);  // todo: cast needed?
+    uint32_t curr_length = block_length;  // number of elements read at once
+    uint32_t curr_size = BLOCK_SIZE;  // size of elements read at once
+    for (uint32_t i = part_start; i < part_end; i += block_length) {
+        if (i + block_length > part_end) {
+            curr_length = part_end - i;
+            curr_size = (part_end_aligned - i) << DIV;
         }
-        for (uint32_t j = 0; j < curr_size >> DIV; j++) {
-            // cache[j] = rr((T)DPU_INPUT_ARGUMENTS.upper_bound, &rngs[tid]);
-            cache[j] = i + j;
+        for (uint32_t j = 0; j < curr_length; j++) {
+            cache[j] = rr((T)DPU_INPUT_ARGUMENTS.upper_bound, &rngs[tid]);
+            // cache[j] = i + j;
+            // cache[j] = length - (i + j);
             // cache[j] = 0;
         }
         mram_write(cache, &elements[i], curr_size);
@@ -99,7 +98,19 @@ int main() {
 #endif
 
     /* Sort the elements. */
-    
+
+    // if (tid == 0) {
+    //     curr_size = BLOCK_SIZE;
+    //     T *testcache = mem_alloc(length_aligned << DIV);
+    //     for (uint32_t i = 0; i < length; i += block_length) {
+    //         if (i + block_length > length_aligned) {
+    //             curr_size = (length_aligned - i) << DIV;
+    //         }
+    //         mram_read(&elements[i], &testcache[i], curr_size);
+    //     }
+    //     print_array(testcache, length);
+    // }
+    // barrier_wait(&omni_barrier);
 
     /* Check if numbers were correctly sorted. */
 #if CHECK_ORDER
@@ -107,13 +118,15 @@ int main() {
     cycles[tid] = perfcounter_get();
 #endif
     curr_size = BLOCK_SIZE;
-    for (uint32_t i = offset; i < length; i += block_length * NR_TASKLETS) {
+    curr_length = block_length;
+    for (uint32_t i = part_start; i < part_end; i += block_length) {
         if (!sorted) break;
-        if (i + block_length > length_aligned) {
-            curr_size = (length_aligned - i) << DIV;
+        if (i + block_length > part_end) {
+            curr_length = part_end - i;
+            curr_size = (part_end_aligned - i) << DIV;
         }
         mram_read(&elements[i], cache, curr_size);
-        if (!is_sorted(cache, curr_size >> DIV) || (i > 0 && elements[i-1] > cache[0])) {
+        if (!is_sorted(cache, curr_length) || (i > 0 && elements[i-1] > cache[0])) {
             mutex_lock(sorted_mutex);
             sorted = false;
             mutex_unlock(sorted_mutex);
