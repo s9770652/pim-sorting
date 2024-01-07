@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <stdio.h>
 #include <stdint.h>
 
@@ -21,8 +22,8 @@ void get_time(perfcounter_t *cycles, char *label) {
     );
 }
 
-void print_array(T arr[], uint32_t len) {
-    for (uint32_t i = 0; i < len; i++) {
+void print_array(T arr[], size_t len) {
+    for (size_t i = 0; i < len; i++) {
 #if UINT32
         printf("%d ", arr[i]);
 #else
@@ -32,8 +33,8 @@ void print_array(T arr[], uint32_t len) {
     printf("\n");
 }
 
-bool is_sorted(T arr[], uint32_t len) {
-    for (uint32_t i = 1; i < len; i++) {
+bool is_sorted(T arr[], size_t len) {
+    for (size_t i = 1; i < len; i++) {
         if (arr[i-1] > arr[i]) {
             return false;
         }
@@ -41,19 +42,19 @@ bool is_sorted(T arr[], uint32_t len) {
     return true;
 }
 
-bool is_uniform(T arr[], uint32_t len, T upper_bound) {
+bool is_uniform(T arr[], size_t len, T upper_bound) {
     T* count = mem_alloc(upper_bound << DIV);
     for (T i = 0; i < upper_bound; i++) {
         count[i] = 0;
     }
     int64_t sum = 0;
-    for (uint32_t i = 0; i < len; i++) {
+    for (size_t i = 0; i < len; i++) {
         count[arr[i]]++;
         sum += arr[i];
     }
     float mean = (double)sum / len;
     float variance = 0;
-    for (uint32_t i = 0; i < upper_bound; i++) {
+    for (size_t i = 0; i < upper_bound; i++) {
         variance += ((float)i - mean) * ((float)i - mean) * count[i];
     }
     variance /= (len - 1);

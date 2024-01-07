@@ -8,6 +8,8 @@
  * The use of these functions is only intented for development purposes.
 **/
 
+#include <stddef.h>
+
 #include <perfcounter.h>
 
 #include "../support/common.h"
@@ -31,7 +33,7 @@ void get_time(perfcounter_t *cycles, char *label);
  * @param arr The array of integers to print.
  * @param len Up to which element to print (exclusive).
 **/
-void print_array(T arr[], uint32_t len);
+void print_array(T arr[], size_t len);
 
 /**
  * @fn is_sorted
@@ -42,7 +44,7 @@ void print_array(T arr[], uint32_t len);
  * 
  * @returns `1` if the array is sorted, elsewise `0`.
 **/
-bool is_sorted(T arr[], uint32_t len);
+bool is_sorted(T arr[], size_t len);
 
 /**
  * @fn is_uniform
@@ -55,6 +57,6 @@ bool is_sorted(T arr[], uint32_t len);
  * 
  * @returns `1` if the mean and variance deviate at most 10 % from the ideal, elsewise `0`.
 **/
-bool is_uniform(T arr[], uint32_t len, T upper_bound);
+bool is_uniform(T arr[], size_t len, T upper_bound);
 
 #endif  // _CHECKERS_H_

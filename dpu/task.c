@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <stdio.h>
 
 #include <alloc.h>
@@ -29,7 +30,7 @@ MUTEX_INIT(sorted_mutex);
 
 BARRIER_INIT(omni_barrier, NR_TASKLETS);
 
-inline uint32_t align(uint32_t to_align) {
+inline size_t align(size_t to_align) {
     return ROUND_UP_POW2(to_align << DIV, 8) >> DIV;
 }
 
@@ -51,18 +52,18 @@ int main() {
 
     /* Compute addresses and boundaries of arrays in WRAM and MRAM. */
     // input length per DPU in number of elements
-    const uint32_t length = DPU_INPUT_ARGUMENTS.length;
+    const size_t length = DPU_INPUT_ARGUMENTS.length;
     // input length such that the size is aligned on 8 bytes
-    const uint32_t length_aligned = align(length);
+    const size_t length_aligned = align(length);
     // maxmium length of each block
-    const uint32_t block_length = BLOCK_SIZE >> DIV;
+    const size_t block_length = BLOCK_SIZE >> DIV;
     // maximum number of elements in the subarray filled by each tasklet
-    const uint32_t part_length = align(DIV_CEIL(length, NR_TASKLETS));
+    const size_t part_length = align(DIV_CEIL(length, NR_TASKLETS));
     // start of the tasklet's subarray
-    const uint32_t part_start = tid * part_length;
+    const size_t part_start = tid * part_length;
     // end of the tasklet's subarray
-    const uint32_t part_end = (tid == NR_TASKLETS - 1) ? length : part_start + part_length;
-    const uint32_t part_end_aligned = align(part_end);
+    const size_t part_end = (tid == NR_TASKLETS - 1) ? length : part_start + part_length;
+    const size_t part_end_aligned = align(part_end);
 
     /* Write random numbers onto the MRAM. */
     rngs[tid] = seed_xs(tid + 0b100111010);  // The binary number is arbitrarily chosen to introduce some 1s to improve the seed.
@@ -71,14 +72,14 @@ int main() {
 #endif
     // Initialize a local cache to store one MRAM block.
     T *cache = mem_alloc(BLOCK_SIZE);  // todo: cast needed?
-    uint32_t curr_length = block_length;  // number of elements read at once
-    uint32_t curr_size = BLOCK_SIZE;  // size of elements read at once
-    for (uint32_t i = part_start; i < part_end; i += block_length) {
+    size_t curr_length = block_length;  // number of elements read at once
+    size_t curr_size = BLOCK_SIZE;  // size of elements read at once
+    for (size_t i = part_start; i < part_end; i += block_length) {
         if (i + block_length > part_end) {
             curr_length = part_end - i;
             curr_size = (part_end_aligned - i) << DIV;
         }
-        for (uint32_t j = 0; j < curr_length; j++) {
+        for (size_t j = 0; j < curr_length; j++) {
             cache[j] = rr((T)DPU_INPUT_ARGUMENTS.upper_bound, &rngs[tid]);
             // cache[j] = i + j;
             // cache[j] = length - (i + j);
@@ -119,7 +120,7 @@ int main() {
 #endif
     curr_size = BLOCK_SIZE;
     curr_length = block_length;
-    for (uint32_t i = part_start; i < part_end; i += block_length) {
+    for (size_t i = part_start; i < part_end; i += block_length) {
         if (!sorted) break;
         if (i + block_length > part_end) {
             curr_length = part_end - i;
