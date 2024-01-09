@@ -35,8 +35,7 @@ inline size_t align(size_t to_align) {
 }
 
 int main() {
-    const thread_id_t tid = me();
-    if (tid == 0) {
+    if (me() == 0) {
         mem_reset();
 #if PERF
         perfcounter_config(COUNT_CYCLES, true);
@@ -61,15 +60,15 @@ int main() {
     // maximum number of elements in the subarray filled by each tasklet
     const size_t part_length = align(DIV_CEIL(length, NR_TASKLETS));
     // start of the tasklet's subarray
-    const size_t part_start = tid * part_length;
+    const size_t part_start = me() * part_length;
     // end of the tasklet's subarray
-    const size_t part_end = (tid == NR_TASKLETS - 1) ? length : part_start + part_length;
+    const size_t part_end = (me() == NR_TASKLETS - 1) ? length : part_start + part_length;
     const size_t part_end_aligned = align(part_end);
 
     /* Write random numbers onto the MRAM. */
-    rngs[tid] = seed_xs(tid + 0b100111010);  // The binary number is arbitrarily chosen to introduce some 1s to improve the seed.
+    rngs[me()] = seed_xs(me() + 0b100111010);  // The binary number is arbitrarily chosen to introduce some 1s to improve the seed.
 #if PERF
-    cycles[tid] = perfcounter_get();
+    cycles[me()] = perfcounter_get();
 #endif
     // Initialize a local cache to store one MRAM block.
     T *cache = mem_alloc(BLOCK_SIZE);  // todo: cast needed?
@@ -81,7 +80,7 @@ int main() {
             curr_size = (part_end_aligned - i) << DIV;
         }
         for (size_t j = 0; j < curr_length; j++) {
-            cache[j] = rr((T)DPU_INPUT_ARGUMENTS.upper_bound, &rngs[tid]);
+            cache[j] = rr((T)DPU_INPUT_ARGUMENTS.upper_bound, &rngs[me()]);
             // cache[j] = i + j;
             // cache[j] = length - (i + j);
             // cache[j] = 0;
@@ -89,11 +88,11 @@ int main() {
         mram_write(cache, &elements[i], curr_size);
     }
 #if PERF
-    cycles[tid] = perfcounter_get() - cycles[tid];
+    cycles[me()] = perfcounter_get() - cycles[me()];
 #endif
     barrier_wait(&omni_barrier);
 #if PERF
-    if (tid == 0) {
+    if (me() == 0) {
         get_time(cycles, "MEMORY");
     }
     barrier_wait(&omni_barrier);
@@ -101,7 +100,7 @@ int main() {
 
     /* Sort the elements. */
 
-    // if (tid == 0) {
+    // if (me() == 0) {
     //     const size_t length_aligned = align(length);
     //     curr_size = BLOCK_SIZE;
     //     T *testcache = mem_alloc(length_aligned << DIV);
@@ -118,7 +117,7 @@ int main() {
     /* Check if numbers were correctly sorted. */
 #if CHECK_ORDER
 #if PERF
-    cycles[tid] = perfcounter_get();
+    cycles[me()] = perfcounter_get();
 #endif
     curr_size = BLOCK_SIZE;
     curr_length = block_length;
@@ -137,16 +136,16 @@ int main() {
         }
     }
 #if PERF
-    cycles[tid] = perfcounter_get() - cycles[tid];
+    cycles[me()] = perfcounter_get() - cycles[me()];
 #endif
     barrier_wait(&omni_barrier);
 #if PERF
-    if (tid == 0) {
+    if (me() == 0) {
         get_time(cycles, "CHECK");
     }
     barrier_wait(&omni_barrier);
 #endif
-    if (tid == 0) {
+    if (me() == 0) {
         if (sorted) {
             printf("[" ANSI_COLOR_GREEN "OK" ANSI_COLOR_RESET "] Elements are sorted.\n");
         } else {
