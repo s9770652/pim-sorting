@@ -24,7 +24,7 @@ static struct xorshift rngs[NR_TASKLETS];  // Contains the seed for each tasklet
 perfcounter_t cycles[NR_TASKLETS];  // Used to measure the time for each tasklet.
 #endif
 #if CHECK_ORDER
-bool sorted = true;
+bool sorted;
 MUTEX_INIT(sorted_mutex);
 #endif
 
@@ -41,6 +41,9 @@ int main() {
 #if PERF
         perfcounter_config(COUNT_CYCLES, true);
 #endif
+#if CHECK_ORDER
+        sorted = true;
+#endif
         // printf("input length: %d\n", DPU_INPUT_ARGUMENTS.length);
         // printf("BLOCK_SIZE: %d\n", BLOCK_SIZE);
         // printf("HEAPPOINTER: %p\n", DPU_MRAM_HEAP_POINTER);
@@ -53,8 +56,6 @@ int main() {
     /* Compute addresses and boundaries of arrays in WRAM and MRAM. */
     // input length per DPU in number of elements
     const size_t length = DPU_INPUT_ARGUMENTS.length;
-    // input length such that the size is aligned on 8 bytes
-    const size_t length_aligned = align(length);
     // maxmium length of each block
     const size_t block_length = BLOCK_SIZE >> DIV;
     // maximum number of elements in the subarray filled by each tasklet
@@ -101,6 +102,7 @@ int main() {
     /* Sort the elements. */
 
     // if (tid == 0) {
+    //     const size_t length_aligned = align(length);
     //     curr_size = BLOCK_SIZE;
     //     T *testcache = mem_alloc(length_aligned << DIV);
     //     for (uint32_t i = 0; i < length; i += block_length) {
