@@ -7,6 +7,6 @@
 
 void insertion_sort(T arr[], size_t len);
 
-void sort(T __mram_ptr *elements, T *cache, const size_t offset, const size_t length, const size_t length_aligned, const size_t block_length);
+void sort(T __mram_ptr *elements, T *cache);
 
 #endif  // _SORT_H_
