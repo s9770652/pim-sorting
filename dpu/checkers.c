@@ -3,10 +3,13 @@
 #include <stdint.h>
 
 #include <alloc.h>
+#include <mutex.h>
 #include <perfcounter.h>
 
 #include "../support/common.h"
 #include "checkers.h"
+
+MUTEX_INIT(printing);
 
 void get_time(perfcounter_t *cycles, char *label) {
     perfcounter_t cycles_total = 0, cycles_max = 0;
@@ -23,14 +26,16 @@ void get_time(perfcounter_t *cycles, char *label) {
 }
 
 void print_array(T arr[], size_t len) {
+    mutex_lock(printing);
     for (size_t i = 0; i < len; i++) {
 #if UINT32
-        printf("%d ", arr[i]);
+        printf("%3d ", arr[i]);
 #else
-        printf("%lu ", arr[i]);
+        printf("%3lu ", arr[i]);
 #endif
     }
     printf("\n");
+    mutex_unlock(printing);
 }
 
 bool is_sorted(T arr[], size_t len) {
