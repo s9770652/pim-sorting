@@ -29,21 +29,9 @@ void insertion_sort(T arr[], size_t len) {
     }
 }
 
-// todo: Adher to INSERTION_SIZE.
-bool sort(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range range) {
-    size_t i, curr_length, curr_size;
-    /* Insertion sort by each tasklet. */
-    LOOP_ON_MRAM(i, curr_length, curr_size, range) {
-        mram_read(&input[i], cache, curr_size);
-        insertion_sort(cache, curr_length);
-        mram_write(cache, &input[i], curr_size);
-    }
-    barrier_wait(&sort_barrier);  // todo: replaceable by a handshake?
-
-    /* Merge by tasklets. */
+bool merge(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range range) {
     seqreader_buffer_t buffers[2] = { seqread_alloc(), seqread_alloc() };
     seqreader_t sr[2];
-    T *out = cache;
     bool flipped = false;
     for (uint32_t run = BLOCK_LENGTH; run < range.end - range.start; run <<= 1) {
         for (uint32_t j = range.start; j < range.end; j += run << 1) {
@@ -58,35 +46,35 @@ bool sort(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range 
                 if (*ptr[!active] < *ptr[active]) {
                     active = !active;
                 }
-                out[ptr_out++] = *ptr[active];
+                cache[ptr_out++] = *ptr[active];
                 if (seqread_tell(ptr[active], &sr[active]) == ends[active]) {
                     // Fill `cache_out` up so that both it and the rest of `cache_in2` have a size aligned on 8 bytes.
                     // todo: fill up only as little as possible? Worth the extra checks/calculations? Though might be more costly due to more mram_writes!
                     for (uint32_t rest = ptr_out; rest < BLOCK_LENGTH; rest++) {
-                        out[rest] = *ptr[!active];
+                        cache[rest] = *ptr[!active];
                         ptr[!active] = seqread_get(ptr[!active], sizeof(T), &sr[!active]);
                     }
                     // Empty `cache_out`.
-                    mram_write(out, &output[j + filled_out], BLOCK_SIZE);
+                    mram_write(cache, &output[j + filled_out], BLOCK_SIZE);
                     filled_out += BLOCK_LENGTH;
                     // Empty `ptr[!active]`.
                     ptr_out = 0;
                     while (seqread_tell(ptr[!active], &sr[!active]) != ends[!active]+1) {
-                        out[ptr_out++] = *ptr[!active];
+                        cache[ptr_out++] = *ptr[!active];
                         ptr[!active] = seqread_get(ptr[!active], sizeof(T), &sr[!active]);
                         if (ptr_out == BLOCK_LENGTH) {
-                            mram_write(out, &output[j + filled_out], BLOCK_SIZE);
+                            mram_write(cache, &output[j + filled_out], BLOCK_SIZE);
                             filled_out += BLOCK_LENGTH;
                             ptr_out = 0;
                         }
                     }
                     if (filled_out != (run << 1)) {
-                        mram_write(out, &output[j + filled_out], (BLOCK_LENGTH - ptr_out) << DIV);
+                        mram_write(cache, &output[j + filled_out], (BLOCK_LENGTH - ptr_out) << DIV);
                     }
                     break;
                 }
                 if (ptr_out == BLOCK_LENGTH) {
-                    mram_write(out, &output[j + filled_out], BLOCK_SIZE);
+                    mram_write(cache, &output[j + filled_out], BLOCK_SIZE);
                     ptr_out = 0;
                     filled_out += BLOCK_LENGTH;
                 }
@@ -99,4 +87,18 @@ bool sort(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range 
         flipped = !flipped;
     }
     return flipped;
+}
+
+// todo: Adher to INSERTION_SIZE.
+bool sort(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range range) {
+    size_t i, curr_length, curr_size;
+    /* Insertion sort by each tasklet. */
+    LOOP_ON_MRAM(i, curr_length, curr_size, range) {
+        mram_read(&input[i], cache, curr_size);
+        insertion_sort(cache, curr_length);
+        mram_write(cache, &input[i], curr_size);
+    }
+    barrier_wait(&sort_barrier);  // todo: replaceable by a handshake?
+    /* Merge by tasklets. */
+    return merge(input, output, cache, range);
 }
