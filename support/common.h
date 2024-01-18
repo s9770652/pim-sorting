@@ -10,12 +10,14 @@
 #define DIV 3  // Shift right to divide by sizeof(T).
 #endif
 
+#define BLOCK_LENGTH (BLOCK_SIZE >> DIV)
+
 // Structures used by both the host and the dpu to communicate information
-typedef struct {
+struct dpu_arguments {
     uint32_t length;  // number of elements to sort
     uint32_t size;  // size sof all elements to sort (aligned on 8 bytes)
     uint64_t upper_bound;  // maximum value (exclusive) of range to draw from TODO: convert to T (mind the sizeof(dpu_arguments_t))
-} dpu_arguments_t;
+};
 
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"

@@ -1,16 +1,17 @@
 #ifndef _PARAMS_H_
 #define _PARAMS_H_
 
+#include <assert.h>
 #include <getopt.h>
 
 #include "common.h"
 
-typedef struct Params {
+struct Params {
     unsigned int length;
     T upper_bound;
     int n_warmup;
     int n_reps;
-} Params;
+};
 
 static void usage() {
     fprintf(stderr,
@@ -27,7 +28,7 @@ static void usage() {
 
 struct Params input_params(int argc, char **argv) {
     struct Params p;
-    p.length = 4096;
+    p.length = 256 * (1 << 0);
     p.upper_bound = 8;
     p.n_warmup = 1;
     p.n_reps = 3;

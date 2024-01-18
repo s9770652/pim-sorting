@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -7,6 +6,17 @@
 
 #include "../support/common.h"
 #include "../support/params.h"
+
+// Sanity Checks
+#if (BLOCK_SIZE > 2048)
+#error `BLOCK_SIZE` too big! `mram_read` and `mram_write` can transfer at most 2048 bytes.
+#endif
+#if (BLOCK_SIZE < 8)
+#error `BLOCK_SIZE` too small! `mram_read` and `mram_write` must transfer at least 8 bytes.
+#endif
+#if (BLOCK_SIZE % 8)
+#error `BLOCK_SIZE` is not divisble by eight! Accesses to MRAM must be aligned on 8 bytes.
+#endif
 
 static void free_dpus(struct dpu_set_t set) {
     DPU_ASSERT(dpu_free(set));
@@ -19,15 +29,12 @@ static void alloc_dpus(struct dpu_set_t *set, uint32_t *nr_dpus) {
 }
 
 int main(int argc, char** argv) {
-    assert(BLOCK_SIZE <= 2048);  // `mram_read` can read at most 2048 = 1 << 11 bytes at a time.
-    assert(!(BLOCK_SIZE % 8));  // Accesses to MRAM must be aligned on 8 bytes.
-
     struct dpu_set_t set, dpu;
     uint32_t nr_dpus;
     alloc_dpus(&set, &nr_dpus);
 
     struct Params p = input_params(argc, argv);
-    dpu_arguments_t input_arguments = {
+    struct dpu_arguments input_arguments = {
         p.length,
         ROUND_UP_POW2(p.length * sizeof(T), 8),
         p.upper_bound
