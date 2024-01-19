@@ -70,7 +70,7 @@ int main() {
     /* Write random numbers onto the MRAM. */
     rngs[me()] = seed_xs(me() + 0b100111010);  // The binary number is arbitrarily chosen to introduce some 1s to improve the seed.
     // Initialize a local cache to store one MRAM block.
-    T *cache = mem_alloc(3 * BLOCK_SIZE);
+    T *cache = mem_alloc(BLOCK_SIZE);
 #if PERF
     cycles[me()] = perfcounter_get();
 #endif
