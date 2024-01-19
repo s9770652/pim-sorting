@@ -39,7 +39,7 @@ bool merge(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range
                 seqread_init(buffers[0], &input[j], &sr[0]),
                 seqread_init(buffers[1], &input[j + run], &sr[1])
             };
-            const T __mram_ptr *ends[2] = { &input[j + run - 1], &input[j + run + run - 1] };
+            const T __mram_ptr *ends[2] = { &input[j + run], &input[j + run + run] };
             bool active = 0;
             size_t ptr_out = 0, filled_out = 0;
             while (1) {
@@ -47,6 +47,7 @@ bool merge(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range
                     active = !active;
                 }
                 cache[ptr_out++] = *ptr[active];
+                ptr[active] = seqread_get(ptr[active], sizeof(T), &sr[active]);
                 if (seqread_tell(ptr[active], &sr[active]) == ends[active]) {
                     // Fill `cache_out` up so that both it and the rest of `cache_in2` have a size aligned on 8 bytes.
                     // todo: fill up only as little as possible? Worth the extra checks/calculations? Though might be more costly due to more mram_writes!
@@ -57,9 +58,9 @@ bool merge(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range
                     // Empty `cache_out`.
                     mram_write(cache, &output[j + filled_out], BLOCK_SIZE);
                     filled_out += BLOCK_LENGTH;
-                    // Empty `ptr[!active]`.
+                    // Finish reading `ptr[!active]`.
                     ptr_out = 0;
-                    while (seqread_tell(ptr[!active], &sr[!active]) != ends[!active]+1) {
+                    while (seqread_tell(ptr[!active], &sr[!active]) != ends[!active]) {
                         cache[ptr_out++] = *ptr[!active];
                         ptr[!active] = seqread_get(ptr[!active], sizeof(T), &sr[!active]);
                         if (ptr_out == BLOCK_LENGTH) {
@@ -78,7 +79,6 @@ bool merge(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range
                     ptr_out = 0;
                     filled_out += BLOCK_LENGTH;
                 }
-                ptr[active] = seqread_get(ptr[active], sizeof(T), &sr[active]);
             }
         }
         T __mram_ptr *tmp = input;
