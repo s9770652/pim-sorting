@@ -63,9 +63,7 @@ int main() {
     const size_t part_start = me() * part_length;
     // end of the tasklet's subarray
     const size_t part_end = (me() == NR_TASKLETS - 1) ? length : part_start + part_length;
-    // end of the tasklet's subarray, aligned on 8 bytes
-    const size_t part_end_aligned = (me() == NR_TASKLETS - 1) ? align(part_end) : part_end;
-    const struct mram_range range = { part_start, part_end, part_end_aligned };
+    const struct mram_range range = { part_start, part_end };
 
     /* Write random numbers onto the MRAM. */
     rngs[me()] = seed_xs(me() + 0b100111010);  // The binary number is arbitrarily chosen to introduce some 1s to improve the seed.
@@ -101,7 +99,7 @@ int main() {
     size_t cnts[8] = {0, 0, 0, 0, 0, 0, 0, 0};
     if (me() == 0) {
         printf("Before sorting:\n");
-        mram_range testrange = { 0, length, length };
+        mram_range testrange = { 0, length };
         LOOP_ON_MRAM(i, curr_length, curr_size, testrange) {
             mram_read(&input[i], cache, curr_size);
             // print_array(cache, curr_length);
@@ -138,7 +136,7 @@ int main() {
     size_t cntso[8] = {0, 0, 0, 0, 0, 0, 0, 0};
     if (me() == 0) {
         printf("After sorting:\n");
-        mram_range testrange = { 0, length, length };
+        mram_range testrange = { 0, length };
         LOOP_ON_MRAM(i, curr_length, curr_size, testrange) {
             mram_read(&within[i], cache, curr_size);
             // print_array(cache, curr_length);

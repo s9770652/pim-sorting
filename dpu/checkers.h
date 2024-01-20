@@ -23,8 +23,6 @@ typedef struct mram_range {
     uint32_t start;
     /// @brief The first index to not include.
     uint32_t end;
-    /// @brief The first index to not include. Must be chosen such that the size is aligned on 8 bytes.
-    uint32_t end_aligned;
 } mram_range;
 
 /**
@@ -39,11 +37,11 @@ typedef struct mram_range {
 for (                                                                                              \
     i = range.start,                                                                               \
     curr_length = (i + BLOCK_LENGTH > range.end) ? range.end - i : BLOCK_LENGTH,                   \
-    curr_size = (i + BLOCK_LENGTH > range.end) ? (range.end_aligned - i) << DIV : BLOCK_SIZE;      \
+    curr_size = (i + BLOCK_LENGTH > range.end) ? ROUND_UP_POW2(curr_length << DIV, 8) : BLOCK_SIZE;      \
     i < range.end;                                                                                 \
     i += BLOCK_LENGTH,                                                                             \
     curr_length = (i + BLOCK_LENGTH > range.end) ? range.end - i : BLOCK_LENGTH,                   \
-    curr_size = (i + BLOCK_LENGTH > range.end) ? (range.end_aligned - i) << DIV : BLOCK_SIZE       \
+    curr_size = (i + BLOCK_LENGTH > range.end) ? ROUND_UP_POW2(curr_length << DIV, 8) : BLOCK_SIZE       \
 )
 
 /**
