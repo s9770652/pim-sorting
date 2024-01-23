@@ -33,10 +33,10 @@ void deplete_reader(T __mram_ptr *output, T *cache, size_t i, T *ptr, seqreader_
         const T __mram_ptr *end, size_t written) {
     // Fill `cache` up before writing it to `output`.
     // todo: fill up only as little as possible? Worth the extra checks/calculations? Though might be more costly due to more mram_writes!
-    do {
+    while (i < BLOCK_LENGTH && seqread_tell(ptr, sr) != end) {
         cache[i++] = *ptr;
         ptr = seqread_get(ptr, sizeof(T), sr);
-    } while (i < BLOCK_LENGTH && seqread_tell(ptr, sr) != end);
+    };
     mram_write(cache, &output[written], ROUND_UP_POW2(i << DIV, 8));
     written += i;
     // If the reader still has unread elements, write them to the cache
