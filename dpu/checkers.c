@@ -26,15 +26,18 @@ void get_time(perfcounter_t *cycles, char *label) {
 }
 
 void print_array(T arr[], size_t len) {
+    char colours[8][9] = { "\x1b[0;100m", "\x1b[0;101m", "\x1b[0;102m", "\x1b[0;103m", "\x1b[0;104m", "\x1b[0;105m", "\x1b[0;106m", "\x1b[0;107m" };
+    char *col;
     mutex_lock(printing);
     for (size_t i = 0; i < len; i++) {
+        col = (arr[i] < 8) ? colours[arr[i]] : ANSI_COLOR_RESET;
 #if UINT32
-        printf("%3d ", arr[i]);
+        printf("%s%3d ", col, arr[i]);
 #else
-        printf("%3lu ", arr[i]);
+        printf("%s%3lu ", col, arr[i]);
 #endif
     }
-    printf("\n");
+    printf(ANSI_COLOR_RESET "\n");
     mutex_unlock(printing);
 }
 
