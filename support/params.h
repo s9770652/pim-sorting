@@ -7,10 +7,10 @@
 #include "common.h"
 
 struct Params {
-    unsigned int length;
+    unsigned length;
     T upper_bound;
-    int n_warmup;
-    int n_reps;
+    unsigned n_warmup;
+    unsigned n_reps;
 };
 
 static void usage() {
@@ -40,10 +40,10 @@ struct Params input_params(int argc, char **argv) {
             usage();
             exit(0);
             break;
-        case 'n': p.length      = atoi(optarg); break;
-        case 'b': p.upper_bound = atoi(optarg); break;
-        case 'w': p.n_warmup    = atoi(optarg); break;
-        case 'r': p.n_reps      = atoi(optarg); break;
+        case 'n': p.length      = (unsigned)atof(optarg); break;
+        case 'b': p.upper_bound = (T)atof(optarg); break;
+        case 'w': p.n_warmup    = (unsigned)atof(optarg); break;
+        case 'r': p.n_reps      = (unsigned)atof(optarg); break;
         default:
             fprintf(stderr, "\nUnrecognized option!\n");
             usage();
