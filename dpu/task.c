@@ -13,7 +13,7 @@
 #include "sort.h"
 #include "random.h"
 
-// maximum number of elements loaded into MRAM
+// maximum number of elements loaded into MRAM (size must be divisible by 8)
 #define LOAD_INTO_MRAM ((1024 * 1024 * 25) >> DIV)
 #define PERF 1
 #define CHECK_SANITY 1
@@ -21,7 +21,9 @@
 __host struct dpu_arguments DPU_INPUT_ARGUMENTS;
 T __mram_noinit input[LOAD_INTO_MRAM];  // array of random numbers
 T __mram_noinit output[LOAD_INTO_MRAM];
+mram_range ranges[NR_TASKLETS];
 static struct xorshift rngs[NR_TASKLETS];  // Contains the seed for each tasklet.
+bool flipped;
 #if PERF
 perfcounter_t cycles[NR_TASKLETS];  // Used to measure the time for each tasklet.
 #endif
@@ -46,6 +48,7 @@ int main() {
         sorted = true;
 #endif
         printf("input length: %d\n", DPU_INPUT_ARGUMENTS.length);
+        printf("diff to max length: %d\n", LOAD_INTO_MRAM - DPU_INPUT_ARGUMENTS.length);
         printf("BLOCK_SIZE: %d\n", BLOCK_SIZE);
         // printf("HEAPPOINTER: %p\n", DPU_MRAM_HEAP_POINTER);
         // printf("T in MRAM: %d\n", 2 * LOAD_INTO_MRAM);
@@ -63,7 +66,9 @@ int main() {
     const size_t part_start = me() * part_length;
     // end of the tasklet's subarray
     const size_t part_end = (me() == NR_TASKLETS - 1) ? length : part_start + part_length;
-    const struct mram_range range = { part_start, part_end };
+    // mram_range range = { part_start, part_end };
+    ranges[me()].start = part_start;
+    ranges[me()].end = part_end;
 
     /* Write random numbers onto the MRAM. */
     rngs[me()] = seed_xs(me() + 0b100111010);  // The binary number is arbitrarily chosen to introduce some 1s to improve the seed.
@@ -73,7 +78,7 @@ int main() {
     cycles[me()] = perfcounter_get();
 #endif
     size_t i, curr_length, curr_size;
-    LOOP_ON_MRAM(i, curr_length, curr_size, range) {
+    LOOP_ON_MRAM(i, curr_length, curr_size, ranges[me()]) {
         for (size_t j = 0; j < curr_length; j++) {
             // cache[j] = rr((T)DPU_INPUT_ARGUMENTS.upper_bound, &rngs[me()]);
             cache[j] = (gen_xs(&rngs[me()]) & 7);
@@ -102,7 +107,8 @@ int main() {
         mram_range testrange = { 0, length };
         LOOP_ON_MRAM(i, curr_length, curr_size, testrange) {
             mram_read(&input[i], cache, curr_size);
-            // print_array(cache, curr_length);
+            if (length <= 2048)
+                print_array(cache, curr_length);
             for (size_t x = 0; x < curr_length; x++) {
                 sum += cache[x];
                 if (cache[x] < 8)
@@ -118,10 +124,11 @@ int main() {
 #if PERF
     cycles[me()] = perfcounter_get();
 #endif
-    int flipped = sort(input, output, cache, range);
+    bool flipped_own = sort(input, output, cache, ranges);
 #if PERF
     cycles[me()] = perfcounter_get() - cycles[me()];
 #endif
+    if (me() == 0) flipped = flipped_own;
     barrier_wait(&omni_barrier);
     T __mram_ptr *within = (flipped) ? output : input;
 #if PERF
@@ -139,7 +146,8 @@ int main() {
         mram_range testrange = { 0, length };
         LOOP_ON_MRAM(i, curr_length, curr_size, testrange) {
             mram_read(&within[i], cache, curr_size);
-            // print_array(cache, curr_length);
+            if (length <= 2048)
+                print_array(cache, curr_length);
             for (size_t x = 0; x < curr_length; x++) {
                 sumo += cache[x];
                 if (cache[x] < 8)
@@ -147,6 +155,9 @@ int main() {
             }
         }
         printf("sums: %lu %lu\n", sum, sumo);
+        if (sum != sumo) {
+            printf("[" ANSI_COLOR_RED "ERROR" ANSI_COLOR_RESET "] Sum of elements unequal.\n");
+        }
         printf("counts: ");
         for (size_t c = 0; c < 8; c++)
             printf("%d: %zu %zu  ", c, cnts[c], cntso[c]);
@@ -160,15 +171,17 @@ int main() {
 #if PERF
     cycles[me()] = perfcounter_get();
 #endif
-    LOOP_ON_MRAM(i, curr_length, curr_size, range) {
+    T prev = (me() == 0) ? 0 : within[ranges[me()].start-1];
+    LOOP_ON_MRAM(i, curr_length, curr_size, ranges[me()]) {
         if (!sorted) break;
         mram_read(&within[i], cache, curr_size);
-        if (!is_sorted(cache, curr_length) || (i > 0 && within[i-1] > cache[0])) {
+        if ((prev > cache[0]) || (!is_sorted(cache, curr_length))) {
             mutex_lock(sorted_mutex);
             sorted = false;
             mutex_unlock(sorted_mutex);
             break;
         }
+        prev = cache[BLOCK_LENGTH-1];
     }
 #if PERF
     cycles[me()] = perfcounter_get() - cycles[me()];
