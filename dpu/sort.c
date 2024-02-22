@@ -31,13 +31,13 @@ void insertion_sort(T arr[], size_t len) {
 __noinline void deplete_reader(T __mram_ptr *output, T *cache, size_t i, T *ptr, seqreader_t *sr,
         const T __mram_ptr *end, size_t written) {
     do {
-        if (i == BLOCK_LENGTH) {
-            mram_write(cache, &output[written], BLOCK_SIZE);
-            written += BLOCK_LENGTH;
-            i = 0;
-        }
+    if (i == BLOCK_LENGTH) {
+    mram_write(cache, &output[written], BLOCK_SIZE);
+    written += BLOCK_LENGTH;
+    i = 0;
+    }
         cache[i++] = *ptr;
-        ptr = seqread_get(ptr, sizeof(T), sr);
+    ptr = seqread_get(ptr, sizeof(T), sr);
     } while (seqread_tell(ptr, sr) != end);
     // If the cache is not full (because the reader did not read
     // a multiple of `BLOCK_LENGTH` many elements), write the remainder to `output`.
@@ -52,8 +52,8 @@ bool merge(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range
     bool flipped = false;  // Whether `input` or `output` contain the sorted elements.
     size_t initial_run_length = BLOCK_LENGTH;
     mram_range range = { ranges[me()].start, ranges[me()].end };
-    const sysname_t lasts[4] = { 1, 3, 7, 15 };
-    for (size_t x = 0; x < NR_TASKLETS_LOG+1; x++) {
+    // `brother_mask` is used to determine the brother node in the tournament tree.
+    for (size_t brother_mask = 1; true; brother_mask <<= 1) {
         for (size_t run = initial_run_length; run < range.end - range.start; run <<= 1) {
             for (size_t j = range.start; j < range.end; j += run << 1) {
                 // If it is just one run, there is nothing to merge.
@@ -99,15 +99,15 @@ bool merge(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range
             output = tmp;
             flipped = !flipped;
         }
-        if ((me() & (1 << x))) {
+        if ((me() & brother_mask)) {
             handshake_notify();
             break;
         } else {
-            if (x == NR_TASKLETS_LOG) break;
-            handshake_wait_for(me() + (1 << x));
+            if (brother_mask == NR_TASKLETS) break;
+            handshake_wait_for(me() | brother_mask);
         }
         initial_run_length = range.end - range.start;
-        range.end = ranges[ me() + lasts[x] ].end;
+        range.end = ranges[ me() | ((brother_mask << 1) - 1) ].end;
     }
     return flipped;
 }
