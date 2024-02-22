@@ -73,18 +73,19 @@ bool merge(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range
                     &input[(j + (run << 1) <= range.end) ? j + (run << 1) : range.end ]
                 };
                 size_t elems_left[2] = { run, ends[1] - ends[0] };
-                bool active = 0;
                 size_t i = 0, written = 0;
-                while (1) {
-                    if (*ptr[!active] < *ptr[active]) {
-                        active = !active;
+                while (true) {
+                    #define INSERT(ACT, PAS)                                                          \
+                    cache[i++] = *ptr[ACT];                                                           \
+                    ptr[ACT] = seqread_get(ptr[ACT], sizeof(T), &sr[ACT]);                            \
+                    if (--elems_left[ACT] == 0) {                                                     \
+                        deplete_reader(&output[j], cache, i, ptr[PAS], &sr[PAS], ends[PAS], written); \
+                        break;                                                                        \
                     }
-                    cache[i++] = *ptr[active];
-                    ptr[active] = seqread_get(ptr[active], sizeof(T), &sr[active]);
-                    // If a reader reached its end, deplete the other one without further comparisons.
-                    if (--elems_left[active] == 0) {
-                        deplete_reader(&output[j], cache, i, ptr[!active], &sr[!active], ends[!active], written);
-                        break;
+                    if (*ptr[0] < *ptr[1]) {
+                        INSERT(0, 1);
+                    } else {
+                        INSERT(1, 0);
                     }
                     // If the cache is full, write its content to `output`.
                     if (i == BLOCK_LENGTH) {
