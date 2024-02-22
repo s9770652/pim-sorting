@@ -72,6 +72,7 @@ bool merge(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range
                     &input[j + run],
                     &input[(j + (run << 1) <= range.end) ? j + (run << 1) : range.end ]
                 };
+                size_t elems_left[2] = { run, ends[1] - ends[0] };
                 bool active = 0;
                 size_t i = 0, written = 0;
                 while (1) {
@@ -81,7 +82,7 @@ bool merge(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range
                     cache[i++] = *ptr[active];
                     ptr[active] = seqread_get(ptr[active], sizeof(T), &sr[active]);
                     // If a reader reached its end, deplete the other one without further comparisons.
-                    if (seqread_tell(ptr[active], &sr[active]) == ends[active]) {
+                    if (--elems_left[active] == 0) {
                         deplete_reader(&output[j], cache, i, ptr[!active], &sr[!active], ends[!active], written);
                         break;
                     }
