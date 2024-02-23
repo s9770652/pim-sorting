@@ -12,18 +12,6 @@
 
 #define BLOCK_LENGTH (BLOCK_SIZE >> DIV)
 
-#if (NR_TASKLETS == 1)
-#define NR_TASKLETS_LOG 0
-#elif (NR_TASKLETS == 2)
-#define NR_TASKLETS_LOG 1
-#elif (NR_TASKLETS == 4)
-#define NR_TASKLETS_LOG 2
-#elif (NR_TASKLETS == 8)
-#define NR_TASKLETS_LOG 3
-#elif (NR_TASKLETS == 16)
-#define NR_TASKLETS_LOG 4
-#endif
-
 // Structures used by both the host and the dpu to communicate information
 struct dpu_arguments {
     uint32_t length;  // number of elements to sort
