@@ -151,7 +151,7 @@ int main() {
 #endif
 
 #if CHECK_SANITY
-    size_t counts_1[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    size_t counts_1[8] = {0};
     uint64_t sum_1 = get_sum(input, cache, counts_1, length, "Before sorting:\n");
     barrier_wait(&omni_barrier);
 #endif
@@ -176,7 +176,7 @@ int main() {
 
 #if CHECK_SANITY
     /* Check if the numbers stayed the same. */
-    size_t counts_2[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+    size_t counts_2[8] = {0};
     uint64_t sum_2 = get_sum(within, cache, counts_2, length, "After sorting:\n");
     if (me() == 0) {
         same_elems = sum_1 == sum_2;
