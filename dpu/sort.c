@@ -7,7 +7,6 @@
 #include <handshake.h>
 #include <mram.h>
 #include <seqread.h>
-#include <string.h>
 
 #include "../support/common.h"
 #include "checkers.h"
@@ -27,23 +26,29 @@ void insertion_sort(T arr[], size_t len) {
     }
 }
 
-// Inlining actually worsens performance.
-__noinline void deplete_reader(T __mram_ptr *output, T *cache, size_t i, T *ptr, seqreader_t *sr,
-        const T __mram_ptr *end, size_t written) {
+// todo: does inlining change performance?
+static void deplete(T __mram_ptr *input, T __mram_ptr *output, T *cache, T *ptr, size_t i, T __mram_ptr const *end) {
+    // Transfer cache to MRAM.
+#ifdef UINT32
+    if (i & 1) {  // Is there need for alignment?
+        cache[i++] = *ptr++;  // Possible since `ptr` must have at least one element.
+        if (++input == end) {
+            mram_write(cache, output, i << DIV);
+            return;
+        };
+    }
+#endif
+    mram_write(cache, output, i << DIV);
+
+    // Transfer from MRAM to MRAM.
+    output += i;
     do {
-    if (i == BLOCK_LENGTH) {
-    mram_write(cache, &output[written], BLOCK_SIZE);
-    written += BLOCK_LENGTH;
-    i = 0;
-    }
-        cache[i++] = *ptr;
-    ptr = seqread_get(ptr, sizeof(T), sr);
-    } while (seqread_tell(ptr, sr) != end);
-    // If the cache is not full (because the reader did not read
-    // a multiple of `BLOCK_LENGTH` many elements), write the remainder to `output`.
-    if (i != 0) {
-        mram_write(cache, &output[written], ROUND_UP_POW2(i << DIV, 8));
-    }
+        size_t rem_size = (input + BLOCK_LENGTH > end) ? (size_t)end - (size_t)input : BLOCK_SIZE;  // todo: does the compiler calculate the sum just once (by making it a subtraction)?
+        mram_read(input, cache, rem_size);
+        mram_write(cache, output, rem_size);
+        input += BLOCK_LENGTH;  // Value may be wrong for the last transfer …
+        output += BLOCK_LENGTH;  // … after which it is not needed anymore, however.
+    } while (input < end);
 }
 
 bool merge(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range ranges[NR_TASKLETS]) {
@@ -59,8 +64,12 @@ bool merge(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range
                 // If it is just one run, there is nothing to merge.
                 // Just move its elements immediately from `input` to `output`.
                 if (j + run >= range.end) {
-                    T *ptr = seqread_init(buffers[0], &input[j], &sr[0]);
-                    deplete_reader(&output[j], cache, 0, ptr, &sr[0], &input[range.end], 0);
+                    size_t i, curr_length, curr_size;
+                    mram_range deplete_range = { j, range.end };
+                    LOOP_ON_MRAM(i, curr_length, curr_size, deplete_range) {
+                        mram_read(&input[i], cache, curr_size);
+                        mram_write(cache, &output[i], curr_size);
+                    }
                     break;
                 }
                 // Otherwise, merging is needed.
@@ -75,12 +84,12 @@ bool merge(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range
                 size_t elems_left[2] = { run, ends[1] - ends[0] };
                 size_t i = 0, written = 0;
                 while (true) {
-                    #define INSERT(ACT, PAS)                                                          \
-                    cache[i++] = *ptr[ACT];                                                           \
-                    ptr[ACT] = seqread_get(ptr[ACT], sizeof(T), &sr[ACT]);                            \
-                    if (--elems_left[ACT] == 0) {                                                     \
-                        deplete_reader(&output[j], cache, i, ptr[PAS], &sr[PAS], ends[PAS], written); \
-                        break;                                                                        \
+                    #define INSERT(ACT, PAS)                                                                            \
+                    cache[i++] = *ptr[ACT];                                                                             \
+                    ptr[ACT] = seqread_get(ptr[ACT], sizeof(T), &sr[ACT]);                                              \
+                    if (--elems_left[ACT] == 0) {                                                                       \
+                        deplete(seqread_tell(ptr[PAS], &sr[PAS]), &output[j + written], cache, ptr[PAS], i, ends[PAS]); \
+                        break;                                                                                          \
                     }
                     if (*ptr[0] < *ptr[1]) {
                         INSERT(0, 1);

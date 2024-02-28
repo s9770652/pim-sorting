@@ -103,8 +103,13 @@ int main() {
     const size_t part_length = align(DIV_CEIL(length, NR_TASKLETS));
     // start of the tasklet's subarray
     const size_t part_start = me() * part_length;
+#ifdef UINT32
+    // end of the tasklet's subarray
+    const size_t part_end = (me() == NR_TASKLETS - 1) ? ROUND_UP_POW2(length, 2) : part_start + part_length;
+#else
     // end of the tasklet's subarray
     const size_t part_end = (me() == NR_TASKLETS - 1) ? length : part_start + part_length;
+#endif
     // mram_range range = { part_start, part_end };
     ranges[me()].start = part_start;
     ranges[me()].end = part_end;
@@ -127,6 +132,13 @@ int main() {
         }
         mram_write(cache, &input[i], curr_size);
     }
+#ifdef UINT32
+    // Add a dummy variable such that the last run has a length disible by 8.
+    // This way, depleting (cf. `sort.c`) need less meddling with unaligned addresses.
+    if (me() == NR_TASKLETS - 1 && length & 1) {
+        input[length] = UINT32_MAX;
+    }
+#endif
 #if PERF
     cycles[me()] = perfcounter_get() - cycles[me()];
 #endif
