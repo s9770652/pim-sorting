@@ -5,7 +5,6 @@
 #include <barrier.h>
 #include <defs.h>
 #include <mram.h>
-#include <mutex.h>
 #include <perfcounter.h>
 
 #include "../support/common.h"
@@ -29,60 +28,14 @@ BARRIER_INIT(omni_barrier, NR_TASKLETS);
 perfcounter_t cycles[NR_TASKLETS];  // Used to measure the time for each tasklet.
 #endif
 
-#if CHECK_SANITY
-bool same_elems, sorted;
-MUTEX_INIT(sorted_mutex);
-#endif
-
 
 inline size_t align(size_t to_align) {
     return ROUND_UP_POW2(to_align << DIV, 8) >> DIV;
 }
 
-/**
- * @brief Calculates the sum of a given MRAM array
- * and also prints its content if the length is at most 2048.
- * For this reason, this function is currently sequential.
- * @param array The MRAM array whose sum is to be calculated.
- * @param cache A cache in WRAM.
- * @param counts Array of occurrences of each array element smaller than 8.
- * Should be initialised to all zeroes.
- * @param length The length of the MRAM array.
- * @param label The text to be shown before the array is printed.
- * @return The sum of all elements in `array`.
- */
-uint64_t get_sum(T __mram_ptr *array, T *cache, size_t counts[8], size_t const length, char *label) {
-    if (me() != 0) return 0;
-    size_t max_length_to_print = 2048;
-    if (length <= max_length_to_print) {
-        printf("%s", label);
-    }
-    uint64_t sum = 0;
-    size_t i, curr_length, curr_size;
-    mram_range sum_range = { 0, length };
-    LOOP_ON_MRAM(i, curr_length, curr_size, sum_range) {
-        mram_read(&array[i], cache, curr_size);
-        if (length <= max_length_to_print) {
-            print_array(cache, curr_length);
-        }
-        for (size_t x = 0; x < curr_length; x++) {
-            sum += cache[x];
-            if (cache[x] < 8)
-                counts[cache[x]]++;
-        }
-    }
-    if (length <= max_length_to_print) {
-        printf("\n");
-    }
-    return sum;
-}
-
 int main() {
     if (me() == 0) {
         mem_reset();
-#if CHECK_SANITY
-        sorted = true;
-#endif
 #if PERF
         perfcounter_config(COUNT_CYCLES, true);
 #endif
@@ -144,15 +97,14 @@ int main() {
 #endif
     barrier_wait(&omni_barrier);
 #if PERF
-    if (me() == 0) {
-        get_time(cycles, "MEMORY");
-    }
+    print_time(cycles, "MEMORY");
     barrier_wait(&omni_barrier);
 #endif
 
 #if CHECK_SANITY
-    size_t counts_1[8] = {0};
-    uint64_t sum_1 = get_sum(input, cache, counts_1, length, "Before sorting:\n");
+    print_array(input, cache, length, "Before sorting");
+    array_stats *stats_1 = mem_alloc(sizeof(array_stats));
+    get_sum(input, cache, length, stats_1);
     barrier_wait(&omni_barrier);
 #endif
 
@@ -168,63 +120,30 @@ int main() {
     barrier_wait(&omni_barrier);
     T __mram_ptr *within = (flipped) ? output : input;
 #if PERF
-    if (me() == 0) {
-        get_time(cycles, "SORT");
-    }
+    print_time(cycles, "SORT");
     barrier_wait(&omni_barrier);
 #endif
 
 #if CHECK_SANITY
-    /* Check if the numbers stayed the same. */
-    size_t counts_2[8] = {0};
-    uint64_t sum_2 = get_sum(within, cache, counts_2, length, "After sorting:\n");
-    if (me() == 0) {
-        same_elems = sum_1 == sum_2;
-        for (size_t c = 0; c < 8; c++) {
-            same_elems = same_elems && counts_1[c] == counts_2[c];
-        }
-        if (!same_elems) {
-            printf("[" ANSI_COLOR_RED "ERROR" ANSI_COLOR_RESET "] Elements have changed.\n");
-            printf("\nSums: %lu ↔ %lu\nCounts: ", sum_1, sum_2);
-            for (size_t c = 0; c < 8; c++) {
-                printf("%d: %zu ↔ %zu   ", c, counts_1[c], counts_2[c]);
-            }
-            printf("\n");
-        }
-    }
-    barrier_wait(&omni_barrier);
-
-    /* Check if numbers were correctly sorted. */
+    print_array(input, cache, length, "After sorting");
 #if PERF
     cycles[me()] = perfcounter_get();
 #endif
-    T prev = (me() == 0) ? 0 : within[ranges[me()].start-1];
-    LOOP_ON_MRAM(i, curr_length, curr_size, ranges[me()]) {
-        if (!sorted) break;
-        mram_read(&within[i], cache, curr_size);
-        if ((prev > cache[0]) || (!is_sorted(cache, curr_length))) {
-            mutex_lock(sorted_mutex);
-            sorted = false;
-            mutex_unlock(sorted_mutex);
-            break;
-        }
-        prev = cache[BLOCK_LENGTH-1];
-    }
+    /* Check if the numbers stayed the same. */
+    array_stats *stats_2 = mem_alloc(sizeof(array_stats));
+    get_sum(within, cache, length, stats_2);
+    bool same_elems = compare_stats(stats_1, stats_2);
+    barrier_wait(&omni_barrier);
+
+    /* Check if numbers were correctly sorted. */
+    bool sorted = is_sorted(within, cache, ranges[me()]);
 #if PERF
     cycles[me()] = perfcounter_get() - cycles[me()];
+    print_time(cycles, "CHECK");
 #endif
-    barrier_wait(&omni_barrier);
-#if PERF
-    if (me() == 0) {
-        get_time(cycles, "CHECK");
-    }
-#endif
-    if (me() == 0) {
-        if (!sorted) {
-            printf("[" ANSI_COLOR_RED "ERROR" ANSI_COLOR_RESET "] Elements are not sorted.\n");
-        } else if (same_elems) {
-            printf("[" ANSI_COLOR_GREEN "OK" ANSI_COLOR_RESET "] Elements are sorted.\n");
-        }
+
+    if (me() == 0 && same_elems && sorted) {
+        printf("[" ANSI_COLOR_GREEN "OK" ANSI_COLOR_RESET "] Elements are correctly sorted.\n");
     }
 #endif
     return 0;
