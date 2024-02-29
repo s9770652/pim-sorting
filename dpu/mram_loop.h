@@ -1,10 +1,10 @@
-#ifndef _MRAM_LOOP_H_
-#define _MRAM_LOOP_H_
-
 /**
- * @file mram_loop.h
+ * @file
  * @brief Simple looping over arrays in MRAM.
 **/
+
+#ifndef _MRAM_LOOP_H_
+#define _MRAM_LOOP_H_
 
 #include <stddef.h>
 

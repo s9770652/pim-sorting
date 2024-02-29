@@ -1,8 +1,5 @@
-#ifndef _RANDOM_H_
-#define _RANDOM_H_
-
 /**
- * @file random.h
+ * @file
  * @brief Uniformly drawing 32-bit and 64-bit integers.
  * 
  * The length of the drawn integers is the same as that of `T`.
@@ -11,6 +8,9 @@
  * has shown them to be extremely performant on the UPMEM architecture.
  * This code draws from the code written by Geis.
 **/
+
+#ifndef _RANDOM_H_
+#define _RANDOM_H_
 
 #include "../support/common.h"
 

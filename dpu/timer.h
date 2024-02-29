@@ -1,10 +1,10 @@
-#ifndef _TIMER_H_
-#define _TIMER_H_
-
 /**
- * @file timer.h
+ * @file
  * @brief Displaying the time measured by multiple tasklets.
 **/
+
+#ifndef _TIMER_H_
+#define _TIMER_H_
 
 #include <perfcounter.h>
 

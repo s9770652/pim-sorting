@@ -1,12 +1,12 @@
-#ifndef _CHECKERS_H_
-#define _CHECKERS_H_
-
 /**
- * @file checkers.h
+ * @file
  * @brief Checking the sanity of generated and sorted numbers.
  * 
  * The use of some of these functions is intented for development purposes only.
 **/
+
+#ifndef _CHECKERS_H_
+#define _CHECKERS_H_
 
 #include <stddef.h>
 
