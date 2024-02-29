@@ -12,6 +12,9 @@
 #include "sort.h"
 #include "random.h"
 
+#ifdef PERF
+#include "timer.h"
+#endif
 #ifdef CHECK_SANITY
 #include "checkers.h"
 #endif

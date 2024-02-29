@@ -7,7 +7,6 @@
 #include <defs.h>
 #include <mram.h>
 #include <mutex.h>
-#include <perfcounter.h>
 #include <string.h>
 
 #include "../support/common.h"
@@ -21,21 +20,6 @@ bool sorted;
 MUTEX_INIT(printing_mutex);
 MUTEX_INIT(checking_mutex);
 BARRIER_INIT(checking_barrier, NR_TASKLETS);
-
-void print_time(perfcounter_t *cycles, char *label) {
-    if (me() != 0) return;
-    perfcounter_t cycles_total = 0, cycles_max = 0;
-    for (unsigned t = 0; t < NR_TASKLETS; t++) {
-        cycles_total += cycles[t];
-        cycles_max = cycles_max < cycles[t] ? cycles[t] : cycles_max;
-    }
-    printf(
-        "time (%s):\t%8.2f ms | %8.2f ms\n",
-        label,
-        (double)cycles_max / CLOCKS_PER_SEC * 1000,
-        (double)cycles_total / CLOCKS_PER_SEC * 1000
-    );
-}
 
 void print_array(T __mram_ptr *array, T *cache, size_t const length, char *label) {
     if (me() != 0) return;
