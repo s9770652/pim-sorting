@@ -37,7 +37,7 @@ void print_single_line(T *array, size_t length);
 #define NR_COUNTS 8
 /**
  * @brief The sum of all elements in some array and the counts of the first `NR_COUNTS` elements.
- */
+**/
 typedef struct array_stats
 {
     /// @brief The sum of all elements in some array.
@@ -53,10 +53,8 @@ typedef struct array_stats
  * 
  * @param array The MRAM array whose sum is to be calculated.
  * @param cache A cache in WRAM.
- * @param counts Array of occurrences of each array element smaller than 8.
- * Should be initialised to all zeroes.
  * @param length The length of the MRAM array.
- * @param label The text to be shown before the array is printed.
+ * @param result The struct where the results are stored.
  * 
  * @return The sum of all elements in `array`.
 **/
@@ -97,9 +95,11 @@ bool is_single_line_sorted(T *array, size_t length);
  * @brief Checks the mean and variance of an array of integers
  * and compares them with an ideal uniform distribution.
  * @note Currently sequentially implemented.
+ * @warning This function allocates `upper_bound` × `sizeof(T)` bytes.
  * 
  * @param array The array of integers to check.
  * @param length Up to which element to check the mean and variance.
+ * @param upper_bound The upper bound (exclusive) of the range whence the random numbers are drawn.
  * 
  * @returns `true` if the mean and variance deviate at most 10 % from the ideal, elsewise `false`.
 **/

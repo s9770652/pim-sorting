@@ -42,7 +42,8 @@ struct xorshift seed_xs(T seed);
 T gen_xs(struct xorshift *rng);
 
 /**
- * @brief RoundReject uniformly draws an integer by rounding `s` to the next highest power of 2 and using rejection sampling.
+ * @brief RoundReject uniformly draws an integer
+ * by rounding `s` to the next highest power of 2 and using rejection sampling.
  * 
  * @param s The upper limit (exclusive) of the range to draw from.
  * @param state The state from which to take the random integer.
