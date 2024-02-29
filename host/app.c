@@ -36,7 +36,6 @@ int main(int argc, char** argv) {
     struct Params p = input_params(argc, argv);
     struct dpu_arguments input_arguments = {
         p.length,
-        ROUND_UP_POW2(p.length * sizeof(T), 8),
         p.upper_bound
     };
     DPU_FOREACH(set, dpu) {

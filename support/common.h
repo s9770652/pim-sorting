@@ -15,7 +15,6 @@
 // Structures used by both the host and the dpu to communicate information
 struct dpu_arguments {
     uint32_t length;  // number of elements to sort
-    uint32_t size;  // size sof all elements to sort (aligned on 8 bytes)
     uint64_t upper_bound;  // maximum value (exclusive) of range to draw from TODO: convert to T (mind the sizeof(dpu_arguments_t))
 };
 
