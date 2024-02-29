@@ -15,7 +15,6 @@
 #include "../support/common.h"
 
 /**
- * @typedef xorshift
  * @brief A struct that contains a word of state for XorShift generators.
  * Should not be altered manually.
 **/
@@ -24,7 +23,6 @@ struct xorshift {
 };
 
 /**
- * @fn seed_xs
  * @brief Sets the initial word of state.
  * 
  * @param seed The initial word of state. Must be positive.
@@ -35,7 +33,6 @@ struct xorshift {
 struct xorshift seed_xs(T seed);
 
 /**
- * @fn gen_xs
  * @brief The XorShift generator generates a 32-bit / 64-bit uniformly drawn random number.
  * 
  * @param rng Word of state.
@@ -45,7 +42,6 @@ struct xorshift seed_xs(T seed);
 T gen_xs(struct xorshift *rng);
 
 /**
- * @fn rr
  * @brief RoundReject uniformly draws an integer by rounding `s` to the next highest power of 2 and using rejection sampling.
  * 
  * @param s The upper limit (exclusive) of the range to draw from.
