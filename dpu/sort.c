@@ -9,7 +9,7 @@
 #include <seqread.h>
 
 #include "../support/common.h"
-#include "checkers.h"
+#include "mram_loop.h"
 #include "sort.h"
 
 #define INSERTION_SIZE SEQREAD_CACHE_SIZE

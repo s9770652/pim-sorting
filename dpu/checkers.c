@@ -12,6 +12,7 @@
 
 #include "../support/common.h"
 #include "checkers.h"
+#include "mram_loop.h"
 
 uint64_t sums[NR_TASKLETS];
 size_t counts[NR_TASKLETS][NR_COUNTS];

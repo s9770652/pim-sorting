@@ -8,9 +8,13 @@
 #include <perfcounter.h>
 
 #include "../support/common.h"
-#include "checkers.h"
+#include "mram_loop.h"
 #include "sort.h"
 #include "random.h"
+
+#ifdef CHECK_SANITY
+#include "checkers.h"
+#endif
 
 // maximum number of elements loaded into MRAM (size must be divisible by 8)
 #define LOAD_INTO_MRAM ((1024 * 1024 * 25) >> DIV)
