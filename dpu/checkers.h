@@ -36,60 +36,53 @@ void print_single_line(T *array, size_t length);
 
 #define NR_COUNTS 8
 /**
- * @brief The sum of all elements in some array and the counts of the first `NR_COUNTS` elements.
+ * @brief Contains several statistical values about MRAM arrays.
 **/
 typedef struct array_stats
 {
     /// @brief The sum of all elements in some array.
     uint64_t sum;
-    /// @brief The counts of the first `NR_COUNTS` elements.
+    /// @brief The counts of the values in the range `[0, `NR_COUNTS - 1[`.
     size_t counts[NR_COUNTS];
+    /// @brief Whether the array is sorted.
+    bool sorted;
 } array_stats;
 
 /**
- * @brief Calculates the sum of a given MRAM array and gets the counts of each possible value.
+ * @brief Calcucates the sum and gets the value counts of an MRAM array.
  * 
- * @param array The MRAM array whose sum is to be calculated.
+ * @param array The MRAM array to check.
  * @param cache A cache in WRAM.
  * @param range The range of indices for the calling tasklet to check.
  * @param dummy Whether a dummy variable was set.
- * If present, it is excluded the statistics.
+ * If present, it is excluded from the statistics.
  * @param result The struct where the results are stored.
- * 
- * @return The sum of all elements in `array`.
+ * The value for `sorted` is undefined.
 **/
-void get_sum(T __mram_ptr *array, T *cache, mram_range range, bool dummy, array_stats *result);
+void get_stats_unsorted(T __mram_ptr const *array, T *cache, mram_range range,
+        bool dummy, array_stats *result);
 
 /**
- * @brief Checks whether the sums of two arrays and their counts of each possible value are equal.
+ * @brief Calulcates the sum and gets the value counts of an MRAM array.
+ * Also checks whether the array is sorted.
  * 
- * @param stats_1 The statistics of the first array.
- * @param stats_2 The statistics of the second array.
- * 
- * @return `true` if everything is equal, elsewise `false`.
-**/
-bool compare_stats(array_stats *stats_1, array_stats *stats_2);
-
-/**
- * @brief Checks whether a given MRAM array is sorted.
- * 
- * @param array The MRAM array to be checked.
+ * @param array The MRAM array to check.
  * @param cache A cache in WRAM.
  * @param range The range of indices for the calling tasklet to check.
- * 
- * @return `true` if everything is sorted, elsewise `false`.
+ * @param dummy Whether a dummy variable was set.
+ * If present, it is excluded from the statistics.
+ * @param result The struct where the results are stored.
 **/
-bool is_sorted(T __mram_ptr *array, T *cache, mram_range range);
+void get_stats_sorted(T __mram_ptr const *array, T *cache, mram_range range,
+        bool dummy, array_stats *result);
 
 /**
- * @brief Checks whether an array is sorted.
+ * @brief Compares two given stats and prints appropriate messages.
  * 
- * @param array The array of integers to check.
- * @param length Up to which element to check the order (exclusive).
- * 
- * @returns `true` if the array is sorted, elsewise `false`.
+ * @param stats_unsorted The statistics of the unsorted array.
+ * @param stats_sorted The statistics of the sorted array.
 **/
-bool is_single_line_sorted(T *array, size_t length);
+void compare_stats(array_stats const *stats_unsorted, array_stats const *stats_sorted);
 
 /**
  * @brief Checks the mean and variance of an array of integers

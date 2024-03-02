@@ -28,7 +28,7 @@ T __mram_noinit output[LOAD_INTO_MRAM];
 mram_range ranges[NR_TASKLETS];
 static struct xorshift rngs[NR_TASKLETS];  // Contains the seed for each tasklet.
 bool flipped;  // Whether `input` or `output` contains the final sorted sequence.
-bool dummies;  // Whether a dummy value was set at the end of the input sequence.
+bool dummy;  // Whether a dummy value was set at the end of the input sequence.
 
 BARRIER_INIT(omni_barrier, NR_TASKLETS);
 
@@ -44,7 +44,7 @@ inline size_t align(size_t to_align) {
 int main() {
     if (me() == 0) {
         mem_reset();
-        dummies = false;
+        dummy = false;
 #if PERF
         perfcounter_config(COUNT_CYCLES, true);
 #endif
@@ -79,7 +79,10 @@ int main() {
     /* Write random numbers onto the MRAM. */
     rngs[me()] = seed_xs(me() + 0b100111010);  // The binary number is arbitrarily chosen to introduce some 1s to improve the seed.
     // Initialize a local cache to store one MRAM block.
-    T *cache = mem_alloc(BLOCK_SIZE);
+    // In front of the cache is a dummy value, useful for sorting and checking the order.
+    size_t const dummy_size = (sizeof(T) >= 8) ? sizeof(T) : 8;
+    T *cache = mem_alloc(BLOCK_SIZE + dummy_size) + dummy_size;
+    cache[-1] = MIN_VALUE;
 #if PERF
     cycles[me()] = perfcounter_get();
 #endif
@@ -99,7 +102,7 @@ int main() {
     // This way, depleting (cf. `sort.c`) need less meddling with unaligned addresses.
     if (me() == NR_TASKLETS - 1 && length & 1) {
         input[length] = UINT32_MAX;
-        dummies = true;
+        dummy = true;
     }
 #endif
 #if PERF
@@ -113,8 +116,17 @@ int main() {
 
 #if CHECK_SANITY
     print_array(input, cache, length, "Before sorting");
+    barrier_wait(&omni_barrier);
+#if PERF
+    cycles[me()] = perfcounter_get();
+#endif
     array_stats *stats_1 = mem_alloc(sizeof(array_stats));
-    get_sum(input, cache, ranges[me()], dummies, stats_1);
+    get_stats_unsorted(input, cache, ranges[me()], dummy, stats_1);
+#if PERF
+    cycles[me()] = perfcounter_get() - cycles[me()];
+    barrier_wait(&omni_barrier);
+    print_time(cycles, "CHECK1");
+#endif
     barrier_wait(&omni_barrier);
 #endif
 
@@ -135,29 +147,19 @@ int main() {
 #endif
 
 #if CHECK_SANITY
-    print_array(input, cache, length, "After sorting");
+    print_array(within, cache, length, "After sorting");
+    barrier_wait(&omni_barrier);
 #if PERF
     cycles[me()] = perfcounter_get();
 #endif
-    // bool sorted = true;
-    bool same_elems = true;
-    /* Check if the numbers stayed the same. */
-    // array_stats *stats_2 = mem_alloc(sizeof(array_stats));
-    // get_sum(within, cache, ranges[me()], dummies, stats_2);
-    // bool same_elems = compare_stats(stats_1, stats_2);
-    // barrier_wait(&omni_barrier);
-
-    /* Check if numbers were correctly sorted. */
-    bool sorted = is_sorted(within, cache, ranges[me()]);
+    array_stats *stats_2 = mem_alloc(sizeof(array_stats));
+    get_stats_sorted(within, cache, ranges[me()], dummy, stats_2);
 #if PERF
     cycles[me()] = perfcounter_get() - cycles[me()];
     barrier_wait(&omni_barrier);
-    print_time(cycles, "CHECK");
+    print_time(cycles, "CHECK2");
 #endif
-
-    if (me() == 0 && same_elems && sorted) {
-        printf("[" ANSI_COLOR_GREEN "OK" ANSI_COLOR_RESET "] Elements are correctly sorted.\n");
-    }
+    compare_stats(stats_1, stats_2);
 #endif
     return 0;
 }
