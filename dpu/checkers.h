@@ -47,18 +47,18 @@ typedef struct array_stats
 } array_stats;
 
 /**
- * @brief Calculates the sum of a given MRAM array
- * and also prints its content if the length is at most 2048.
- * For this reason, this function is currently sequential.
+ * @brief Calculates the sum of a given MRAM array and gets the counts of each possible value.
  * 
  * @param array The MRAM array whose sum is to be calculated.
  * @param cache A cache in WRAM.
- * @param length The length of the MRAM array.
+ * @param range The range of indices for the calling tasklet to check.
+ * @param dummy Whether a dummy variable was set.
+ * If present, it is excluded the statistics.
  * @param result The struct where the results are stored.
  * 
  * @return The sum of all elements in `array`.
 **/
-void get_sum(T __mram_ptr *array, T *cache, size_t const length, array_stats *result);
+void get_sum(T __mram_ptr *array, T *cache, mram_range range, bool dummy, array_stats *result);
 
 /**
  * @brief Checks whether the sums of two arrays and their counts of each possible value are equal.

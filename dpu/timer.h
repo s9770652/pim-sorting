@@ -19,4 +19,4 @@
 **/
 void print_time(perfcounter_t *cycles, char *label);
 
-#endif
+#endif  // _TIMER_H_

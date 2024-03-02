@@ -50,20 +50,19 @@ void print_single_line(T *cache, size_t length) {
     mutex_unlock(printing_mutex);
 }
 
-void get_sum(T __mram_ptr *array, T *cache, size_t const length, array_stats *result) {
+void get_sum(T __mram_ptr *array, T *cache, mram_range range, bool dummy, array_stats *result) {
     sums[me()] = 0;
     for (size_t i = 0; i < NR_COUNTS; i++) {
         counts[me()][i] = 0;
     }
 
     size_t i, curr_length, curr_size;
-    mram_range range = { 0, length };
     LOOP_ON_MRAM(i, curr_length, curr_size, range) {
         mram_read(&array[i], cache, curr_size);
-        for (size_t x = 0; x < curr_length; x++) {
-            sums[me()] += cache[x];
-            if (cache[x] < 8) {
-                counts[me()][cache[x]]++;
+        for (size_t j = 0; j < curr_length; j++) {
+            sums[me()] += cache[j];
+            if (cache[j] < 8) {
+                counts[me()][cache[j]]++;
             }
         }
     }
@@ -72,11 +71,14 @@ void get_sum(T __mram_ptr *array, T *cache, size_t const length, array_stats *re
     if (me() != 0) return;
     for (size_t t = 1; t < NR_TASKLETS; t++) {
         sums[me()] += sums[t];
-        for (size_t i = 1; i < NR_COUNTS; i++) {
-            counts[me()][i] += counts[t][i];
+        for (size_t j = 0; j < NR_COUNTS; j++) {
+            counts[me()][j] += counts[t][j];
         }
     }
     result->sum = sums[me()];
+#ifdef UINT32
+    result->sum -= (dummy) ? UINT32_MAX : 0;
+#endif
     memcpy(&result->counts, counts[me()], NR_COUNTS * sizeof(size_t));
 }
 
