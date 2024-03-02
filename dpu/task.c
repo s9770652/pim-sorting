@@ -76,8 +76,8 @@ int main() {
     ranges[me()].start = part_start;
     ranges[me()].end = part_end;
 
-    /* Write random numbers onto the MRAM. */
-    rngs[me()] = seed_xs(me() + 0b100111010);  // The binary number is arbitrarily chosen to introduce some 1s to improve the seed.
+    /* Write random elements onto the MRAM. */
+    rngs[me()] = seed_xs(me() + 0b100111010);  // arbitrary number to improve the seed
     // Initialize a local cache to store one MRAM block.
     // In front of the cache is a dummy value, useful for sorting and checking the order.
     size_t const dummy_size = (sizeof(T) >= 8) ? sizeof(T) : 8;
@@ -86,6 +86,7 @@ int main() {
 #if PERF
     cycles[me()] = perfcounter_get();
 #endif
+
     size_t i, curr_length, curr_size;
     LOOP_ON_MRAM(i, curr_length, curr_size, ranges[me()]) {
         for (size_t j = 0; j < curr_length; j++) {
@@ -98,30 +99,32 @@ int main() {
         mram_write(cache, &input[i], curr_size);
     }
 #ifdef UINT32
-    // Add a dummy variable such that the last run has a length disible by 8.
+    // Add a dummy variable such that the last initial run has a length disible by 8.
     // This way, depleting (cf. `sort.c`) need less meddling with unaligned addresses.
     if (me() == NR_TASKLETS - 1 && length & 1) {
         input[length] = UINT32_MAX;
         dummy = true;
     }
 #endif
+
 #if PERF
     cycles[me()] = perfcounter_get() - cycles[me()];
-#endif
     barrier_wait(&omni_barrier);
-#if PERF
     print_time(cycles, "MEMORY");
-    barrier_wait(&omni_barrier);
 #endif
+    barrier_wait(&omni_barrier);
 
+    /* Gather info about generated elements for validation of the sorted ones. */
 #if CHECK_SANITY
     print_array(input, cache, length, "Before sorting");
-    barrier_wait(&omni_barrier);
 #if PERF
+    barrier_wait(&omni_barrier);
     cycles[me()] = perfcounter_get();
 #endif
+
     array_stats *stats_1 = mem_alloc(sizeof(array_stats));
     get_stats_unsorted(input, cache, ranges[me()], dummy, stats_1);
+
 #if PERF
     cycles[me()] = perfcounter_get() - cycles[me()];
     barrier_wait(&omni_barrier);
@@ -134,26 +137,30 @@ int main() {
 #if PERF
     cycles[me()] = perfcounter_get();
 #endif
+
     bool flipped_own = sort(input, output, cache, ranges);
+
 #if PERF
     cycles[me()] = perfcounter_get() - cycles[me()];
+    barrier_wait(&omni_barrier);
+    print_time(cycles, "SORT");
 #endif
+
     if (me() == 0) flipped = flipped_own;
     barrier_wait(&omni_barrier);
     T __mram_ptr *within = (flipped) ? output : input;
-#if PERF
-    print_time(cycles, "SORT");
-    barrier_wait(&omni_barrier);
-#endif
 
+    /* Validate sorted elements. */
 #if CHECK_SANITY
     print_array(within, cache, length, "After sorting");
-    barrier_wait(&omni_barrier);
 #if PERF
+    barrier_wait(&omni_barrier);
     cycles[me()] = perfcounter_get();
 #endif
+
     array_stats *stats_2 = mem_alloc(sizeof(array_stats));
     get_stats_sorted(within, cache, ranges[me()], dummy, stats_2);
+
 #if PERF
     cycles[me()] = perfcounter_get() - cycles[me()];
     barrier_wait(&omni_barrier);
