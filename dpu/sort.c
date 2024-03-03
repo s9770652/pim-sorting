@@ -26,8 +26,9 @@ void insertion_sort(T arr[], size_t len) {
     }
 }
 
-// todo: does inlining change performance?
-static void deplete(T __mram_ptr *input, T __mram_ptr *output, T *cache, T *ptr, size_t i, T __mram_ptr const *end) {
+// Inlining actually worsens performance.
+static __noinline void deplete(T __mram_ptr *input, T __mram_ptr *output, T *cache, T *ptr,
+        size_t i, T __mram_ptr const *end) {
     // Transfer cache to MRAM.
 #ifdef UINT32
     if (i & 1) {  // Is there need for alignment?
@@ -43,7 +44,9 @@ static void deplete(T __mram_ptr *input, T __mram_ptr *output, T *cache, T *ptr,
     // Transfer from MRAM to MRAM.
     output += i;
     do {
-        size_t rem_size = (input + BLOCK_LENGTH > end) ? (size_t)end - (size_t)input : BLOCK_SIZE;  // todo: does the compiler calculate the sum just once (by making it a subtraction)?
+        // Thanks to the dummy values, even for numbers smaller than 8 bytes,
+        // there is no need to round the size up.
+        size_t rem_size = (input + BLOCK_LENGTH > end) ? (size_t)end - (size_t)input : BLOCK_SIZE;
         mram_read(input, cache, rem_size);
         mram_write(cache, output, rem_size);
         input += BLOCK_LENGTH;  // Value may be wrong for the last transfer …
