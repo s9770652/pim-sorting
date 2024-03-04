@@ -79,10 +79,11 @@ int main() {
     /* Write random elements onto the MRAM. */
     rngs[me()] = seed_xs(me() + 0b100111010);  // arbitrary number to improve the seed
     // Initialize a local cache to store one MRAM block.
-    // In front of the cache is a dummy value, useful for sorting and checking the order.
-    size_t const dummy_size = (sizeof(T) >= 8) ? sizeof(T) : 8;
-    T *cache = mem_alloc(BLOCK_SIZE + dummy_size) + dummy_size;
+    // In front of the cache is a sentinel value, useful for sorting and checking the order.
+    size_t const sentinel_size = (sizeof(T) >= 8) ? sizeof(T) : 8;
+    T *cache = mem_alloc(BLOCK_SIZE + sentinel_size) + sentinel_size;
     cache[-1] = MIN_VALUE;
+
 #if PERF
     cycles[me()] = perfcounter_get();
 #endif

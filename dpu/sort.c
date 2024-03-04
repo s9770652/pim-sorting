@@ -14,15 +14,24 @@
 
 #define INSERTION_SIZE SEQREAD_CACHE_SIZE
 
-void insertion_sort(T arr[], size_t len) {
-    for (size_t i = 1; i < len; i++) {
-        T to_sort = arr[i];
-        size_t j = i;
-        while ((j > 0) && (arr[j-1] > to_sort)) {
-            arr[j] = arr[j-1];
-            j--;
+
+/**
+ * @brief A standard implementation of InsertionSort.
+ * @attention This algorithm relies on `array[-1]` equaling the sentinel value `MIN_VALUE`.
+ * 
+ * @param array The WRAM array to sort.
+ * @param length The length of the array.
+**/
+static void insertion_sort(T *array, size_t const length) {
+    for (size_t i = 1; i < length; i++) {
+        T *curr = &array[i];
+        T *prev = curr - 1;
+        T const to_sort = *curr;
+        while (*prev > to_sort) {
+            *curr = *prev;
+            curr = prev--;  // always valid due to the sentinel value
         }
-        arr[j] = to_sort;
+        *curr = to_sort;
     }
 }
 
@@ -40,9 +49,9 @@ static __noinline void deplete(T __mram_ptr *input, T __mram_ptr *output, T *cac
     }
 #endif
     mram_write(cache, output, i << DIV);
+    output += i;
 
     // Transfer from MRAM to MRAM.
-    output += i;
     do {
         // Thanks to the dummy values, even for numbers smaller than 8 bytes,
         // there is no need to round the size up.
