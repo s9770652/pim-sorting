@@ -12,7 +12,7 @@
 #include "mram_loop.h"
 #include "sort.h"
 
-#define INSERTION_SIZE SEQREAD_CACHE_SIZE
+#define INSERTION_LENGTH 48
 
 
 /**
@@ -67,7 +67,7 @@ bool merge(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range
     seqreader_buffer_t buffers[2] = { seqread_alloc(), seqread_alloc() };
     seqreader_t sr[2];
     bool flipped = false;  // Whether `input` or `output` contain the sorted elements.
-    size_t initial_run_length = BLOCK_LENGTH;
+    size_t initial_run_length = INSERTION_LENGTH;
     mram_range range = { ranges[me()].start, ranges[me()].end };
     // `brother_mask` is used to determine the brother node in the tournament tree.
     for (size_t brother_mask = 1; true; brother_mask <<= 1) {
@@ -135,11 +135,10 @@ bool merge(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range
     return flipped;
 }
 
-// todo: Adher to INSERTION_SIZE.
 bool sort(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range ranges[NR_TASKLETS]) {
-    size_t i, curr_length, curr_size;
     /* Insertion sort by each tasklet. */
-    LOOP_ON_MRAM(i, curr_length, curr_size, ranges[me()]) {
+    size_t i, curr_length, curr_size;
+    LOOP_ON_MRAM_BL(i, curr_length, curr_size, ranges[me()], INSERTION_LENGTH) {
         mram_read(&input[i], cache, curr_size);
         insertion_sort(cache, curr_length);
         mram_write(cache, &input[i], curr_size);

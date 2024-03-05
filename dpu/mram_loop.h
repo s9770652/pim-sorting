@@ -38,4 +38,15 @@ for (                                                                           
     curr_size = (i + BLOCK_LENGTH > range.end) ? ROUND_UP_POW2(curr_length << DIV, 8) : BLOCK_SIZE  \
 )
 
+#define LOOP_ON_MRAM_BL(i, curr_length, curr_size, range, block_length)                                      \
+for (                                                                                                        \
+    i = range.start,                                                                                         \
+    curr_length = (i + block_length > range.end) ? range.end - i : block_length,                             \
+    curr_size = (i + block_length > range.end) ? ROUND_UP_POW2(curr_length << DIV, 8) : block_length << DIV; \
+    i < range.end;                                                                                           \
+    i += block_length,                                                                                       \
+    curr_length = (i + block_length > range.end) ? range.end - i : block_length,                             \
+    curr_size = (i + block_length > range.end) ? ROUND_UP_POW2(curr_length << DIV, 8) : block_length << DIV  \
+)
+
 #endif  // _MRAM_LOOP_H_

@@ -60,7 +60,7 @@ int main() {
 
     /* Compute addresses and boundaries of arrays in WRAM and MRAM. */
     // input length per DPU in number of elements
-    const size_t length = DPU_INPUT_ARGUMENTS.length;
+    const size_t length = DPU_INPUT_ARGUMENTS.length ?: 0x600;
     // maximum number of elements in the subarray filled by each tasklet
     const size_t part_length = align(DIV_CEIL(length, NR_TASKLETS));
     // start of the tasklet's subarray
