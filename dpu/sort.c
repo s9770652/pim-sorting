@@ -12,12 +12,28 @@
 #include "mram_loop.h"
 #include "sort.h"
 
-#define INSERTION_LENGTH 48
+#define INSERTION_LENGTH 48  // base length when using just InsertionSort
+#define QUICK1_LENGTH 128  // base length when using QuickSort1 + InsertionSort
+#define QUICK1_INSERTION_BASE 32  // when to switch from QuickSort1 to InsertionSort
+#define QUICK2_LENGTH 128
+#define QUICK2_INSERTION_BASE 32
+#define QUICK3_LENGTH 1024  // 512, 768
+#define QUICK3_INSERTION_BASE 24 // 24, 32
+
+#define BASE_LENGTH QUICK3_LENGTH
+#if (BASE_LENGTH > BLOCK_LENGTH)
+// #error `BASE_LENGTH` does not fit within a cache of size `BLOCK_LENGTH`!
+#endif
+
+typedef int32_t ssize_t;
 
 
 /**
  * @brief A standard implementation of InsertionSort.
- * @attention This algorithm relies on `array[-1]` equaling the sentinel value `MIN_VALUE`.
+ * @attention This algorithm relies on `array[-1]` being a sentinel value,
+ * i.e. being at least as small as any value in the array.
+ * For this reason, `cache[-1]` is set to `MIN_VALUE`.
+ * For QuickSort, the last value of the previous partition takes on that role.
  * 
  * @param array The WRAM array to sort.
  * @param length The length of the array.
@@ -33,6 +49,157 @@ static void insertion_sort(T *array, size_t const length) {
         }
         *curr = to_sort;
     }
+}
+
+static void swap(T *a, T *b) {
+    T temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+static inline T get_pivot(T *start, T *end) {
+    (void)start;  // Gets optimised away …
+    (void)end;  // … but suppresses potential warnings about unused functions.
+    /* Always the leftmost element. */
+    // return *start;
+    /* The mean of the leftmost and the rightmost element. */
+    return (*start + *end) / 2;
+    /* The median of the leftmost, middle and rightmost element. */
+    // T *middle = (T *)(((uintptr_t)start + (uintptr_t)end) / 2 & ~(sizeof(T)-1));
+    // if ((*start > *middle) ^ (*start > *end))
+    //     return *start;
+    // else if ((*middle < *start) ^ (*middle < *end))
+    //     return *middle;
+    // else
+    //     return *end;
+}
+
+
+static ssize_t my_partition(T *array, ssize_t const low, ssize_t const high) {
+    T pivot = get_pivot(&array[low], &array[high]);
+    ssize_t i = low, j = high;
+    while (i < j) {
+        while (array[i] <= pivot && i <= high - 1) {
+            i++;
+        }
+        while (array[j] > pivot && j >= low + 1) {
+            j--;
+        }
+        if (i < j) {
+            swap(&array[i], &array[j]);
+        }
+    }
+    swap(&array[low], &array[j]);
+    return j;
+}
+
+static void quick_sort_recursive_1(T *array, ssize_t const low, ssize_t const high) {
+    if (low >= high) return;
+    if (high - low <= QUICK1_INSERTION_BASE) {
+        insertion_sort(&array[low], high - low + 1);
+        return;
+    }
+    ssize_t index = my_partition(array, low, high);
+
+    quick_sort_recursive_1(array, low, index - 1);
+    quick_sort_recursive_1(array, index + 1, high);
+}
+
+static void quick_sort_recursive_2(T *array, ssize_t const low, ssize_t const high) {
+    if (high - low <= QUICK2_INSERTION_BASE) {
+        insertion_sort(&array[low], high - low + 1);  // does nothing if `high < low`
+        return;
+    }
+    /* Put elements into right partitions. */
+    ssize_t i = low, j = high;
+    T pivot = get_pivot(&array[low], &array[high]), temp;
+    while (i <= j) {
+        while (array[i] < pivot) i++;
+        while (array[j] > pivot) j--;
+
+        if (i <= j) {
+            temp = array[i];
+            array[i] = array[j];
+            array[j] = temp;
+            i++;
+            j--;
+        }
+    }
+    /* Sort left and right partitions. */
+    quick_sort_recursive_2(array, low, j);
+    quick_sort_recursive_2(array, i, high);
+}
+
+static void quick_sort_recursive_3(T *start, T *end) {
+    if (end - start <= QUICK3_INSERTION_BASE) {
+        insertion_sort(start, end - start + 1);  // does nothing if `end < start`
+        return;
+    }
+    /* Put elements into right partitions. */
+    T *i = start, *j = end;
+    T pivot = get_pivot(start, end);
+    while (i <= j) {
+        while (*i < pivot) i++;
+        while (*j > pivot) j--;
+
+        if (i <= j) {
+            T temp = *i;
+            *i = *j;
+            *j = temp;
+            i++;
+            j--;
+        }
+    }
+    /* Sort left and right partitions. */
+    quick_sort_recursive_3(start, j);
+    quick_sort_recursive_3(i, end);
+}
+
+static void quick_sort_iterative(T *start, T *end) {
+    T **stack = (T **)(uintptr_t)(end + 2);
+    T **ptr = stack;
+    *ptr = start; ptr++;
+    *ptr = end; ptr++;
+    do {
+        T *right = *--ptr, *left = *--ptr;
+        if (right - left <= QUICK3_INSERTION_BASE) {
+            insertion_sort(left, right - left + 1);
+            continue;
+        }
+        /* Put elements into right partitions. */
+        T *i = left, *j = right;
+        T pivot = get_pivot(left, right);
+        while (i <= j) {
+            while (*i < pivot) i++;
+            while (*j > pivot) j--;
+
+            if (i <= j) {
+                T temp = *i;
+                *i = *j;
+                *j = temp;
+                i++;
+                j--;
+            }
+        }
+        /* Put left partition on stack. */
+        if (j > left) {
+            *ptr = left; ptr++;
+            *ptr = j; ptr++;
+        }
+        /* Put right partition on stack. */
+        if (right > i) {
+            *ptr = i; ptr++;
+            *ptr = right; ptr++;
+        }
+    } while (ptr != stack);
+}
+
+static void base_sort(T *array, size_t const length) {
+    // insertion_sort(array, length);
+    // quick_sort_recursive_1(array, 0, length - 1);
+    // quick_sort_recursive_2(array, 0, length - 1);
+    quick_sort_recursive_3(array, &array[length-1]);
+    // quick_sort_iterative(array, &array[length-1]);
 }
 
 // Inlining actually worsens performance.
@@ -67,7 +234,7 @@ bool merge(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range
     seqreader_buffer_t buffers[2] = { seqread_alloc(), seqread_alloc() };
     seqreader_t sr[2];
     bool flipped = false;  // Whether `input` or `output` contain the sorted elements.
-    size_t initial_run_length = INSERTION_LENGTH;
+    size_t initial_run_length = BASE_LENGTH;
     mram_range range = { ranges[me()].start, ranges[me()].end };
     // `brother_mask` is used to determine the brother node in the tournament tree.
     for (size_t brother_mask = 1; true; brother_mask <<= 1) {
@@ -138,9 +305,9 @@ bool merge(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range
 bool sort(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range ranges[NR_TASKLETS]) {
     /* Insertion sort by each tasklet. */
     size_t i, curr_length, curr_size;
-    LOOP_ON_MRAM_BL(i, curr_length, curr_size, ranges[me()], INSERTION_LENGTH) {
+    LOOP_ON_MRAM_BL(i, curr_length, curr_size, ranges[me()], BASE_LENGTH) {
         mram_read(&input[i], cache, curr_size);
-        insertion_sort(cache, curr_length);
+        base_sort(cache, curr_length);
         mram_write(cache, &input[i], curr_size);
     }
     /* Merge by tasklets. */
