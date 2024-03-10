@@ -122,8 +122,8 @@ int main() {
     cycles[me()] = perfcounter_get();
 #endif
 
-    array_stats *stats_1 = mem_alloc(sizeof(array_stats));
-    get_stats_unsorted(input, cache, ranges[me()], dummy, stats_1);
+    array_stats stats_1;
+    get_stats_unsorted(input, cache, ranges[me()], dummy, &stats_1);
 
 #if PERF
     cycles[me()] = perfcounter_get() - cycles[me()];
@@ -158,15 +158,15 @@ int main() {
     cycles[me()] = perfcounter_get();
 #endif
 
-    array_stats *stats_2 = mem_alloc(sizeof(array_stats));
-    get_stats_sorted(within, cache, ranges[me()], dummy, stats_2);
+    array_stats stats_2;
+    get_stats_sorted(within, cache, ranges[me()], dummy, &stats_2);
 
 #if PERF
     cycles[me()] = perfcounter_get() - cycles[me()];
     barrier_wait(&omni_barrier);
     print_time(cycles, "CHECK2");
 #endif
-    compare_stats(stats_1, stats_2);
+    compare_stats(&stats_1, &stats_2);
 #endif
     return 0;
 }
