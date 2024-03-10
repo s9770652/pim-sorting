@@ -18,7 +18,6 @@ size_t counts[NR_TASKLETS][NR_COUNTS];
 bool sorted[NR_TASKLETS];
 
 MUTEX_INIT(printing_mutex);
-MUTEX_INIT(checking_mutex);
 BARRIER_INIT(checking_barrier, NR_TASKLETS);
 
 void print_array(T __mram_ptr *array, T *cache, size_t const length, char *label) {
@@ -146,7 +145,7 @@ void compare_stats(array_stats const * const stats_1, array_stats const * const 
 }
 
 bool is_uniform(T *array, size_t length, T upper_bound) {
-    T* count = mem_alloc(upper_bound << DIV);
+    T *count = mem_alloc(upper_bound * sizeof(T *));
     for (T i = 0; i < upper_bound; i++) {
         count[i] = 0;
     }

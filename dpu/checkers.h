@@ -88,7 +88,7 @@ void compare_stats(array_stats const *stats_unsorted, array_stats const *stats_s
  * @brief Checks the mean and variance of an array of integers
  * and compares them with an ideal uniform distribution.
  * @note Currently sequentially implemented.
- * @warning This function allocates `upper_bound` × `sizeof(T)` bytes.
+ * @warning This function allocates `upper_bound` × `sizeof(T *)` bytes.
  * 
  * @param array The array of integers to check.
  * @param length Up to which element to check the mean and variance.
