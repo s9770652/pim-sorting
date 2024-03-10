@@ -8,6 +8,7 @@
 #include <perfcounter.h>
 
 #include "../support/common.h"
+#include "buffers.h"
 #include "mram_loop.h"
 #include "sort.h"
 #include "random.h"
@@ -78,11 +79,9 @@ int main() {
 
     /* Write random elements onto the MRAM. */
     rngs[me()] = seed_xs(me() + 0b100111010);  // arbitrary number to improve the seed
-    // Initialize a local cache to store one MRAM block.
-    // In front of the cache is a sentinel value, useful for sorting and checking the order.
-    size_t const sentinel_size = (sizeof(T) >= 8) ? sizeof(T) : 8;
-    T *cache = mem_alloc(BLOCK_SIZE + sentinel_size) + sentinel_size;
-    cache[-1] = MIN_VALUE;
+    wram_buffers buffers;
+    allocate_buffers(&buffers);
+    T *cache = buffers.cache;
 
 #if PERF
     cycles[me()] = perfcounter_get();
@@ -139,7 +138,7 @@ int main() {
     cycles[me()] = perfcounter_get();
 #endif
 
-    bool flipped_own = sort(input, output, cache, ranges);
+    bool flipped_own = sort(input, output, &buffers, ranges);
 
 #if PERF
     cycles[me()] = perfcounter_get() - cycles[me()];

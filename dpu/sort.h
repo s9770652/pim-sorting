@@ -5,9 +5,10 @@
 #include <stddef.h>
 
 #include "../support/common.h"
+#include "buffers.h"
 
-bool merge(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range ranges[NR_TASKLETS]);
+bool merge(T __mram_ptr *input, T __mram_ptr *output, wram_buffers *buffers, const mram_range ranges[NR_TASKLETS]);
 
-bool sort(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range ranges[NR_TASKLETS]);
+bool sort(T __mram_ptr *input, T __mram_ptr *output, wram_buffers *buffers, const mram_range ranges[NR_TASKLETS]);
 
 #endif  // _SORT_H_

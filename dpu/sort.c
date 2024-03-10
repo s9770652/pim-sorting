@@ -17,7 +17,7 @@
 #define QUICK1_INSERTION_BASE 32  // when to switch from QuickSort1 to InsertionSort
 #define QUICK2_LENGTH 128
 #define QUICK2_INSERTION_BASE 32
-#define QUICK3_LENGTH 1024  // 512, 768
+#define QUICK3_LENGTH 512  // 512, 768
 #define QUICK3_INSERTION_BASE 24 // 24, 32
 
 #define BASE_LENGTH QUICK3_LENGTH
@@ -230,8 +230,8 @@ static __noinline void deplete(T __mram_ptr *input, T __mram_ptr *output, T *cac
     } while (input < end);
 }
 
-bool merge(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range ranges[NR_TASKLETS]) {
-    seqreader_buffer_t buffers[2] = { seqread_alloc(), seqread_alloc() };
+bool merge(T __mram_ptr *input, T __mram_ptr *output, wram_buffers *buffers, const mram_range ranges[NR_TASKLETS]) {
+    T *cache = buffers->cache;
     seqreader_t sr[2];
     bool flipped = false;  // Whether `input` or `output` contain the sorted elements.
     size_t initial_run_length = BASE_LENGTH;
@@ -253,8 +253,8 @@ bool merge(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range
                 }
                 // Otherwise, merging is needed.
                 T *ptr[2] = {
-                    seqread_init(buffers[0], &input[j], &sr[0]),
-                    seqread_init(buffers[1], &input[j + run], &sr[1])
+                    seqread_init(buffers->seq_1, &input[j], &sr[0]),
+                    seqread_init(buffers->seq_2, &input[j + run], &sr[1])
                 };
                 const T __mram_ptr *ends[2] = {
                     &input[j + run],
@@ -302,7 +302,8 @@ bool merge(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range
     return flipped;
 }
 
-bool sort(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range ranges[NR_TASKLETS]) {
+bool sort(T __mram_ptr *input, T __mram_ptr *output, wram_buffers *buffers, const mram_range ranges[NR_TASKLETS]) {
+    T *cache = buffers->cache;
     /* Insertion sort by each tasklet. */
     size_t i, curr_length, curr_size;
     LOOP_ON_MRAM_BL(i, curr_length, curr_size, ranges[me()], BASE_LENGTH) {
@@ -310,6 +311,20 @@ bool sort(T __mram_ptr *input, T __mram_ptr *output, T *cache, const mram_range 
         base_sort(cache, curr_length);
         mram_write(cache, &input[i], curr_size);
     }
+    // LOOP_ON_MRAM_BL(i, curr_length, curr_size, ranges[me()], BASE_LENGTH) {
+    //     size_t long_read_size = curr_size;
+    //     for (size_t j = 0; j < curr_length; j += BLOCK_LENGTH) {
+    //         mram_read(&input[i + j], cache[j], (long_read_size > BLOCK_SIZE) ? BLOCK_SIZE : long_read_size);
+    //         long_read_size -= BLOCK_SIZE;
+    //     }
+    //     base_sort(cache, curr_length);
+    //     long_read_size = curr_size;
+    //     for (size_t j = 0; j < curr_length; j += BLOCK_LENGTH) {
+    //         mram_read(cache[j], &input[i + j], (long_read_size > BLOCK_SIZE) ? BLOCK_SIZE : long_read_size);
+    //         long_read_size -= BLOCK_SIZE;
+    //     }
+    // }
     /* Merge by tasklets. */
-    return merge(input, output, cache, ranges);
+    // return false;
+    return merge(input, output, buffers, ranges);
 }
