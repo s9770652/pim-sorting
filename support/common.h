@@ -3,11 +3,11 @@
 
 // Data Type
 #if defined(UINT32)
-#define T uint32_t
+typedef uint32_t T;
 #define DIV 2  // Shift right to divide by sizeof(T).
 #define MIN_VALUE 0
 #elif defined(UINT64)
-#define T uint64_t
+typedef uint32_t T;
 #define DIV 3  // Shift right to divide by sizeof(T).
 #define MIN_VALUE 0
 #endif
@@ -17,7 +17,7 @@
 // Structures used by both the host and the dpu to communicate information
 struct dpu_arguments {
     uint32_t length;  // number of elements to sort
-    uint64_t upper_bound;  // maximum value (exclusive) of range to draw from TODO: convert to T (mind the sizeof(dpu_arguments_t))
+    uint64_t upper_bound;  // maximum value (exclusive) of range to draw from // TODO: convert to T (mind the sizeof(dpu_arguments))
 };
 
 #define ANSI_COLOR_RED     "\x1b[31m"
