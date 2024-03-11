@@ -30,7 +30,7 @@ ATOMIC_BIT_EXTERN(__heap_pointer);
 BARRIER_INIT(allocating_barrier, NR_TASKLETS);
 MUTEX_INIT(allocating_mutex);
 
-void allocate_buffers(wram_buffers *buffers) {
+void allocate_triple_buffer(triple_buffers *buffers) {
     // This barrier-mutex construction is needed to ensure
     // that no call to `mem_alloc` happens somewhere else in between.
     barrier_wait(&allocating_barrier);

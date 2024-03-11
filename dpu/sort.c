@@ -15,14 +15,15 @@
 #define INSERTION_LENGTH 48  // base length when using just InsertionSort
 #define QUICK1_LENGTH 128  // base length when using QuickSort1 + InsertionSort
 #define QUICK1_INSERTION_BASE 32  // when to switch from QuickSort1 to InsertionSort
-#define QUICK2_LENGTH 128
-#define QUICK2_INSERTION_BASE 32
-#define QUICK3_LENGTH 512  // 512, 768
-#define QUICK3_INSERTION_BASE 24 // 24, 32
+#define QUICK2_LENGTH 768
+#define QUICK2_INSERTION_BASE 48
+#define QUICK3_LENGTH 768
+#define QUICK3_INSERTION_BASE 48
 
 #define BASE_LENGTH QUICK3_LENGTH
-#if (BASE_LENGTH > BLOCK_LENGTH)
-// #error `BASE_LENGTH` does not fit within a cache of size `BLOCK_LENGTH`!
+#define BASE_SIZE (BASE_LENGTH << DIV)
+#if (BASE_SIZE > TRIPLE_BUFFER_SIZE)
+#error `BASE_LENGTH` does not fit within the three combined WRAM buffers!
 #endif
 
 typedef int32_t ssize_t;
@@ -106,21 +107,19 @@ static void quick_sort_recursive_1(T *array, ssize_t const low, ssize_t const hi
 }
 
 static void quick_sort_recursive_2(T *array, ssize_t const low, ssize_t const high) {
-    if (high - low <= QUICK2_INSERTION_BASE) {
-        insertion_sort(&array[low], high - low + 1);  // does nothing if `high < low`
+    if (high - low <= QUICK2_INSERTION_BASE) {  // false if `end < start` due to wrapping
+        insertion_sort(&array[low], high - low + 1);
         return;
     }
-    /* Put elements into right partitions. */
+    /* Put elements into respective partitions. */
     ssize_t i = low, j = high;
-    T pivot = get_pivot(&array[low], &array[high]), temp;
+    T pivot = get_pivot(&array[low], &array[high]);
     while (i <= j) {
         while (array[i] < pivot) i++;
         while (array[j] > pivot) j--;
 
         if (i <= j) {
-            temp = array[i];
-            array[i] = array[j];
-            array[j] = temp;
+            swap(&array[i], &array[j]);
             i++;
             j--;
         }
@@ -131,24 +130,19 @@ static void quick_sort_recursive_2(T *array, ssize_t const low, ssize_t const hi
 }
 
 static void quick_sort_recursive_3(T *start, T *end) {
-    if (end - start <= QUICK3_INSERTION_BASE) {
-        insertion_sort(start, end - start + 1);  // does nothing if `end < start`
+    if (end - start <= QUICK3_INSERTION_BASE) {  // false if `end < start` due to wrapping
+        insertion_sort(start, end - start + 1);
         return;
     }
-    /* Put elements into right partitions. */
+    /* Put elements into respective partitions. */
     T *i = start, *j = end;
     T pivot = get_pivot(start, end);
     while (i <= j) {
         while (*i < pivot) i++;
         while (*j > pivot) j--;
 
-        if (i <= j) {
-            T temp = *i;
-            *i = *j;
-            *j = temp;
-            i++;
-            j--;
-        }
+        if (i <= j)
+            swap(i++, j--);
     }
     /* Sort left and right partitions. */
     quick_sort_recursive_3(start, j);
@@ -166,20 +160,15 @@ static void quick_sort_iterative(T *start, T *end) {
             insertion_sort(left, right - left + 1);
             continue;
         }
-        /* Put elements into right partitions. */
+        /* Put elements into respective partitions. */
         T *i = left, *j = right;
         T pivot = get_pivot(left, right);
         while (i <= j) {
             while (*i < pivot) i++;
             while (*j > pivot) j--;
 
-            if (i <= j) {
-                T temp = *i;
-                *i = *j;
-                *j = temp;
-                i++;
-                j--;
-            }
+            if (i <= j)
+                swap(i++, j--);
         }
         /* Put left partition on stack. */
         if (j > left) {
@@ -200,7 +189,7 @@ static void base_sort(T *array, size_t const length) {
     // quick_sort_recursive_2(array, 0, length - 1);
     quick_sort_recursive_3(array, &array[length-1]);
     // quick_sort_iterative(array, &array[length-1]);
-}
+    }
 
 // Inlining actually worsens performance.
 static __noinline void deplete(T __mram_ptr *input, T __mram_ptr *output, T *cache, T *ptr,
@@ -230,7 +219,7 @@ static __noinline void deplete(T __mram_ptr *input, T __mram_ptr *output, T *cac
     } while (input < end);
 }
 
-bool merge(T __mram_ptr *input, T __mram_ptr *output, wram_buffers *buffers, const mram_range ranges[NR_TASKLETS]) {
+bool merge(T __mram_ptr *input, T __mram_ptr *output, triple_buffers *buffers, const mram_range ranges[NR_TASKLETS]) {
     T *cache = buffers->cache;
     seqreader_t sr[2];
     bool flipped = false;  // Whether `input` or `output` contain the sorted elements.
@@ -302,29 +291,21 @@ bool merge(T __mram_ptr *input, T __mram_ptr *output, wram_buffers *buffers, con
     return flipped;
 }
 
-bool sort(T __mram_ptr *input, T __mram_ptr *output, wram_buffers *buffers, const mram_range ranges[NR_TASKLETS]) {
+bool sort(T __mram_ptr *input, T __mram_ptr *output, triple_buffers *buffers, const mram_range ranges[NR_TASKLETS]) {
     T *cache = buffers->cache;
     /* Insertion sort by each tasklet. */
     size_t i, curr_length, curr_size;
     LOOP_ON_MRAM_BL(i, curr_length, curr_size, ranges[me()], BASE_LENGTH) {
+#if (BASE_SIZE <= MAX_TRANSFER_SIZE)
         mram_read(&input[i], cache, curr_size);
         base_sort(cache, curr_length);
         mram_write(cache, &input[i], curr_size);
+#else
+        mram_read_triple(&input[i], cache, curr_size);
+        base_sort(cache, curr_length);
+        mram_write_triple(cache, &input[i], curr_size);
+#endif
     }
-    // LOOP_ON_MRAM_BL(i, curr_length, curr_size, ranges[me()], BASE_LENGTH) {
-    //     size_t long_read_size = curr_size;
-    //     for (size_t j = 0; j < curr_length; j += BLOCK_LENGTH) {
-    //         mram_read(&input[i + j], cache[j], (long_read_size > BLOCK_SIZE) ? BLOCK_SIZE : long_read_size);
-    //         long_read_size -= BLOCK_SIZE;
-    //     }
-    //     base_sort(cache, curr_length);
-    //     long_read_size = curr_size;
-    //     for (size_t j = 0; j < curr_length; j += BLOCK_LENGTH) {
-    //         mram_read(cache[j], &input[i + j], (long_read_size > BLOCK_SIZE) ? BLOCK_SIZE : long_read_size);
-    //         long_read_size -= BLOCK_SIZE;
-    //     }
-    // }
     /* Merge by tasklets. */
-    // return false;
     return merge(input, output, buffers, ranges);
 }

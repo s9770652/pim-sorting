@@ -14,24 +14,30 @@
 
 #include <stddef.h>
 
+#include <mram.h>
 #include <seqread.h>
 
 #include "../support/common.h"
 
 
+/// @brief The (minimum) size of a general-purpose buffer and two sequential-reader buffers.
+#define TRIPLE_BUFFER_SIZE (BLOCK_SIZE + 4 * SEQREAD_CACHE_SIZE)
+/// @brief The maximum number of bytes transferrable at once between MRAM and a triple buffer.
+#define MAX_TRANSFER_SIZE ((TRIPLE_BUFFER_SIZE > 2048) ? 2048 : TRIPLE_BUFFER_SIZE)
+
 /**
  * @brief Holds the WRAM addresses of one general-purpose buffer and two sequential-read buffers.
  * They are contiguous so they can be seen as a single buffer,
- * ranging from `&cache[0]` to `&cache[get_full_buffer_size()]`.
+ * ranging from `&cache[0]` to `&cache[TRIPLE_BUFFER_SIZE]`.
 **/
-typedef struct wram_buffers {
+typedef struct triple_buffers {
     /// @brief The general-purpose buffer of size `BLOCK_SIZE`.
     T *cache;
     /// @brief The first buffer for some sequential reader.
     seqreader_buffer_t seq_1;
     /// @brief The second buffer for some sequential reader.
     seqreader_buffer_t seq_2;
-} wram_buffers;
+} triple_buffers;
 
 /**
  * @brief Allocates contiguous memory for general-purpose buffer and two sequential-reader buffers.
@@ -39,13 +45,40 @@ typedef struct wram_buffers {
  * 
  * @param buffers The struct where the addresses are stored.
 **/
-void allocate_buffers(wram_buffers *buffers);
+void allocate_triple_buffer(triple_buffers *buffers);
 
 /**
- * @brief Returns the (minimum) size of a general-purpose buffer and two sequential-reader buffers.
+ * @brief Stores the specified number of bytes from MRAM to a triple buffer in WRAM.
  * 
- * @return `BLOCK_SIZE` + 4 × `SEQREAD_CACHE_SIZE`
+ * @param from Source address in MRAM.
+ * @param to Destination address of triple buffer in WRAM.
+ * @param nb_of_bytes Number of bytes to transfer.
 **/
-static inline size_t get_full_buffer_size(void) { return BLOCK_SIZE + 4 * SEQREAD_CACHE_SIZE; }
+static inline void mram_read_triple(void const __mram_ptr *from, void *to, size_t nb_of_bytes) {
+    do {
+        size_t const read_size = (nb_of_bytes > MAX_TRANSFER_SIZE) ? MAX_TRANSFER_SIZE : nb_of_bytes;
+        mram_read(from, to, read_size);
+        from += read_size;
+        to += read_size;
+        nb_of_bytes -= read_size;
+    } while (nb_of_bytes);
+}
+
+/**
+ * @brief Stores the specified number of bytes from a triple buffer in WRAM to MRAM.
+ * 
+ * @param from Source address of triple buffer in WRAM.
+ * @param to Destination address in MRAM.
+ * @param nb_of_bytes Number of bytes to transfer.
+**/
+static inline void mram_write_triple(void const *from, void __mram_ptr *to, size_t nb_of_bytes) {
+    do {
+        size_t const read_size = (nb_of_bytes > MAX_TRANSFER_SIZE) ? MAX_TRANSFER_SIZE : nb_of_bytes;
+        mram_write(from, to, read_size);
+        from += read_size;
+        to += read_size;
+        nb_of_bytes -= read_size;
+    } while (nb_of_bytes);
+}
 
 #endif  // _BUFFERS_H_

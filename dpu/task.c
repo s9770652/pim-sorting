@@ -79,8 +79,8 @@ int main() {
 
     /* Write random elements onto the MRAM. */
     rngs[me()] = seed_xs(me() + 0b100111010);  // arbitrary number to improve the seed
-    wram_buffers buffers;
-    allocate_buffers(&buffers);
+    triple_buffers buffers;
+    allocate_triple_buffer(&buffers);
     T *cache = buffers.cache;
 
 #if PERF
