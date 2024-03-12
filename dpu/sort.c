@@ -25,6 +25,9 @@
 #if (BASE_SIZE > TRIPLE_BUFFER_SIZE)
 #error `BASE_LENGTH` does not fit within the three combined WRAM buffers!
 #endif
+#if (BASE_SIZE % 8)
+#error `BASE_SIZE` must be divisible by eight!
+#endif
 
 
 /**
@@ -187,7 +190,7 @@ static void base_sort(T *array, size_t const length) {
 }
 
 // Inlining actually worsens performance.
-static __noinline void deplete(T __mram_ptr *input, T __mram_ptr *output, T *cache, T *ptr,
+static __noinline void flush(T __mram_ptr *input, T __mram_ptr *output, T *cache, T *ptr,
         size_t i, T __mram_ptr const *end) {
     // Transfer cache to MRAM.
 #ifdef UINT32
@@ -196,7 +199,7 @@ static __noinline void deplete(T __mram_ptr *input, T __mram_ptr *output, T *cac
         if (++input == end) {
             mram_write(cache, output, i << DIV);
             return;
-        };
+        }
     }
 #endif
     mram_write(cache, output, i << DIV);
@@ -251,7 +254,7 @@ bool merge(T __mram_ptr *input, T __mram_ptr *output, triple_buffers *buffers, c
                     cache[i++] = *ptr[ACT];                                                                             \
                     ptr[ACT] = seqread_get(ptr[ACT], sizeof(T), &sr[ACT]);                                              \
                     if (--elems_left[ACT] == 0) {                                                                       \
-                        deplete(seqread_tell(ptr[PAS], &sr[PAS]), &output[j + written], cache, ptr[PAS], i, ends[PAS]); \
+                        flush(seqread_tell(ptr[PAS], &sr[PAS]), &output[j + written], cache, ptr[PAS], i, ends[PAS]); \
                         break;                                                                                          \
                     }
                     if (*ptr[0] < *ptr[1]) {
