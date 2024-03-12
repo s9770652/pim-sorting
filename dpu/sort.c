@@ -34,7 +34,7 @@
  * @brief A standard implementation of InsertionSort.
  * @attention This algorithm relies on `start[-1]` being a sentinel value,
  * i.e. being at least as small as any value in the array.
- * For this reason, `cache[-1]` is set to `MIN_VALUE`.
+ * For this reason, `cache[-1]` is set to `T_MIN`.
  * For QuickSort, the last value of the previous partition takes on that role.
  * 
  * @param start The start of the WRAM array to sort.

@@ -5,11 +5,11 @@
 #if defined(UINT32)
 typedef uint32_t T;
 #define DIV 2  // Shift right to divide by sizeof(T).
-#define MIN_VALUE 0
+#define T_MIN 0
 #elif defined(UINT64)
-typedef uint32_t T;
+typedef uint64_t T;
 #define DIV 3  // Shift right to divide by sizeof(T).
-#define MIN_VALUE 0
+#define T_MIN 0
 #endif
 
 #define BLOCK_LENGTH (BLOCK_SIZE >> DIV)

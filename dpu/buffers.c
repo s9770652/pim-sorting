@@ -45,7 +45,7 @@ void allocate_triple_buffer(triple_buffers *buffers) {
     mutex_unlock(allocating_mutex);
     barrier_wait(&allocating_barrier);
     // Set the sentinel value and the missing members of `buffers`.
-    *(cache_pointer-1) = MIN_VALUE;
+    *(cache_pointer-1) = T_MIN;
     buffers->cache = cache_pointer;
 
     /*
@@ -55,7 +55,7 @@ void allocate_triple_buffer(triple_buffers *buffers) {
     // In front of the cache is a sentinel value, useful for sorting and checking the order.
     size_t const sentinel_size = (sizeof(T) >= 8) ? sizeof(T) : 8;
     T *cache_pointer = mem_alloc_nolock(BLOCK_SIZE + sentinel_size) + sentinel_size;
-    *(cache_pointer-1) = MIN_VALUE;
+    *(cache_pointer-1) = T_MIN;
 
     // Initialise the buffers for the two sequential readers.
     uintptr_t heap_pointer = (uintptr_t)__HEAP_POINTER;

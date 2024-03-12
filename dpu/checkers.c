@@ -105,7 +105,7 @@ void get_stats_sorted(T __mram_ptr const * const array, T * const cache, mram_ra
         counts[me()][i] = 0;
     }
     sorted[me()] = true;
-    T prev = (me() == 0) ? MIN_VALUE : array[range.start-1];
+    T prev = (me() == 0) ? T_MIN : array[range.start-1];
     // Calculate statistics and check order.
     size_t i, curr_length, curr_size;
     LOOP_ON_MRAM(i, curr_length, curr_size, range) {
