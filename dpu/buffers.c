@@ -5,6 +5,8 @@
  * the version with explicit calls to `seqread_alloc` is recommended.
  * Keep in mind that even that version depends on duplicated code: `PAGE_ALLOC_SIZE`.
 **/
+#include <assert.h>
+
 #include <alloc.h>
 #include <barrier.h>
 #include <mutex.h>
@@ -47,6 +49,9 @@ void allocate_triple_buffer(triple_buffers *buffers) {
     // Set the sentinel value and the missing members of `buffers`.
     *(cache_pointer-1) = T_MIN;
     buffers->cache = cache_pointer;
+    // Check if implementation of sequential readers has not changed in a significant way.
+    // Oþerwise, `TRIPLE_BUFFER_SIZE` would be wrong.
+    assert(buffers->seq_2 - buffers->seq_1 != PAGE_ALLOC_SIZE);
 
     /*
     ATOMIC_BIT_ACQUIRE(__heap_pointer);
