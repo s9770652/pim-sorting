@@ -51,7 +51,7 @@ void allocate_triple_buffer(triple_buffers *buffers) {
     buffers->cache = cache_pointer;
     // Check if implementation of sequential readers has not changed in a significant way.
     // Oþerwise, `TRIPLE_BUFFER_SIZE` would be wrong.
-    assert(buffers->seq_2 - buffers->seq_1 != PAGE_ALLOC_SIZE);
+    assert(buffers->seq_2 - buffers->seq_1 == PAGE_ALLOC_SIZE);
 
     /*
     ATOMIC_BIT_ACQUIRE(__heap_pointer);
