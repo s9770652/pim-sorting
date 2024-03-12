@@ -174,11 +174,12 @@ static void heap_sort(T *data, size_t const n) {
     for (size_t r = n / 2; r > 0; r--)
         heapify(data, n, r - 1);
     /* Sort by repeatedly putting the root at the end of the heap. */
-    for (size_t i = n - 1; i > HEAP_INSERTION_BASE; i--) {
+    size_t i;
+    for (i = n - 1; i > HEAP_INSERTION_BASE; i--) {
         swap(&data[0], &data[i]);
         heapify(data, i, 0);
     }
-    insertion_sort(data, &data[HEAP_INSERTION_BASE]);
+    insertion_sort(data, &data[i]);
 }
 
 static void base_sort(T *array, size_t const length) {
@@ -250,12 +251,12 @@ bool merge(T __mram_ptr *input, T __mram_ptr *output, triple_buffers *buffers, c
                 size_t elems_left[2] = { run, ends[1] - ends[0] };
                 size_t i = 0, written = 0;
                 while (true) {
-                    #define INSERT(ACT, PAS)                                                                            \
-                    cache[i++] = *ptr[ACT];                                                                             \
-                    ptr[ACT] = seqread_get(ptr[ACT], sizeof(T), &sr[ACT]);                                              \
-                    if (--elems_left[ACT] == 0) {                                                                       \
+                    #define INSERT(ACT, PAS)                                                                          \
+                    cache[i++] = *ptr[ACT];                                                                           \
+                    ptr[ACT] = seqread_get(ptr[ACT], sizeof(T), &sr[ACT]);                                            \
+                    if (--elems_left[ACT] == 0) {                                                                     \
                         flush(seqread_tell(ptr[PAS], &sr[PAS]), &output[j + written], cache, ptr[PAS], i, ends[PAS]); \
-                        break;                                                                                          \
+                        break;                                                                                        \
                     }
                     if (*ptr[0] < *ptr[1]) {
                         INSERT(0, 1);
