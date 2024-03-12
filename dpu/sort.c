@@ -13,35 +13,33 @@
 #include "sort.h"
 
 #define INSERTION_LENGTH 48  // base length when using just InsertionSort
-#define QUICK1_LENGTH 128  // base length when using QuickSort1 + InsertionSort
-#define QUICK1_INSERTION_BASE 32  // when to switch from QuickSort1 to InsertionSort
-#define QUICK2_LENGTH 768
-#define QUICK2_INSERTION_BASE 48
+#define QUICK2_LENGTH 768  // base length when using QuickSort2 + InsertionSort
+#define QUICK2_INSERTION_BASE 48  // when to switch from QuickSort2 to InsertionSort
 #define QUICK3_LENGTH 768
 #define QUICK3_INSERTION_BASE 48
+#define HEAP_LENGTH 768
+#define HEAP_INSERTION_BASE 64
 
-#define BASE_LENGTH QUICK3_LENGTH
+#define BASE_LENGTH HEAP_LENGTH
 #define BASE_SIZE (BASE_LENGTH << DIV)
 #if (BASE_SIZE > TRIPLE_BUFFER_SIZE)
 #error `BASE_LENGTH` does not fit within the three combined WRAM buffers!
 #endif
 
-typedef int32_t ssize_t;
-
 
 /**
  * @brief A standard implementation of InsertionSort.
- * @attention This algorithm relies on `array[-1]` being a sentinel value,
+ * @attention This algorithm relies on `start[-1]` being a sentinel value,
  * i.e. being at least as small as any value in the array.
  * For this reason, `cache[-1]` is set to `MIN_VALUE`.
  * For QuickSort, the last value of the previous partition takes on that role.
  * 
- * @param array The WRAM array to sort.
- * @param length The length of the array.
+ * @param start The start of the WRAM array to sort.
+ * @param end The (inclusive) end of said array.
 **/
-static void insertion_sort(T *array, size_t const length) {
-    for (size_t i = 1; i < length; i++) {
-        T *curr = &array[i];
+static void insertion_sort(T *start, T * const end) {
+    T *curr;
+    while ((curr = start++) <= end) {  // todo: `++start` is slower‽
         T *prev = curr - 1;
         T const to_sort = *curr;
         while (*prev > to_sort) {
@@ -52,13 +50,13 @@ static void insertion_sort(T *array, size_t const length) {
     }
 }
 
-static void swap(T *a, T *b) {
-    T temp = *a;
+static void swap(T * const a, T * const b) {
+    T const temp = *a;
     *a = *b;
     *b = temp;
 }
 
-static inline T get_pivot(T *start, T *end) {
+static inline T get_pivot(T const * const start, T const * const end) {
     (void)start;  // Gets optimised away …
     (void)end;  // … but suppresses potential warnings about unused functions.
     /* Always the leftmost element. */
@@ -75,121 +73,118 @@ static inline T get_pivot(T *start, T *end) {
     //     return *end;
 }
 
-
-static ssize_t my_partition(T *array, ssize_t const low, ssize_t const high) {
-    T pivot = get_pivot(&array[low], &array[high]);
-    ssize_t i = low, j = high;
-    while (i < j) {
-        while (array[i] <= pivot && i <= high - 1) {
-            i++;
-        }
-        while (array[j] > pivot && j >= low + 1) {
-            j--;
-        }
-        if (i < j) {
-            swap(&array[i], &array[j]);
-        }
-    }
-    swap(&array[low], &array[j]);
-    return j;
-}
-
-static void quick_sort_recursive_1(T *array, ssize_t const low, ssize_t const high) {
-    if (low >= high) return;
-    if (high - low <= QUICK1_INSERTION_BASE) {
-        insertion_sort(&array[low], high - low + 1);
+static void quick_sort_recursive_2(T * const array, size_t const low, size_t const high) {
+    /* Detect base cases. */
+    if (high - low <= QUICK2_INSERTION_BASE) {  // false if `high < low` due to wrapping
+        insertion_sort(&array[low], &array[high]);
         return;
-    }
-    ssize_t index = my_partition(array, low, high);
-
-    quick_sort_recursive_1(array, low, index - 1);
-    quick_sort_recursive_1(array, index + 1, high);
-}
-
-static void quick_sort_recursive_2(T *array, ssize_t const low, ssize_t const high) {
-    if (high - low <= QUICK2_INSERTION_BASE) {  // false if `end < start` due to wrapping
-        insertion_sort(&array[low], high - low + 1);
-        return;
-    }
+    } else if (high <= low) return;
     /* Put elements into respective partitions. */
-    ssize_t i = low, j = high;
+    size_t i = low, j = high;
     T pivot = get_pivot(&array[low], &array[high]);
-    while (i <= j) {
+    do {
         while (array[i] < pivot) i++;
         while (array[j] > pivot) j--;
 
-        if (i <= j) {
-            swap(&array[i], &array[j]);
-            i++;
-            j--;
-        }
-    }
+        if (i <= j)
+            swap(&array[i++], &array[j--]);
+    } while (i <= j);
     /* Sort left and right partitions. */
     quick_sort_recursive_2(array, low, j);
     quick_sort_recursive_2(array, i, high);
 }
 
-static void quick_sort_recursive_3(T *start, T *end) {
+static void quick_sort_recursive_3(T * const start, T * const end) {
+    /* Detect base cases. */
     if (end - start <= QUICK3_INSERTION_BASE) {  // false if `end < start` due to wrapping
-        insertion_sort(start, end - start + 1);
+        insertion_sort(start, end);
         return;
-    }
+    } else if (end <= start) return;
     /* Put elements into respective partitions. */
     T *i = start, *j = end;
     T pivot = get_pivot(start, end);
-    while (i <= j) {
+    do {
         while (*i < pivot) i++;
         while (*j > pivot) j--;
 
         if (i <= j)
             swap(i++, j--);
-    }
+    } while (i <= j);
     /* Sort left and right partitions. */
     quick_sort_recursive_3(start, j);
     quick_sort_recursive_3(i, end);
 }
 
-static void quick_sort_iterative(T *start, T *end) {
-    T **stack = (T **)(uintptr_t)(end + 2);
-    T **ptr = stack;
-    *ptr = start; ptr++;
-    *ptr = end; ptr++;
+static void quick_sort_iterative(T * const start, T * const end) {
+    // A “call” stack for holding the values of `left` and `right` is maintained.
+    // Since QuickSort works in-place, it is stored right after the end.
+    T **stack = (T **)(uintptr_t)end;
+    *++stack = start;
+    *++stack = end;
     do {
-        T *right = *--ptr, *left = *--ptr;
-        if (right - left <= QUICK3_INSERTION_BASE) {
-            insertion_sort(left, right - left + 1);
+        T *right = *stack--, *left = *stack--;  // Pop from stack.
+        /* Detect base cases. */
+        if (right - left <= QUICK3_INSERTION_BASE) {  // false if `right < left` due to wrapping
+            insertion_sort(left, right);
             continue;
-        }
+        } else if (right <= left) return;
         /* Put elements into respective partitions. */
         T *i = left, *j = right;
         T pivot = get_pivot(left, right);
-        while (i <= j) {
+        do {
             while (*i < pivot) i++;
             while (*j > pivot) j--;
 
             if (i <= j)
                 swap(i++, j--);
-        }
+        } while (i <= j);
         /* Put left partition on stack. */
         if (j > left) {
-            *ptr = left; ptr++;
-            *ptr = j; ptr++;
+            *++stack = left;
+            *++stack = j;
         }
         /* Put right partition on stack. */
         if (right > i) {
-            *ptr = i; ptr++;
-            *ptr = right; ptr++;
+            *++stack = i;
+            *++stack = right;
         }
-    } while (ptr != stack);
+    } while (stack != (T **)(uintptr_t)end);
+}
+
+static void heapify(T *data, size_t const n, size_t const root) {
+    T old_root_value = data[root];
+    size_t father = root, son;
+    while ((son = father * 2 + 1) < n) {  // left son
+        if ((son + 1 < n) && (data[son + 1] > data[son]))  // Check if right son is bigger.
+            son++;
+        if (data[son] <= old_root_value)  // Stop if both sons are smaller than their father.
+            break;
+        data[father] = data[son];  // Shift son up.
+        father = son;
+    }
+    data[father] = old_root_value;
+}
+
+static void heap_sort(T *data, size_t const n) {
+    if (n < 2) return;
+    /* Build a heap using Floyd's method. */
+    for (size_t r = n / 2; r > 0; r--)
+        heapify(data, n, r - 1);
+    /* Sort by repeatedly putting the root at the end of the heap. */
+    for (size_t i = n - 1; i > HEAP_INSERTION_BASE; i--) {
+        swap(&data[0], &data[i]);
+        heapify(data, i, 0);
+    }
+    insertion_sort(data, &data[HEAP_INSERTION_BASE]);
 }
 
 static void base_sort(T *array, size_t const length) {
-    // insertion_sort(array, length);
-    // quick_sort_recursive_1(array, 0, length - 1);
+    // insertion_sort(array, &array[length - 1]);
     // quick_sort_recursive_2(array, 0, length - 1);
-    quick_sort_recursive_3(array, &array[length-1]);
-    // quick_sort_iterative(array, &array[length-1]);
-    }
+    quick_sort_recursive_3(array, &array[length - 1]);
+    // quick_sort_iterative(array, &array[length - 1]);
+    // heap_sort(array, length);
+}
 
 // Inlining actually worsens performance.
 static __noinline void deplete(T __mram_ptr *input, T __mram_ptr *output, T *cache, T *ptr,
