@@ -28,7 +28,8 @@ static void free_dpus(struct dpu_set_t set) {
     DPU_ASSERT(dpu_free(set));
 }
 
-static void alloc_dpus(struct dpu_set_t *set, uint32_t *nr_dpus, char * const binary) {
+static void alloc_dpus(struct dpu_set_t *set, uint32_t *nr_dpus, unsigned const mode) {
+    char *binary = mode ? BENCHMARK_BINARY : SORTING_BINARY;
     DPU_ASSERT(dpu_alloc(1, NULL, set));
     DPU_ASSERT(dpu_load(*set, binary, NULL));
     DPU_ASSERT(dpu_get_nr_dpus(*set, nr_dpus));
@@ -38,7 +39,7 @@ int main(int argc, char** argv) {
     struct Params p = input_params(argc, argv);
     struct dpu_set_t set, dpu;
     uint32_t nr_dpus;
-    alloc_dpus(&set, &nr_dpus, p.binary);
+    alloc_dpus(&set, &nr_dpus, p.mode);
 
     struct dpu_arguments input_arguments = {
         .length = p.length,

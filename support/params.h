@@ -3,7 +3,6 @@
 
 #include <assert.h>
 #include <getopt.h>
-#include <string.h>
 
 #include "common.h"
 
@@ -12,7 +11,7 @@ struct Params {
     T upper_bound;
     unsigned n_warmup;
     unsigned n_reps;
-    char binary[20];
+    unsigned mode;
 };
 
 static void usage() {
@@ -35,9 +34,7 @@ struct Params input_params(int argc, char **argv) {
     p.upper_bound = 8;
     p.n_warmup = 1;
     p.n_reps = 3;
-    assert(strlen(p.binary) <= strlen(SORTING_BINARY));
-    assert(strlen(p.binary) <= strlen(BENCHMARK_BINARY));
-    strcpy(p.binary, SORTING_BINARY);
+    p.mode = 0;
 
     int opt;
     while ((opt = getopt(argc, argv, "hBn:b:w:r:")) >= 0) {
@@ -46,7 +43,7 @@ struct Params input_params(int argc, char **argv) {
             usage();
             exit(0);
             break;
-        case 'B': strcpy(p.binary, BENCHMARK_BINARY); break;
+        case 'B': p.mode = 1; break;
         case 'n': p.length      = (unsigned)atof(optarg); break;
         case 'b': p.upper_bound = (T)atof(optarg); break;
         case 'w': p.n_warmup    = (unsigned)atof(optarg); break;
