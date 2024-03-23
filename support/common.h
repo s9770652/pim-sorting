@@ -1,6 +1,8 @@
 #ifndef _COMMON_H_
 #define _COMMON_H_
 
+#include <stdint.h>
+
 // Data Type
 #if defined(UINT32)
 typedef uint32_t T;
@@ -17,14 +19,16 @@ typedef uint64_t T;
 // Structures used by both the host and the dpu to communicate information
 struct dpu_arguments {
     uint32_t length;  // number of elements to sort
-    uint64_t upper_bound;  // maximum value (exclusive) of range to draw from // TODO: convert to T (mind the sizeof(dpu_arguments))
+    T upper_bound;  // maximum value (exclusive) of range to draw from
+    uint32_t n_reps;
+    uint32_t n_warmup;
 };
 
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"
 #define ANSI_COLOR_RESET   "\x1b[0m"
 
-// Computes `n` : `m` rounded up.
+// Computes `n` ÷ `m` rounded up.
 #define DIV_CEIL(n, m) (((n)-1) / (m) + 1)
 // Rounds `n` up to the next highest multiple of `m` if not already a multiple.
 #define ROUND_UP(n, m) ((((n) + (m) - 1) / (m)) * (m))

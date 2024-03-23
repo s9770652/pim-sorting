@@ -9,7 +9,6 @@
 #include <mutex.h>
 #include <string.h>
 
-#include "../support/common.h"
 #include "checkers.h"
 #include "mram_loop.h"
 

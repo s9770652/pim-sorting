@@ -16,7 +16,6 @@
 #include <dpuruntime.h>
 */
 
-#include "../support/common.h"
 #include "buffers.h"
 
 #define PAGE_SIZE (SEQREAD_CACHE_SIZE)

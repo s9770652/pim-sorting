@@ -4,7 +4,6 @@
 #include <mram.h>
 #include <sysdef.h>
 
-#include "../support/common.h"
 #include "random.h"
 
 struct xorshift seed_xs(T seed) {

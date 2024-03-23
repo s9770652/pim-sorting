@@ -22,26 +22,28 @@ static void free_dpus(struct dpu_set_t set) {
     DPU_ASSERT(dpu_free(set));
 }
 
-static void alloc_dpus(struct dpu_set_t *set, uint32_t *nr_dpus) {
+static void alloc_dpus(struct dpu_set_t *set, uint32_t *nr_dpus, char * const binary) {
     DPU_ASSERT(dpu_alloc(1, NULL, set));
-    DPU_ASSERT(dpu_load(*set, DPU_BINARY, NULL));
+    DPU_ASSERT(dpu_load(*set, binary, NULL));
     DPU_ASSERT(dpu_get_nr_dpus(*set, nr_dpus));
 }
 
 int main(int argc, char** argv) {
+    struct Params p = input_params(argc, argv);
     struct dpu_set_t set, dpu;
     uint32_t nr_dpus;
-    alloc_dpus(&set, &nr_dpus);
+    alloc_dpus(&set, &nr_dpus, p.binary);
 
-    struct Params p = input_params(argc, argv);
     struct dpu_arguments input_arguments = {
-        p.length,
-        p.upper_bound
+        .length = p.length,
+        .upper_bound = p.upper_bound,
+        .n_reps = p.n_reps,
+        .n_warmup = p.n_warmup
     };
     DPU_FOREACH(set, dpu) {
         DPU_ASSERT(dpu_prepare_xfer(dpu, &input_arguments));
     }
-    DPU_ASSERT(dpu_push_xfer(set, DPU_XFER_TO_DPU, "DPU_INPUT_ARGUMENTS", 0, sizeof(input_arguments), DPU_XFER_DEFAULT));  // broadcast?
+    DPU_ASSERT(dpu_push_xfer(set, DPU_XFER_TO_DPU, "DPU_INPUT_ARGUMENTS", 0, sizeof(struct dpu_arguments), DPU_XFER_DEFAULT));  // broadcast?
 
     DPU_ASSERT(dpu_launch(set, DPU_SYNCHRONOUS));
 

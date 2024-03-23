@@ -8,7 +8,6 @@
 #include <mram.h>
 #include <seqread.h>
 
-#include "../support/common.h"
 #include "mram_loop.h"
 #include "sort.h"
 
