@@ -12,7 +12,7 @@
 #ifndef _RANDOM_H_
 #define _RANDOM_H_
 
-#include "../support/common.h"
+#include "common.h"
 
 /**
  * @brief A struct that contains a word of state for XorShift generators.

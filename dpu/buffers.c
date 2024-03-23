@@ -10,7 +10,6 @@
 #include <alloc.h>
 #include <barrier.h>
 #include <mutex.h>
-#include <seqread.h>
 /*
 #include <atomic_bit.h>
 #include <dpuruntime.h>

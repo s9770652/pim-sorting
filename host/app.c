@@ -4,8 +4,8 @@
 #include <dpu.h>
 #include <dpu_log.h>
 
-#include "../support/common.h"
-#include "../support/params.h"
+#include "common.h"
+#include "params.h"
 
 // Sanity Checks
 #if (BLOCK_SIZE > 2048)

@@ -7,7 +7,7 @@
 #include <mram.h>
 #include <perfcounter.h>
 
-#include "../support/common.h"
+#include "common.h"
 #include "buffers.h"
 #include "mram_loop.h"
 #include "sort.h"

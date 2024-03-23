@@ -1,7 +1,6 @@
 #include <stdio.h>
 
 #include <defs.h>
-#include <perfcounter.h>
 
 #include "timer.h"
 

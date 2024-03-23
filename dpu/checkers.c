@@ -1,4 +1,3 @@
-#include <stddef.h>
 #include <stdio.h>
 #include <stdint.h>
 
@@ -10,7 +9,6 @@
 #include <string.h>
 
 #include "checkers.h"
-#include "mram_loop.h"
 
 uint64_t sums[NR_TASKLETS];
 size_t counts[NR_TASKLETS][NR_COUNTS];
