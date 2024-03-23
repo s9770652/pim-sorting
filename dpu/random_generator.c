@@ -4,7 +4,7 @@
 #include <mram.h>
 #include <sysdef.h>
 
-#include "random.h"
+#include "random_generator.h"
 
 struct xorshift seed_xs(T seed) {
     assert(seed > 0);

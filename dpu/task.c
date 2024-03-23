@@ -11,7 +11,7 @@
 #include "buffers.h"
 #include "mram_loop.h"
 #include "sort.h"
-#include "random.h"
+#include "random_distribution.h"
 
 #ifdef PERF
 #include "timer.h"
@@ -27,7 +27,7 @@ __host struct dpu_arguments DPU_INPUT_ARGUMENTS;
 T __mram_noinit input[LOAD_INTO_MRAM];  // array of random numbers
 T __mram_noinit output[LOAD_INTO_MRAM];
 mram_range ranges[NR_TASKLETS];
-static struct xorshift rngs[NR_TASKLETS];  // Contains the seed for each tasklet.
+struct xorshift rngs[NR_TASKLETS];  // Contains the seed for each tasklet.
 bool flipped;  // Whether `input` or `output` contains the final sorted sequence.
 bool dummy;  // Whether a dummy value was set at the end of the input sequence.
 
@@ -87,17 +87,7 @@ int main() {
     cycles[me()] = perfcounter_get();
 #endif
 
-    size_t i, curr_length, curr_size;
-    LOOP_ON_MRAM(i, curr_length, curr_size, ranges[me()]) {
-        for (size_t j = 0; j < curr_length; j++) {
-            // cache[j] = rr((T)DPU_INPUT_ARGUMENTS.upper_bound, &rngs[me()]);
-            cache[j] = (gen_xs(&rngs[me()]) & 7);
-            // cache[j] = i + j;
-            // cache[j] = length - (i + j) - 1;
-            // cache[j] = 0;
-        }
-        mram_write(cache, &input[i], curr_size);
-    }
+    generate_uniform_distribution(input, cache, &ranges[me()], DPU_INPUT_ARGUMENTS.upper_bound);
 #ifdef UINT32
     // Add a dummy variable such that the last initial run has a length disible by 8.
     // This way, depleting (cf. `sort.c`) need less meddling with unaligned addresses.

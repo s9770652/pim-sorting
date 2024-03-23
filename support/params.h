@@ -21,11 +21,11 @@ static void usage() {
         "\n"
         "\nOptions:"
         "\n    -h    help"
-        "\n    -B    if specified, load benchmark code instead of normal sorting code"
-        "\n    -w    # of untimed warmup iterations (default=1)"
-        "\n    -r    # of timed repetition iterations (default=3)"
         "\n    -n    input length (default=512 elements)"
-        "\n    -b    upper bound (exclusive) of range to draw random numbers from"
+        "\n    -b    upper bound (exclusive) of range to draw random numbers from (default=8)"
+        "\n    -w    # of untimed warm-up iterations (default=1)"
+        "\n    -r    # of timed repetition iterations (default=3)"
+        "\n    -B    if specified, load benchmark code instead of normal sorting code"
         "\n");
 }
 
@@ -35,10 +35,12 @@ struct Params input_params(int argc, char **argv) {
     p.upper_bound = 8;
     p.n_warmup = 1;
     p.n_reps = 3;
+    assert(strlen(p.binary) <= strlen(SORTING_BINARY));
+    assert(strlen(p.binary) <= strlen(BENCHMARK_BINARY));
     strcpy(p.binary, SORTING_BINARY);
 
     int opt;
-    while ((opt = getopt(argc, argv, "hBn:w:r:")) >= 0) {
+    while ((opt = getopt(argc, argv, "hBn:b:w:r:")) >= 0) {
         switch(opt) {
         case 'h':
             usage();
@@ -55,7 +57,9 @@ struct Params input_params(int argc, char **argv) {
             exit(0);
         }
     }
-    assert(NR_DPUS > 0 && "Invalid # of dpus!");
+    assert(p.length > 0 && "Input length must be positive!");
+    assert(p.n_warmup > 0 && "Invalid # of warm-up iterations!");
+    assert(p.n_reps > 0 && "Invalid # of repetition iterations!");
 
     return p;
 }

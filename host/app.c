@@ -17,6 +17,12 @@
 #if (BLOCK_SIZE % 8)
 #error `BLOCK_SIZE` is not divisble by eight! Accesses to MRAM must be aligned on 8 bytes.
 #endif
+#if (NR_DPUS <= 0)
+#error The number of DPUs must be positive!
+#endif
+#if (NR_TASKLETS <= 0 || NR_TASKLETS > 16)
+#error The number of tasklets must be between 1 and 16!
+#endif
 
 static void free_dpus(struct dpu_set_t set) {
     DPU_ASSERT(dpu_free(set));
