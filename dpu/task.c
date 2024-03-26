@@ -1,5 +1,4 @@
 #include <stddef.h>
-#include <stdio.h>
 
 #include <alloc.h>
 #include <barrier.h>
@@ -13,10 +12,10 @@
 #include "sort.h"
 #include "random_distribution.h"
 
-#ifdef PERF
+#if PERF
 #include "timer.h"
 #endif
-#ifdef CHECK_SANITY
+#if CHECK_SANITY
 #include "checkers.h"
 #endif
 
@@ -49,6 +48,7 @@ int main() {
 #if PERF
         perfcounter_config(COUNT_CYCLES, true);
 #endif
+#include <stdio.h>
         printf("input length: %d\n", DPU_INPUT_ARGUMENTS.length);
         printf("diff to max length: %d\n", LOAD_INTO_MRAM - DPU_INPUT_ARGUMENTS.length);
         printf("BLOCK_SIZE: %d\n", BLOCK_SIZE);

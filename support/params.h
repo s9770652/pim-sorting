@@ -43,7 +43,7 @@ struct Params input_params(int argc, char **argv) {
             usage();
             exit(0);
             break;
-        case 'B': p.mode = 1; break;
+        case 'B': p.mode        = 1; break;
         case 'n': p.length      = (unsigned)atof(optarg); break;
         case 'b': p.upper_bound = (T)atof(optarg); break;
         case 'w': p.n_warmup    = (unsigned)atof(optarg); break;

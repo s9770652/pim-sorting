@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdint.h>
 
 #include <defs.h>
@@ -7,7 +8,7 @@
 
 void generate_uniform_distribution(T __mram_ptr *array, T * const cache,
         mram_range const * const range, T const upper_bound) {
-    int is_power_of_two = (upper_bound & (upper_bound - 1)) == 0;
+    bool is_power_of_two = (upper_bound & (upper_bound - 1)) == 0;
     if (is_power_of_two) {
         size_t i, curr_length, curr_size;
         LOOP_ON_MRAM(i, curr_length, curr_size, (*range)) {

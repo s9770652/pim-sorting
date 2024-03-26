@@ -50,6 +50,6 @@ T gen_xs(struct xorshift *rng);
  * 
  * @returns A uniformly drawn integer between `0` and `s-1`.
 **/
-T rr(const T s, struct xorshift* state);
+T rr(const T s, struct xorshift *state);
 
 #endif  // _RANDOM_H_
