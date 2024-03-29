@@ -23,14 +23,12 @@ struct xorshift {
 };
 
 /**
- * @brief Sets the initial word of state.
- * 
- * @param seed The initial word of state. Must be positive.
- * More 1s in the binary representation are better.
- * 
- * @returns A seeded state.
+ * @brief Uses the tasklet's ID to set the inital word of state.
+ * Adds a constant to introduce more 1s, which supposedly improve the seed.
+ *
+ * @return A seeded state.
 **/
-struct xorshift seed_xs(T seed);
+struct xorshift seed_with_tasklet_id(void);
 
 /**
  * @brief The XorShift generator generates a 32-bit / 64-bit uniformly drawn random number.

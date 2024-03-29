@@ -1,16 +1,29 @@
 #include <assert.h>
 #include <stdio.h>
 
+#include <defs.h>
 #include <mram.h>
 #include <sysdef.h>
 
 #include "random_generator.h"
 
+/**
+ * @brief Sets the initial word of state.
+ * 
+ * @param seed The initial word of state. Must be positive.
+ * More 1s in the binary representation are better.
+ * 
+ * @returns A seeded state.
+**/
 struct xorshift seed_xs(T const seed) {
     assert(seed > 0);
     struct xorshift rng = { seed };
     return rng;
-} 
+}
+
+struct xorshift seed_with_tasklet_id(void) {
+    return seed_xs(me() + 0b100111010);  // arbitrary number to improve the seed
+}
 
 T gen_xs(struct xorshift *rng) {
     T x = rng->x;

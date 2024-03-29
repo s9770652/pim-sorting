@@ -28,7 +28,7 @@
 
 
 /**
- * @brief A standard implementation of InsertionSort.
+ * @brief An implementation of standard InsertionSort.
  * @attention This algorithm relies on `start[-1]` being a sentinel value,
  * i.e. being at least as small as any value in the array.
  * For this reason, `cache[-1]` is set to `T_MIN`.
@@ -50,12 +50,28 @@ static void insertion_sort(T *start, T * const end) {
     }
 }
 
+/**
+ * @brief Swaps the content of two addresses.
+ * 
+ * @param a First WRAM address.
+ * @param b Second WRAM address.
+**/
 static void swap(T * const a, T * const b) {
     T const temp = *a;
     *a = *b;
     *b = temp;
 }
 
+
+/**
+ * @brief Returns a pivot element for a WRAM array.
+ * The method of choosing currently must be changed by (un-)commenting the respective code lines.
+ * 
+ * @param start The start of the WRAM array to sort.
+ * @param end The (inclusive) end of said array.
+ *
+ * @return The pivot element.
+**/
 static inline T get_pivot(T const * const start, T const * const end) {
     (void)start;  // Gets optimised away …
     (void)end;  // … but suppresses potential warnings about unused functions.

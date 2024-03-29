@@ -55,7 +55,6 @@ struct Params input_params(int argc, char **argv) {
         }
     }
     assert(p.length > 0 && "Input length must be positive!");
-    assert(p.n_warmup > 0 && "Invalid # of warm-up iterations!");
     assert(p.n_reps > 0 && "Invalid # of repetition iterations!");
 
     return p;

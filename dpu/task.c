@@ -26,7 +26,7 @@ __host struct dpu_arguments DPU_INPUT_ARGUMENTS;
 T __mram_noinit input[LOAD_INTO_MRAM];  // array of random numbers
 T __mram_noinit output[LOAD_INTO_MRAM];
 mram_range ranges[NR_TASKLETS];
-struct xorshift rngs[NR_TASKLETS];  // Contains the seed for each tasklet.
+struct xorshift rngs[NR_TASKLETS];
 bool flipped;  // Whether `input` or `output` contains the final sorted sequence.
 bool dummy;  // Whether a dummy value was set at the end of the input sequence.
 
@@ -78,7 +78,7 @@ int main() {
     ranges[me()].end = part_end;
 
     /* Write random elements onto the MRAM. */
-    rngs[me()] = seed_xs(me() + 0b100111010);  // arbitrary number to improve the seed
+    rngs[me()] = seed_with_tasklet_id();
     triple_buffers buffers;
     allocate_triple_buffer(&buffers);
     T *cache = buffers.cache;
@@ -87,7 +87,7 @@ int main() {
     cycles[me()] = perfcounter_get();
 #endif
 
-    generate_uniform_distribution(input, cache, &ranges[me()], DPU_INPUT_ARGUMENTS.upper_bound);
+    generate_uniform_distribution_mram(input, cache, &ranges[me()], DPU_INPUT_ARGUMENTS.upper_bound);
 #ifdef UINT32
     // Add a dummy variable such that the last initial run has a length disible by 8.
     // This way, depleting (cf. `sort.c`) need less meddling with unaligned addresses.
