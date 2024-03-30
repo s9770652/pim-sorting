@@ -54,4 +54,5 @@ dkms.conf
 # Uninteresting Stuff
 .vscode
 bin
+obj
 *.s

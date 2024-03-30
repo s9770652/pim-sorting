@@ -17,7 +17,7 @@
 #include <mram.h>
 #include <seqread.h>
 
-#include "../support/common.h"
+#include "common.h"
 
 
 /// @brief The (minimum) size of a general-purpose buffer and two sequential-reader buffers.

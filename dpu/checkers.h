@@ -11,7 +11,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "../support/common.h"
+#include "common.h"
 #include "mram_loop.h"
 
 /**
