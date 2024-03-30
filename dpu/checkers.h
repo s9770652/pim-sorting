@@ -35,7 +35,6 @@ void print_array(T __mram_ptr *array, T *cache, size_t const length, char *label
 **/
 void print_single_line(T *array, size_t length);
 
-#define NR_COUNTS 8
 /**
  * @brief Contains several statistical values about MRAM arrays.
 **/
@@ -43,8 +42,8 @@ typedef struct array_stats
 {
     /// @brief The sum of all elements in some array.
     uint64_t sum;
-    /// @brief The counts of the values in the range `[0, `NR_COUNTS - 1[`.
-    size_t counts[NR_COUNTS];
+    /// @brief The counts of the values in the range `[0, 7]`.
+    size_t counts[8];
     /// @brief Whether the array is sorted.
     bool sorted;
 } array_stats;

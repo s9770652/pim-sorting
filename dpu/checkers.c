@@ -10,6 +10,9 @@
 
 #include "checkers.h"
 
+// The counts of the values in the range `[0, NR_COUNTS - 1]` are stored by `array_stats`.
+#define NR_COUNTS (sizeof(((array_stats *)0)->counts) / sizeof(((array_stats *)0)->counts[0]))
+
 uint64_t sums[NR_TASKLETS];
 size_t counts[NR_TASKLETS][NR_COUNTS];
 bool sorted[NR_TASKLETS];
