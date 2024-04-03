@@ -20,8 +20,9 @@ typedef uint64_t T;
 struct dpu_arguments {
     uint32_t length;  // number of elements to sort
     T upper_bound;  // maximum value (exclusive) of range to draw from
-    uint32_t n_reps;
-    uint32_t n_warmup;
+    uint32_t mode;  // benchmark: ID (0=no benchmark)
+    uint32_t n_reps;  // benchmark: how often to repeat measurements
+    uint32_t n_warmup;  // benchmark: how many repetitions before measuring time
 };
 
 #define ANSI_COLOR_RED     "\x1b[31m"

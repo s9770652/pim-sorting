@@ -44,6 +44,7 @@ int main(int argc, char** argv) {
     struct dpu_arguments input_arguments = {
         .length = p.length,
         .upper_bound = p.upper_bound,
+        .mode = p.mode,
         .n_reps = p.n_reps,
         .n_warmup = p.n_warmup
     };
