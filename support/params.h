@@ -22,7 +22,7 @@ static void usage(void) {
         "\nOptions:"
         "\n    -h          help"
         "\n    -n <uint>   input length [default: 512]"
-        "\n    -b <uint>   upper bound (exclusive) of range to draw random numbers from [default: 8]"
+        "\n    -b <uint>   upper bound (exclusive) of range to draw random numbers from (set to 0 to disable) [default: 8]"
         "\n    -w <uint>   # of untimed warm-up iterations [default: 1]"
         "\n    -r <uint>   # of timed repetition iterations [default: 3]"
         "\n    -B <int>    ID of benchmark to run (set to -1 to show list of all benchmark IDs)"

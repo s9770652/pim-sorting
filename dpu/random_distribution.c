@@ -8,7 +8,11 @@
 
 void generate_uniform_distribution_wram(T * const start, T * const end, T const upper_bound) {
     bool const is_power_of_two = (upper_bound & (upper_bound - 1)) == 0;
-    if (is_power_of_two) {
+    if (upper_bound == 0) {
+        for (T *t = start; t <= end; t++) {
+            *t = gen_xs(&rngs[me()]);
+        }
+    } else if (is_power_of_two) {
         for (T *t = start; t <= end; t++) {
             *t = (gen_xs(&rngs[me()]) & (upper_bound - 1));
         }
