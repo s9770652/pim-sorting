@@ -3,6 +3,7 @@
 
 #include <assert.h>
 #include <getopt.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "common.h"
@@ -25,7 +26,7 @@ static void usage(void) {
         "\n    -b <uint>   upper bound (exclusive) of range to draw random numbers from (set to 0 to disable) [default: 8]"
         "\n    -w <uint>   # of untimed warm-up iterations [default: 1]"
         "\n    -r <uint>   # of timed repetition iterations [default: 3]"
-        "\n    -B <int>    ID of benchmark to run (set to -1 to show list of all benchmark IDs)"
+        "\n    -B <int>    ID of benchmark to run (set to -1 to show list of all benchmark IDs) [default: 0]"
         "\n");
 }
 
@@ -33,9 +34,8 @@ static void show_modes(void) {
     fprintf(stderr,
         "\nBenchmark IDs:"
         "\n     0   None/Run normal sorting program (default)"
-        "\n     1   Custom ShellSorts"
-        "\n"
-        "\nSpecify these using -B=<ID> or -B<ID>!"
+        "\n     1   Sorting on a full WRAM cache"
+        "\n     2   Custom ShellSorts"
         "\n");
 }
 

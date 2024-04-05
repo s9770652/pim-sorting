@@ -41,7 +41,7 @@ inline size_t align(size_t to_align) {
     return ROUND_UP_POW2(to_align << DIV, 8) >> DIV;
 }
 
-int main() {
+int main(void) {
     if (me() == 0) {
         mem_reset();
         dummy = false;
