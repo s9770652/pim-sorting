@@ -1,4 +1,4 @@
-#include <stddef.h>
+#include <stdlib.h>
 
 #include <alloc.h>
 #include <barrier.h>
@@ -158,5 +158,5 @@ int main(void) {
 #endif
     compare_stats(&stats_1, &stats_2);
 #endif
-    return 0;
+    return EXIT_SUCCESS;
 }

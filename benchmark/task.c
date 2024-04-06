@@ -1,7 +1,7 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 #include <defs.h>
-#include <mram.h>
 #include <perfcounter.h>
 
 #include "base_sorts.h"
@@ -34,9 +34,9 @@ int main(void) {
         NULL, test_wram_sorts, test_custom_shell_sorts
     };
     if (DPU_INPUT_ARGUMENTS.mode > (sizeof testers / sizeof testers[0])) {
-        printf("'%d' is no known benchmark ID!\n", DPU_INPUT_ARGUMENTS.mode);
-        return 0;
+        printf("'%u' is no known benchmark ID!\n", DPU_INPUT_ARGUMENTS.mode);
+        return EXIT_SUCCESS;
     }
     testers[DPU_INPUT_ARGUMENTS.mode](&buffers, &DPU_INPUT_ARGUMENTS);
-    return 0;
+    return EXIT_SUCCESS;
 }
