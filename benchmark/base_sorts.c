@@ -24,12 +24,12 @@ struct algos_to_test {
  * @param start The start of the WRAM array to sort.
  * @param end The (exclusive) end of said array.
 **/
-static void insertion_sort_nosentinel(T *start, T * const end) {
-    T *curr, * const start_orig = start;
-    while ((curr = start++) < end) {  // todo: `++start` is slower‽
+static void insertion_sort_nosentinel(T * const start, T * const end) {
+    T *curr, *i = start;
+    while ((curr = i++) < end) {  // todo: `++i` is slower‽
         T *prev = curr - 1;
         T const to_sort = *curr;
-        while (prev >= start_orig && *prev > to_sort) {
+        while (prev >= start && *prev > to_sort) {
             *curr = *prev;
             curr = prev--;
         }
@@ -47,9 +47,9 @@ static void insertion_sort_nosentinel(T *start, T * const end) {
  * @param start The start of the WRAM array to sort.
  * @param end The (exclusive) end of said array.
 **/
-static void insertion_sort_sentinel(T *start, T * const end) {
-    T *curr;
-    while ((curr = start++) < end) {  // todo: `++start` is slower‽
+static void insertion_sort_sentinel(T * const start, T * const end) {
+    T *curr, *i = start;
+    while ((curr = i++) < end) {  // todo: `++i` is slower‽
         T *prev = curr - 1;
         T const to_sort = *curr;
         while (*prev > to_sort) {
@@ -68,12 +68,12 @@ static void insertion_sort_sentinel(T *start, T * const end) {
  * @param end The (exclusive) end of said array.
  * @param step The distance between any two elements compared.
 **/
-static void insertion_sort_with_steps(T *start, T * const end, size_t const step) {
-    T *curr, * const start_orig = start;
-    while ((curr = (start += step)) < end) {
+static void insertion_sort_with_steps(T * const start, T * const end, size_t const step) {
+    T *curr, *i = start;
+    while ((curr = (i += step)) < end) {
         T *prev = curr - step;  // todo: What if negative‽
         T const to_sort = *curr;
-        while (prev >= start_orig && *prev > to_sort) {
+        while (prev >= start && *prev > to_sort) {
             *curr = *prev;
             curr = prev;
             prev -= step;
@@ -90,9 +90,9 @@ static void insertion_sort_with_steps(T *start, T * const end, size_t const step
  * @param end The (exclusive) end of said array.
  * @param step The distance between any two elements compared.
 **/
-static void insertion_sort_with_steps_sentinel(T *start, T * const end, size_t const step) {
-    T *curr;
-    while ((curr = (start += step)) < end) {
+static void insertion_sort_with_steps_sentinel(T * const start, T * const end, size_t const step) {
+    T *curr, *i = start;
+    while ((curr = (i += step)) < end) {
         T *prev = curr - step;  // todo: What if negative‽
         T const to_sort = *curr;
         while (*prev > to_sort) {
