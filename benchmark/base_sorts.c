@@ -280,6 +280,7 @@ static perfcounter_t get_mean_of_time(perfcounter_t zeroth, perfcounter_t first)
  * @return The standard deviation.
 **/
 static perfcounter_t get_std_of_time(perfcounter_t zeroth, perfcounter_t first, perfcounter_t second) {
+    if (zeroth == 1) return 0;
     return sqroot_on_dpu((zeroth * second - first * first) / (zeroth * (zeroth - 1)));
 }
 
