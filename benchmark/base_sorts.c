@@ -62,7 +62,7 @@ static void insertion_sort_sentinel(T * const start, T * const end) {
 
 /**
  * @brief An implementation of InsertionSort where compared elements need not be neighbours.
- * Needed by ShellSort.
+ * Needed by the classic ShellSort.
  * 
  * @param start The start of the WRAM array to sort.
  * @param end The (exclusive) end of said array.
@@ -71,12 +71,36 @@ static void insertion_sort_sentinel(T * const start, T * const end) {
 static void insertion_sort_with_steps(T * const start, T * const end, size_t const step) {
     T *curr, *i = start;
     while ((curr = (i += step)) < end) {
-        T *prev = curr - step;  // todo: What if negative‽
+        T *prev = curr - step;
         T const to_sort = *curr;
         while (prev >= start && *prev > to_sort) {
             *curr = *prev;
             curr = prev;
             prev -= step;
+        }
+        *curr = to_sort;
+    }
+}
+
+/**
+ * @brief The same as `insertion_sort_with_steps`
+ * but additionally checks whether `prev` wrapped around.
+ * Needed by the classic ShellSort.
+ *
+ * @param start The start of the WRAM array to sort.
+ * @param end The (exclusive) end of said array.
+ * @param step The distance between any two elements compared.
+**/
+static void insertion_sort_with_large_steps(T * const start, T * const end, size_t const step) {
+    T *curr, *i = start;
+    while ((curr = (i += step)) < end) {
+        T *prev = curr - step;
+        T const to_sort = *curr;
+        while (prev >= start && *prev > to_sort) {
+            *curr = *prev;
+            curr = prev;
+            prev -= step;
+            if (prev >= end) break;  // Since `end` – `start` is small, this check is sufficient.
         }
         *curr = to_sort;
     }
@@ -93,7 +117,7 @@ static void insertion_sort_with_steps(T * const start, T * const end, size_t con
 static void insertion_sort_with_steps_sentinel(T * const start, T * const end, size_t const step) {
     T *curr, *i = start;
     while ((curr = (i += step)) < end) {
-        T *prev = curr - step;  // todo: What if negative‽
+        T *prev = curr - step;
         T const to_sort = *curr;
         while (*prev > to_sort) {
             *curr = *prev;
@@ -112,33 +136,54 @@ static void insertion_sort_with_steps_sentinel(T * const start, T * const end, s
 **/
 static void shell_sort_classic(T * const start, T * const end) {
     // Sort all elements which are n/2, n/4, …, 4, 2 indices apart.
-    size_t const n = end - start;
-    for (size_t inc = n / 2; inc >= 2; inc /= 2)
-        for (size_t j = 0; j < inc; j++)
-            insertion_sort_with_steps(&start[j], end, inc);
+    size_t step = (end - start) / 2;
+    for (; step >= ((uintptr_t)start >> DIV); step /= 2)  // Likely: step ≥ 512
+        for (size_t j = 0; j < step; j++)
+            insertion_sort_with_large_steps(&start[j], end, step);
+    for (; step >= 2; step /= 2)  // Likely: step ≤ 256
+        for (size_t j = 0; j < step; j++)
+            insertion_sort_with_steps(&start[j], end, step);
+    // Do one final sort with a step size of 1.
     insertion_sort_sentinel(start, end);
 }
 
 // Ciura
 static void shell_sort_ciura(T * const start, T * const end) {
-    size_t const steps[] = { 301, 132, 57, 23, 10, 4 };
-    for (size_t i = 0; i < 4; i++)
+    size_t const steps[] = { 57, 23, 10, 4 };
+    for (size_t i = 0; i < 2; i++)
         for (size_t j = 0; j < steps[i]; j++)
             insertion_sort_with_steps(&start[j], end, steps[i]);
-    for (size_t i = 4; i < 6; i++)
+    for (size_t i = 2; i < 4; i++)
         for (size_t j = 0; j < steps[i]; j++)
             insertion_sort_with_steps_sentinel(&start[j], end, steps[i]);
+    // Do one final sort with a step size of 1.
     insertion_sort_sentinel(start, end);
 }
 
-// Ciura-like
-static void shell_sort_custom(T * const start, T * const end) {
-    size_t const step = 6;
-    if (end - start <= 16)
-        for (size_t j = 0; j < step; j++)
-            insertion_sort_with_steps_sentinel(&start[j], end, step);
-    insertion_sort_sentinel(start, end);
+#define SHELL_SORT_CUSTOM_STEP_X(step)                                      \
+static void shell_sort_custom_step_##step(T * const start, T * const end) { \
+    for (size_t j = 0; j < step; j++)                                       \
+        insertion_sort_with_steps_sentinel(&start[j], end, step);           \
+    insertion_sort_sentinel(start, end);                                    \
 }
+SHELL_SORT_CUSTOM_STEP_X(2)
+SHELL_SORT_CUSTOM_STEP_X(3)
+SHELL_SORT_CUSTOM_STEP_X(4)
+SHELL_SORT_CUSTOM_STEP_X(5)
+SHELL_SORT_CUSTOM_STEP_X(6)
+SHELL_SORT_CUSTOM_STEP_X(7)
+SHELL_SORT_CUSTOM_STEP_X(8)
+SHELL_SORT_CUSTOM_STEP_X(9)
+
+// Ciura-like
+// static void shell_sort_custom(T * const start, T * const end) {
+//     size_t const step = 6;
+//     if (end - start > 16)
+//         for (size_t j = 0; j < step; j++)
+//             insertion_sort_with_steps_sentinel(&start[j], end, step);
+//     // Do one final sort with a step size of 1.
+//     insertion_sort_sentinel(start, end);
+// }
 
 /**
  * @brief Swaps the content of two addresses.
@@ -185,8 +230,7 @@ static inline T get_pivot(T const * const start, T const * const end) {
 static void quick_sort_recursive(T * const start, T * const end) {
     /* Detect base cases. */
     if (end - start <= QUICK_TO_INSERTION) {  // false if `end < start` due to wrapping
-        // insertion_sort_sentinel(start, end);
-        shell_sort_custom(start, end);
+        insertion_sort_sentinel(start, end);
         return;
     } else if (end <= start) return;
     /* Put elements into respective partitions. */
@@ -285,8 +329,24 @@ static perfcounter_t get_std_of_time(perfcounter_t zeroth, perfcounter_t first, 
 }
 
 #ifndef PRINT_IN_FILE_FRIENDLY_FORMAT
-#define PRINT_IN_FILE_FRIENDLY_FORMAT (0)
+#define PRINT_IN_FILE_FRIENDLY_FORMAT (1)
 #endif
+
+static void print_header(char *name, struct algos_to_test const algos[],
+        size_t const num_of_algos) {
+#if PRINT_IN_FILE_FRIENDLY_FORMAT
+    (void)name;
+    printf("n\t");
+    for (size_t i = 0; i < num_of_algos; i++)
+        printf("µ_%s σ_%s\t", algos[i].name, algos[i].name);
+#else
+    (void)algos;
+    (void)num_of_algos;
+    printf("TEST: %s (C: cycles, n: length)\n", name);
+#endif
+    printf("\n");
+}
+
 /**
  * @brief Prints the average of the measured runtimes and their standard deviation to the console.
  * Additionally prints the average on a per-element basis.
@@ -301,7 +361,15 @@ static perfcounter_t get_std_of_time(perfcounter_t zeroth, perfcounter_t first, 
 static void print_measurements(struct algos_to_test const * const algos, size_t const num_of_algos,
         size_t const length, perfcounter_t const zeroth, perfcounter_t const * const firsts,
         perfcounter_t const * const seconds) {
-#if !PRINT_IN_FILE_FRIENDLY_FORMAT
+#if PRINT_IN_FILE_FRIENDLY_FORMAT
+    (void)algos;  // Surpresses warning about unused arguments.
+    printf("%zd\t", length);
+    for (size_t id = 0; id < num_of_algos; id++) {
+        perfcounter_t mean = get_mean_of_time(zeroth, firsts[id]);
+        perfcounter_t std = get_std_of_time(zeroth, firsts[id], seconds[id]);
+        printf("%6lu %5lu\t", mean, std);
+    }
+#else
     size_t const log = 31 - __builtin_clz(length);
     printf("Length: %zd\n", length);
     for (size_t id = 0; id < num_of_algos; id++) {
@@ -317,8 +385,8 @@ static void print_measurements(struct algos_to_test const * const algos, size_t 
             mean / (length * length)
         );
     }
-    printf("\n");
 #endif
+    printf("\n");
 }
 
 void test_wram_sorts(triple_buffers *buffers, struct dpu_arguments *args) {
@@ -335,7 +403,7 @@ void test_wram_sorts(triple_buffers *buffers, struct dpu_arguments *args) {
         { insertion_sort_sentinel, "Insert (Sent.)" },
         // { shell_sort_classic, "Shell" },
         // { shell_sort_ciura, "Shell (Ciura)" },
-        // { shell_sort_custom, "Shell (Custom)" },
+        // { shell_sort_custom_step_6, "Shell (Custom)" },  // todo: Add skip over step
         // { quick_sort_recursive, "Quick (Rec.)" },
         // { quick_sort_iterative, "Quick (It.)" }
     };
@@ -349,10 +417,10 @@ void test_wram_sorts(triple_buffers *buffers, struct dpu_arguments *args) {
     }
 
     /* Do and time actual repetitions. */
-    size_t const lengths[] = { 8, 12, 16, 24, 32, 48, 64, 96, 128, 256, 512, 1024 };
+    size_t const lengths[] = { 8, 12, 16, 24, 32, 48, 64, 96, 128, 256, 512, 1024 };  // todo: add missing sizes
     assert(lengths[sizeof(lengths) / sizeof(lengths[0]) - 1] <= (TRIPLE_BUFFER_SIZE >> DIV));
 
-    printf("TEST: BASE SORTING ALGORITHMS (C: cycles, n: length)\n\n");
+    print_header("BASE SORTING ALGORITHMS", algos, num_of_algos);
     for (size_t li = 0; li < (sizeof lengths / sizeof lengths[0]); li++) {
         memset(first_moments, 0, sizeof first_moments);
         memset(second_moments, 0, sizeof second_moments);
@@ -387,26 +455,31 @@ void test_wram_sorts(triple_buffers *buffers, struct dpu_arguments *args) {
 void test_custom_shell_sorts(triple_buffers *buffers, struct dpu_arguments *args) {
     if (me() != 0) return;
     T *cache = buffers->cache;
-    enum { max_step = 11 };
-    perfcounter_t first_moments[max_step], second_moments[max_step], curr_time;
+
+    struct algos_to_test algos[] = {
+        { insertion_sort_sentinel, "1" },
+        { shell_sort_custom_step_2, "2" },
+        { shell_sort_custom_step_3, "3" },
+        { shell_sort_custom_step_4, "4" },
+        { shell_sort_custom_step_5, "5" },
+        { shell_sort_custom_step_6, "6" },
+        { shell_sort_custom_step_7, "7" },
+        { shell_sort_custom_step_8, "8" },
+        { shell_sort_custom_step_9, "9" },
+    };
+    enum { num_of_algos = sizeof algos / sizeof algos[0] };
+    perfcounter_t first_moments[num_of_algos], second_moments[num_of_algos], curr_time;
 
     /* Add additional sentinel values. */
-    for (size_t i = 0; i < max_step; i++)
+    for (size_t i = 0; i < num_of_algos; i++)
         cache[i] = T_MIN;
-    cache += max_step;
-
-    /* Create list of ShellSort names. */
-    struct algos_to_test algos[] = {  // no sprintf \[T]/
-        { NULL, "1" }, { NULL, "2" }, { NULL, "3" }, { NULL, "4" }, { NULL, "5" }, { NULL, "6" },
-        { NULL, "7" }, { NULL, "8" }, { NULL, "9" }, { NULL, "10" }, { NULL, "11" }
-    };
-    assert(max_step <= (sizeof algos / sizeof algos[0]));
+    cache += num_of_algos;
 
     /* Do and time actual repetitions. */
     size_t const lengths[] = { 8, 12, 16, 24, 32, 48, 64, 96, 128 };
-    assert(lengths[sizeof(lengths) / sizeof(lengths[0]) - 1] + max_step <= (TRIPLE_BUFFER_SIZE >> DIV));
+    assert(lengths[sizeof(lengths) / sizeof(lengths[0]) - 1] + num_of_algos <= (TRIPLE_BUFFER_SIZE >> DIV));
 
-    printf("TEST: CUSTOM SHELLSORTS (C: cycles, n: length)\n\n");
+    print_header("CUSTOM SHELLSORTS", algos, num_of_algos);
     for (size_t li = 0; li < (sizeof lengths / sizeof lengths[0]); li++) {
         memset(first_moments, 0, sizeof first_moments);
         memset(second_moments, 0, sizeof second_moments);
@@ -414,26 +487,16 @@ void test_custom_shell_sorts(triple_buffers *buffers, struct dpu_arguments *args
         T * const start = cache, * const end = &cache[length];
 
         for (uint32_t rep = 0; rep < args->n_reps; rep++) {
-            /* InsertionSort */
-            generate_uniform_distribution_wram(start, end, args->upper_bound);
-            curr_time = perfcounter_get();
-            insertion_sort_sentinel(start, end);
-            curr_time = perfcounter_get() - curr_time;
-            first_moments[0] += curr_time;
-            second_moments[0] += curr_time * curr_time;
-            /* ShellSorts */
-            for (size_t step = 2; step <= max_step; step++) {
+            for (size_t id = 0; id < num_of_algos; id++) {
                 generate_uniform_distribution_wram(start, end, args->upper_bound);
                 curr_time = perfcounter_get();
-                for (size_t j = 0; j < step; j++)
-                    insertion_sort_with_steps_sentinel(start, end, step);
-                insertion_sort_sentinel(start, end);
+                algos[id].algo(start, end);
                 curr_time = perfcounter_get() - curr_time;
-                first_moments[step-1] += curr_time;
-                second_moments[step-1] += curr_time * curr_time;
+                first_moments[id] += curr_time;
+                second_moments[id] += curr_time * curr_time;
             }
         }
 
-        print_measurements(algos, max_step, length, args->n_reps, first_moments, second_moments);
+        print_measurements(algos, num_of_algos, length, args->n_reps, first_moments, second_moments);
     }
 }
