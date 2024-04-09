@@ -4,10 +4,11 @@
 #include <defs.h>
 #include <perfcounter.h>
 
-#include "base_sorts.h"
 #include "buffers.h"
 #include "common.h"
 #include "random_generator.h"
+
+#include "base_sorts.h"
 
 typedef void test_function(triple_buffers *, struct dpu_arguments *);
 
