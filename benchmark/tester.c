@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include <alloc.h>
+#include <attributes.h>
 #include <perfcounter.h>
 
 #include "random_distribution.h"
@@ -156,7 +157,7 @@ void test_algos(char const name[], struct algos_to_test const algos[], size_t co
         memset(second_moments, 0, nb_of_bytes_for_moments);
 
         size_t const length = lengths[li];
-        T * const start = cache, * const end = &cache[length];
+        T * const start = cache, * const end = &cache[length - 1];
         for (uint32_t rep = 0; rep < args->n_reps; rep++) {
             for (size_t id = 0; id < num_of_algos; id++) {
                 generate_uniform_distribution_wram(start, end, args->upper_bound);

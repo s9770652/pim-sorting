@@ -16,8 +16,8 @@ extern struct xorshift rngs[NR_TASKLETS];
 /**
  * @brief Uniformly draws numbers and stores them in a WRAM array.
  * 
- * @param start The start of the array where to store the random data.
- * @param length The (exclusive) end of said array.
+ * @param start The first element of the array where to store the random data.
+ * @param length The last element of said array.
  * @param upper_bound The (exclusive) upper limit of the range to draw from.
 **/
 void generate_uniform_distribution_wram(T *start, T *end, T upper_bound);
