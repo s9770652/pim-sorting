@@ -12,8 +12,7 @@ struct Params {
     uint32_t length;  // number of elements to sort
     T upper_bound;  // maximum value (exclusive) of range to draw from
     uint32_t mode;  // benchmark: ID (0=no benchmark)
-    uint32_t n_warmup;  // benchmark: how often to repeat measurements
-    uint32_t n_reps;  // benchmark: how many repetitions before measuring time
+    uint32_t n_reps;  // benchmark: how often to repeat measurements
 };
 
 static void usage(void) {
@@ -43,7 +42,6 @@ struct Params input_params(int argc, char **argv) {
     struct Params p;
     p.length = 512;
     p.upper_bound = 8;
-    p.n_warmup = 1;
     p.n_reps = 3;
     p.mode = 0;
 
@@ -56,7 +54,6 @@ struct Params input_params(int argc, char **argv) {
             break;
         case 'n': p.length      = (uint32_t)atof(optarg); break;
         case 'b': p.upper_bound = (T)atof(optarg); break;
-        case 'w': p.n_warmup    = (uint32_t)atof(optarg); break;
         case 'r': p.n_reps      = (uint32_t)atof(optarg); break;
         case 'B':
             if (strcmp(optarg, "-1") == 0) {

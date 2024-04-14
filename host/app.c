@@ -45,7 +45,6 @@ int main(int argc, char** argv) {
         .upper_bound = p.upper_bound,
         .mode = p.mode,
         .n_reps = p.n_reps,
-        .n_warmup = p.n_warmup
     };
     DPU_FOREACH(set, dpu) {
         DPU_ASSERT(dpu_prepare_xfer(dpu, &input_arguments));
