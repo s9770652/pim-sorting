@@ -14,13 +14,21 @@ T **call_stack;
 
 /**
  * @brief An implementation of standard InsertionSort.
+ * @internal The compiler is iffy when it comes to this function.
+ * Using `curr = ++i` would algorithmically make sense as a list of length 1 is always sorted,
+ * yet it actually runs ~2% slower.
+ * And since moves and additions cost the same, the it does also does not benefit
+ * from being able to use `prev = i` instead of `prev = curr - 1`.
+ * The same slowdowns also happens when using `*i = start + 1`.
+ * Since only a few extra instructions are performed each call,
+ * I refrain from injecting Assembly code for the sake of maintainability and readability
  * 
  * @param start The first element of the WRAM array to sort.
  * @param end The last element of said array.
 **/
 static void insertion_sort_nosentinel(T * const start, T * const end) {
     T *curr, *i = start;
-    while ((curr = i++) <= end) {  // todo: `++i` is slower‽
+    while ((curr = i++) <= end) {
         T *prev = curr - 1;
         T const to_sort = *curr;
         while (prev >= start && *prev > to_sort) {
@@ -43,12 +51,12 @@ static void insertion_sort_nosentinel(T * const start, T * const end) {
 **/
 static void insertion_sort_sentinel(T * const start, T * const end) {
     T *curr, *i = start;
-    while ((curr = i++) <= end) {  // todo: `++i` is slower‽
-        T *prev = curr - 1;
+    while ((curr = i++) <= end) {
+        T *prev = curr - 1;  // always valid due to the sentinel value
         T const to_sort = *curr;
         while (*prev > to_sort) {
             *curr = *prev;
-            curr = prev--;  // always valid due to the sentinel value // todo: actually not because of i++ instead of ++i
+            curr = prev--;  // always valid due to the sentinel value
         }
         *curr = to_sort;
     }
@@ -294,7 +302,8 @@ void test_wram_sorts(triple_buffers * const buffers, struct dpu_arguments * cons
         { quick_sort_recursive, "Quick (Rec.)" },
         { quick_sort_iterative, "Quick (It.)" },
     };
-    size_t lengths[] = { 8, 12, 16, 24, 32, 48, 64, 96, 128, 256, 512, 1024 };  // todo: add missing sizes
+    // size_t lengths[] = { 8, 12, 16, 24, 32, 48, 64, 96, 128, 256, 384, 512, 768, 1024, 1280 };
+    size_t lengths[] = { 32, 48, 512, 1024 };
     size_t num_of_algos = sizeof algos / sizeof algos[0];
     size_t num_of_lengths = sizeof lengths / sizeof lengths[0];
     assert(lengths[num_of_lengths - 1] <= (TRIPLE_BUFFER_SIZE >> DIV));
