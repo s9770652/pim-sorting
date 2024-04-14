@@ -198,8 +198,7 @@ static void swap(T * const a, T * const b) {
  * Used by QuickSort.
  * Currently, the method of choosing must be changed by (un-)commenting the respective code lines.
  * Possible are:
- * - always the leftmost element
- * - the mean of the leftmost and the rightmost element
+ * - always the rightmost element
  * - the median of the leftmost, middle and rightmost element
  * 
  * @param start The first element of the WRAM array to sort.
@@ -207,21 +206,19 @@ static void swap(T * const a, T * const b) {
  *
  * @return The pivot element.
 **/
-static inline T get_pivot(T const * const start, T const * const end) {
+static inline T *get_pivot(T const * const start, T const * const end) {
     (void)start;  // Gets optimised away …
     (void)end;  // … but suppresses potential warnings about unused functions.
-    /* Always the leftmost element. */
-    // return *start;
-    /* The mean of the leftmost and the rightmost element. */
-    return (*start + *end) / 2;  // todo: source of error for large numbers!
-    /* The median of the leftmost, middle and rightmost element. */
+    /* Always the rightmost element. */
+    return (T *)end;
+    /* The median of the leftmost, middle and rightmost element. */  // todo: breaks iterative QuickSort
     // T *middle = (T *)(((uintptr_t)start + (uintptr_t)end) / 2 & ~(sizeof(T)-1));
     // if ((*start > *middle) ^ (*start > *end))
-    //     return *start;
-    // else if ((*middle < *start) ^ (*middle < *end))
-    //     return *middle;
+    //     return (T *)start;
+    // else if ((*start > *middle) ^ (*end > *middle))
+    //     return (T *)middle;
     // else
-    //     return *end;
+    //     return (T *)end;
 }
 
 static void quick_sort_recursive(T * const start, T * const end) {
@@ -232,12 +229,12 @@ static void quick_sort_recursive(T * const start, T * const end) {
         return;
     };
     /* Put elements into respective partitions. */
-    T * const pivot = end;
-    swap(pivot, end);
+    T * const pivot = get_pivot(start, end);
+    swap(pivot, end);  // Pivot acts as sentinel value.
     T *i = start - 1, *j = end;
     while (true) {
-        while (*++i < *pivot);
-        while (*--j > *pivot);
+        while (*++i < *end);
+        while (*--j > *end);
         if (i >= j) break;
         swap(i, j);
     }
@@ -261,7 +258,7 @@ static void quick_sort_iterative(T * const start, T * const end) {
             continue;
         }
         /* Put elements into respective partitions. */
-        T * const pivot = right;
+        T * const pivot = get_pivot(left, right);  // Pivot acts as sentinel value.
         swap(pivot, right);
         T *i = left - 1, *j = right;
         while (true) {
