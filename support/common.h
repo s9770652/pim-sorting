@@ -8,10 +8,12 @@
 typedef uint32_t T;
 #define DIV (2)  // Shift right to divide by `sizeof(T)`.
 #define T_MIN (0)
+#define TYPE_NAME "UINT32"
 #elif defined(UINT64)
 typedef uint64_t T;
 #define DIV (3)  // Shift right to divide by `sizeof(T)`.
 #define T_MIN (0)
+#define TYPE_NAME "UINT64"
 #endif
 
 #define BLOCK_LENGTH (BLOCK_SIZE >> DIV)
