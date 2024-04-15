@@ -72,9 +72,20 @@ static perfcounter_t get_std_of_time(perfcounter_t const zeroth, perfcounter_t c
  * @param name The name of the test.
  * @param algos A list of sorting algorithms and their names.
  * @param num_of_algos The length of the list.
+ * @param args The arguments with which the program was started,
+ * including the number of repetitions and the upper bound for random numbers.
 **/
 static void print_header(char const name[], struct algos_to_test const algos[],
-        size_t const num_of_algos) {
+        size_t const num_of_algos, struct dpu_arguments const * const args) {
+    printf(
+        "# reps=%d, upper bound=%d, TYPE=%s, BLOCK_SIZE=%d, SEQREAD_CACHE_SIZE=%d, NR_TASKLETS=%d\n",
+        args->n_reps,
+        args->upper_bound,
+        TYPE_NAME,
+        BLOCK_SIZE,
+        SEQREAD_CACHE_SIZE,
+        NR_TASKLETS
+    );
 #if PRINT_IN_FILE_FRIENDLY_FORMAT
     (void)name;
     printf("n\t");
@@ -151,7 +162,7 @@ void test_algos(char const name[], struct algos_to_test const algos[], size_t co
     overhead = get_mean_of_time(args->n_reps, overhead);
 
     /* Do and time actual repetitions. */
-    print_header(name, algos, num_of_algos);
+    print_header(name, algos, num_of_algos, args);
     for (size_t li = 0; li < num_of_lengths; li++) {
         memset(first_moments, 0, nb_of_bytes_for_moments);
         memset(second_moments, 0, nb_of_bytes_for_moments);
