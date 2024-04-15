@@ -32,7 +32,7 @@ int main(void) {
         DPU_INPUT_ARGUMENTS.upper_bound = 4;
     }
     test_function *testers[] = {
-        NULL, test_wram_sorts, test_custom_shell_sorts
+        NULL, test_wram_sorts, test_very_small_sorts
     };
     if (DPU_INPUT_ARGUMENTS.mode > (sizeof testers / sizeof testers[0])) {
         printf("'%u' is no known benchmark ID!\n", DPU_INPUT_ARGUMENTS.mode);

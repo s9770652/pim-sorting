@@ -8,9 +8,79 @@
 #include "tester.h"
 
 // The input length at which QuickSort changes to InsertionSort.
-#define QUICK_TO_INSERTION (96)
+#define QUICK_TO_INSERTION (16)
+// The input length at which HeapSort changes to InsertionSort.
+#define HEAP_TO_INSERTION (12)
 // The call stack for iterative QuickSort.
 T **call_stack;
+
+/**
+ * @brief Swaps the content of two addresses.
+ * 
+ * @param a First WRAM address.
+ * @param b Second WRAM address.
+**/
+static void swap(T * const a, T * const b) {
+    T const temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+/**
+ * @brief An implementation of standard BubbleSort.
+ * 
+ * @param start The first element of the WRAM array to sort.
+ * @param end The last element of said array.
+**/
+static void bubble_sort_nonadaptive(T * const start, T * const end) {
+    for (T *until = end; until > start; until--) {
+        for (T *i = start; i < until; i++) {
+            if (*i > *(i+1)) {
+                swap(i, i+1);
+            }
+        }
+    }
+}
+
+/**
+ * @brief An implementation of BubbleSort which terminates early if the array is sorted.
+ * 
+ * @param start The first element of the WRAM array to sort.
+ * @param end The last element of said array.
+**/
+static void bubble_sort_adaptive(T * const start, T * const end) {
+    bool swapped;
+    T *until = end;
+    do {
+        swapped = false;
+        for (T *i = start; i < until; i++) {
+            if (*i > *(i+1)) {
+                swap(i, i+1);
+                swapped = true;
+            }
+        }
+        until--;
+    } while (swapped);
+}
+
+/**
+ * @brief An implementation of standard SelectionSort.
+ * 
+ * @param start The first element of the WRAM array to sort.
+ * @param end The last element of said array.
+**/
+void selection_sort(T * const start, T * const end) {
+    for (T *i = start; i < end; i++) {
+        T *min = i;
+        for (T *j = i + 1; j <= end; j++) {
+            if (*j < *min) {
+                min = j;
+            }
+        }
+        swap(i, min);
+    }
+}
+
 
 /**
  * @brief An implementation of standard InsertionSort.
@@ -87,6 +157,7 @@ static void insertion_sort_with_steps(T * const start, T * const end, size_t con
 /**
  * @brief The same as `insertion_sort_with_steps`
  * but additionally checks whether `prev` wrapped around.
+ * This is needed if `(uintprt_t)start < ((step << DIV) * 2)`.
  * Needed by the classic ShellSort.
  *
  * @param start The first element of the WRAM array to sort.
@@ -151,10 +222,10 @@ static void shell_sort_classic(T * const start, T * const end) {
 
 // Ciura
 static void shell_sort_ciura(T * const start, T * const end) {
-    size_t const steps[] = { 57, 23, 10, 4 };
+    size_t const steps[] = { 132, 57, 23, 10, 4 };
     assert((uintptr_t)start >= (steps[0] << DIV));
     size_t i = 0;
-    for (; i < 2; i++)
+    for (; i <= sizeof steps / sizeof steps[0] - 2; i++)
         for (size_t j = 0; j < steps[i]; j++)
             insertion_sort_with_steps(&start[j], end, steps[i]);
     for (; i < sizeof steps / sizeof steps[0]; i++)
@@ -170,6 +241,7 @@ static void shell_sort_custom_step_##step(T * const start, T * const end) { \
         insertion_sort_with_steps_sentinel(&start[j], end, step);           \
     insertion_sort_sentinel(start, end);                                    \
 }
+
 SHELL_SORT_CUSTOM_STEP_X(2)
 SHELL_SORT_CUSTOM_STEP_X(3)
 SHELL_SORT_CUSTOM_STEP_X(4)
@@ -178,28 +250,6 @@ SHELL_SORT_CUSTOM_STEP_X(6)
 SHELL_SORT_CUSTOM_STEP_X(7)
 SHELL_SORT_CUSTOM_STEP_X(8)
 SHELL_SORT_CUSTOM_STEP_X(9)
-
-// Ciura-like
-// static void shell_sort_custom(T * const start, T * const end) {
-//     size_t const step = 6;
-//     if (end - start > 16)
-//         for (size_t j = 0; j < step; j++)
-//             insertion_sort_with_steps_sentinel(&start[j], end, step);
-//     // Do one final sort with a step size of 1.
-//     insertion_sort_sentinel(start, end);
-// }
-
-/**
- * @brief Swaps the content of two addresses.
- * 
- * @param a First WRAM address.
- * @param b Second WRAM address.
-**/
-static void swap(T * const a, T * const b) {
-    T const temp = *a;
-    *a = *b;
-    *b = temp;
-}
 
 /**
  * @brief Returns a pivot element for a WRAM array.
@@ -229,6 +279,14 @@ static inline T *get_pivot(T const * const start, T const * const end) {
     //     return (T *)end;
 }
 
+/**
+ * @brief An implementation of standard QuickSort.
+ * @internal Again, the compiler is iffy.
+ * Detecting the base cases before doing a recursive calls worsens the performance.
+ *
+ * @param start The first element of the WRAM array to sort.
+ * @param end The last element of said array.
+**/
 static void quick_sort_recursive(T * const start, T * const end) {
     /* Detect base cases. */
     if (end <= start) return;
@@ -252,6 +310,13 @@ static void quick_sort_recursive(T * const start, T * const end) {
     quick_sort_recursive(i + 1, end);
 }
 
+/**
+ * @brief An implementation of QuickSort with a manual call stack.
+ * To this end, enough memory should be reserved and saved in the file-wide variable `call_stack`.
+ * 
+ * @param start The first element of the WRAM array to sort.
+ * @param end The last element of said array.
+**/
 static void quick_sort_iterative(T * const start, T * const end) {
     // A “call” call_stack for holding the values of `left` and `right` is maintained.
     // Since QuickSort works in-place, it is stored right after the end.
@@ -289,21 +354,64 @@ static void quick_sort_iterative(T * const start, T * const end) {
     } while (call_stack != start_of_call_stack);
 }
 
+/**
+ * @brief Sifts a value down in a binary max-heap.
+ * 
+ * @param array A binary tree whose left and right subtrees are heapified.
+ * @param n The size of the binary tree.
+ * @param root The index of the value to sift down.
+**/
+static void heapify(T heap[], size_t const n, size_t const root) {
+    T const root_value = heap[root];
+    size_t father = root, son;
+    while ((son = father * 2 + 1) < n) {  // left son
+        if ((son + 1 < n) && (heap[son + 1] > heap[son]))  // Check if right son is bigger.
+            son++;
+        if (heap[son] <= root_value)  // Stop if both sons are smaller than their father.
+            break;
+        heap[father] = heap[son];  // Shift son up.
+        father = son;
+    }
+    heap[father] = root_value;
+}
+
+/**
+ * @brief An implementation of standard HeapSort.
+ * 
+ * @param start The first element of the WRAM array to sort.
+ * @param end The last element of said array.
+**/
+static void heap_sort(T * const start, T * const end) {
+    size_t n = end - start + 1;
+    /* Build a heap using Floyd's method. */
+    for (size_t r = n / 2; r > 0; r--) {
+        heapify(start, n, r - 1);
+    }
+    /* Sort by repeatedly putting the root at the end of the heap. */
+    size_t i;
+    for (i = n - 1; i > HEAP_TO_INSERTION; i--) {
+        swap(&start[0], &start[i]);
+        heapify(start, i, 0);
+    }
+    insertion_sort_sentinel(start, &start[i]);
+}
+
 void test_wram_sorts(triple_buffers * const buffers, struct dpu_arguments * const args) {
     if (me() != 0) return;
 
     char name[] = "BASE SORTING ALGORITHMS";
     struct algos_to_test const algos[] = {
         // { insertion_sort_nosentinel, "Insert" },
-        // { insertion_sort_sentinel, "Insert (Sent.)" },
-        { shell_sort_classic, "Shell" },
-        { shell_sort_ciura, "Shell (Ciura)" },
-        // { shell_sort_custom_step_6, "Shell (Custom)" },  // todo: Add skip over step
-        { quick_sort_recursive, "Quick (Rec.)" },
-        { quick_sort_iterative, "Quick (It.)" },
+        // { insertion_sort_sentinel, "InsertSent" },
+        // { shell_sort_classic, "Shell" },
+        // { shell_sort_ciura, "ShellCiura" },
+        // { shell_sort_custom_step_6, "ShellCustom" },  // todo: Add skip over step
+        // { quick_sort_recursive, "QuickRec" },
+        { heap_sort, "Heap" },
+        // { quick_sort_iterative, "QuickIt" },
     };
     // size_t lengths[] = { 8, 12, 16, 24, 32, 48, 64, 96, 128, 256, 384, 512, 768, 1024, 1280 };
-    size_t lengths[] = { 32, 48, 512, 1024 };
+    size_t lengths[] = { 1024 };
     size_t num_of_algos = sizeof algos / sizeof algos[0];
     size_t num_of_lengths = sizeof lengths / sizeof lengths[0];
     assert(lengths[num_of_lengths - 1] <= (TRIPLE_BUFFER_SIZE >> DIV));
@@ -315,7 +423,7 @@ void test_wram_sorts(triple_buffers * const buffers, struct dpu_arguments * cons
     test_algos(name, algos, num_of_algos, lengths, num_of_lengths, buffers, args);
 }
 
-void test_custom_shell_sorts(triple_buffers * const buffers, struct dpu_arguments * const args) {
+void test_very_small_sorts(triple_buffers * const buffers, struct dpu_arguments * const args) {
     if (me() != 0) return;
 
     char name[] = "CUSTOM SHELLSORTS";
@@ -329,17 +437,19 @@ void test_custom_shell_sorts(triple_buffers * const buffers, struct dpu_argument
         { shell_sort_custom_step_7, "7" },
         { shell_sort_custom_step_8, "8" },
         { shell_sort_custom_step_9, "9" },
+        { bubble_sort_adaptive, "BubbleAdapt" },
+        { bubble_sort_nonadaptive, "BubbleNonAdapt" },
+        { selection_sort, "Selection" },
     };
-    size_t lengths[] = { 8, 12, 16, 24, 32, 48, 64, 96, 128 };
+    size_t lengths[] = { 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24 };
     size_t num_of_algos = sizeof algos / sizeof algos[0];
     size_t num_of_lengths = sizeof lengths / sizeof lengths[0];
 
     /* Add additional sentinel values. */
-    size_t sentinels = (BIG_STEP > 9) ? BIG_STEP : num_of_algos;
-    assert(lengths[num_of_lengths - 1] + sentinels <= (TRIPLE_BUFFER_SIZE >> DIV));
-    for (size_t i = 0; i < sentinels; i++)
+    assert(lengths[num_of_lengths - 1] + num_of_algos <= (TRIPLE_BUFFER_SIZE >> DIV));
+    for (size_t i = 0; i < num_of_algos; i++)
         buffers->cache[i] = T_MIN;
-    buffers->cache += sentinels;
+    buffers->cache += num_of_algos;
 
     test_algos(name, algos, num_of_algos, lengths, num_of_lengths, buffers, args);
 }

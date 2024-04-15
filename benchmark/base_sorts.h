@@ -20,6 +20,6 @@ void test_wram_sorts(triple_buffers *buffers, struct dpu_arguments *args);
  * @param buffers A struct containing a WRAM cache.
  * @param args The arguments with which the program was started.
 **/
-void test_custom_shell_sorts(triple_buffers *buffers, struct dpu_arguments *args);
+void test_very_small_sorts(triple_buffers *buffers, struct dpu_arguments *args);
 
 #endif // _BASE_SORTS_H_
