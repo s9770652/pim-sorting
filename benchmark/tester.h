@@ -8,7 +8,7 @@ typedef void base_sort_algo(T *, T *);
  * @brief Holds both a pointer to and the name of a function.
  * Useful for creating lists of functions to test.
 **/
-struct algos_to_test {
+struct algo_to_test {
     /// @brief A pointer to a WRAM sorting function.
     base_sort_algo *algo;
     /// @brief The name of a WRAM sorting function.
@@ -27,6 +27,6 @@ struct algos_to_test {
  * @param args The arguments with which the program was started,
  * including the number of repetitions and the upper bound for random numbers.
 **/
-void test_algos(char const name[], struct algos_to_test const algos[], size_t num_of_algos,
+void test_algos(char const name[], struct algo_to_test const algos[], size_t num_of_algos,
         size_t const lengths[], size_t num_of_lengths, triple_buffers const *buffers,
         struct dpu_arguments const *args);

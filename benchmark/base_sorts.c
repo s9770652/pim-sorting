@@ -8,7 +8,7 @@
 #include "tester.h"
 
 // The input length at which QuickSort changes to InsertionSort.
-#define QUICK_TO_INSERTION (16)
+#define QUICK_TO_INSERTION (12)
 // The input length at which HeapSort changes to InsertionSort.
 #define HEAP_TO_INSERTION (12)
 // The call stack for iterative QuickSort.
@@ -133,53 +133,6 @@ static void insertion_sort_sentinel(T * const start, T * const end) {
 }
 
 /**
- * @brief An implementation of InsertionSort where compared elements need not be neighbours.
- * Needed by the classic ShellSort.
- * 
- * @param start The first element of the WRAM array to sort.
- * @param end The last element of said array.
- * @param step The distance between any two elements compared.
-**/
-static void insertion_sort_with_steps(T * const start, T * const end, size_t const step) {
-    T *curr, *i = start;
-    while ((curr = (i += step)) <= end) {
-        T *prev = curr - step;
-        T const to_sort = *curr;
-        while (prev >= start && *prev > to_sort) {
-            *curr = *prev;
-            curr = prev;
-            prev -= step;
-        }
-        *curr = to_sort;
-    }
-}
-
-/**
- * @brief The same as `insertion_sort_with_steps`
- * but additionally checks whether `prev` wrapped around.
- * This is needed if `(uintprt_t)start < ((step << DIV) * 2)`.
- * Needed by the classic ShellSort.
- *
- * @param start The first element of the WRAM array to sort.
- * @param end The last element of said array.
- * @param step The distance between any two elements compared.
-**/
-static void insertion_sort_with_large_steps(T * const start, T * const end, size_t const step) {
-    T *curr, *i = start;
-    while ((curr = (i += step)) <= end) {
-        T *prev = curr - step;
-        T const to_sort = *curr;
-        while (prev >= start && *prev > to_sort) {
-            *curr = *prev;
-            curr = prev;
-            prev -= step;
-            if (prev >= end) break;  // Since `end` – `start` is small, this check is sufficient.
-        }
-        *curr = to_sort;
-    }
-}
-
-/**
  * @brief A combination of `insertion_sort_sentinel` and `insertion_sort_with_steps`.
  * Needed by ShellSort.
  * 
@@ -202,41 +155,43 @@ static void insertion_sort_with_steps_sentinel(T * const start, T * const end, s
 }
 
 /**
- * @brief An implementation of standard ShellSort.
+ * @brief An implementation of ShellSort using Ciura’s optimal sequence for 128 elements.
  * 
  * @param start The first element of the WRAM array to sort.
  * @param end The last element of said array.
 **/
-static void shell_sort_classic(T * const start, T * const end) {
-    // Sort all elements which are n/2, n/4, …, 4, 2 indices apart.
-    size_t step = (end - start + 1) / 2;
-    for (; step >= ((uintptr_t)start >> DIV); step /= 2)  // Likely: step ≥ 512
-        for (size_t j = 0; j < step; j++)
-            insertion_sort_with_large_steps(&start[j], end, step);
-    for (; step >= 2; step /= 2)  // Likely: step ≤ 256
-        for (size_t j = 0; j < step; j++)
-            insertion_sort_with_steps(&start[j], end, step);
-    // Do one final sort with a step size of 1.
-    insertion_sort_sentinel(start, end);
-}
-
-// Ciura
 static void shell_sort_ciura(T * const start, T * const end) {
-    size_t const steps[] = { 132, 57, 23, 10, 4 };
-    assert((uintptr_t)start >= (steps[0] << DIV));
-    size_t i = 0;
-    for (; i <= sizeof steps / sizeof steps[0] - 2; i++)
-        for (size_t j = 0; j < steps[i]; j++)
-            insertion_sort_with_steps(&start[j], end, steps[i]);
-    for (; i < sizeof steps / sizeof steps[0]; i++)
-        for (size_t j = 0; j < steps[i]; j++)
-            insertion_sort_with_steps_sentinel(&start[j], end, steps[i]);
-    // Do one final sort with a step size of 1.
+    if (end - start + 1 <= 64) {
+        for (size_t j = 0; j < 6; j++)
+            insertion_sort_with_steps_sentinel(&start[j], end, 6);
+    } else {
+        for (size_t j = 0; j < 17; j++)
+            insertion_sort_with_steps_sentinel(&start[j], end, 17);
+        for (size_t j = 0; j < 4; j++)
+            insertion_sort_with_steps_sentinel(&start[j], end, 4);
+    }
     insertion_sort_sentinel(start, end);
 }
 
+#define BIG_STEP (-1)
+
+/**
+ * @brief Creates a ShellSort of the name `shell_sort_custom_step_x`
+ * with x being the step size before the final InsertionSort.
+ * If `BIG_STEP` is bigger than `x`, there will be three rounds
+ * with `BIG_STEP` being the first step size.
+ * 
+ * @param step The step size before the final InsertionSort. [Parameter of the macro]
+ * @param start The first element of the WRAM array to sort. [Parameter of the ShellSort]
+ * @param end The last element of said array. [Parameter of the ShellSort]
+**/
 #define SHELL_SORT_CUSTOM_STEP_X(step)                                      \
 static void shell_sort_custom_step_##step(T * const start, T * const end) { \
+    if (BIG_STEP >= step) {                                                 \
+        _Pragma("nounroll")                                                 \
+        for (size_t j = 0; j < BIG_STEP; j++)                               \
+            insertion_sort_with_steps_sentinel(&start[j], end, BIG_STEP);   \
+    }                                                                       \
     for (size_t j = 0; j < step; j++)                                       \
         insertion_sort_with_steps_sentinel(&start[j], end, step);           \
     insertion_sort_sentinel(start, end);                                    \
@@ -400,25 +355,36 @@ void test_wram_sorts(triple_buffers * const buffers, struct dpu_arguments * cons
     if (me() != 0) return;
 
     char name[] = "BASE SORTING ALGORITHMS";
-    struct algos_to_test const algos[] = {
-        // { insertion_sort_nosentinel, "Insert" },
-        // { insertion_sort_sentinel, "InsertSent" },
-        // { shell_sort_classic, "Shell" },
-        // { shell_sort_ciura, "ShellCiura" },
-        // { shell_sort_custom_step_6, "ShellCustom" },  // todo: Add skip over step
-        // { quick_sort_recursive, "QuickRec" },
+    struct algo_to_test const algos[] = {
+        { insertion_sort_nosentinel, "Insert" },
+        { insertion_sort_sentinel, "InsertSent" },
+        { shell_sort_ciura, "ShellCiura" },
+        { quick_sort_recursive, "QuickRec" },
+        { quick_sort_iterative, "QuickIt" },
         { heap_sort, "Heap" },
-        // { quick_sort_iterative, "QuickIt" },
     };
     // size_t lengths[] = { 8, 12, 16, 24, 32, 48, 64, 96, 128, 256, 384, 512, 768, 1024, 1280 };
-    size_t lengths[] = { 1024 };
+    // size_t lengths[] = { 24, 32, 48, 64, 96, 128 };
+    size_t lengths[] = {
+        24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68, 72, 76, 80,
+        84, 88, 92, 96, 100, 104, 108, 112, 116, 120, 124, 128
+    };
     size_t num_of_algos = sizeof algos / sizeof algos[0];
     size_t num_of_lengths = sizeof lengths / sizeof lengths[0];
     assert(lengths[num_of_lengths - 1] <= (TRIPLE_BUFFER_SIZE >> DIV));
 
+    /* Add additional sentinel values. */
+    size_t num_of_sentinels = 17;
+    assert(lengths[num_of_lengths - 1] + num_of_sentinels <= (TRIPLE_BUFFER_SIZE >> DIV));
+    for (size_t i = 0; i < num_of_sentinels; i++)
+        buffers->cache[i] = T_MIN;
+    buffers->cache += num_of_sentinels;
+
     /* Reserve memory for custom call stack, which is needed by the iterative QuickSort. */
+    // 20 pointers on the stack was the most I've seen for 1024 elements
+    // so the space reserved here should be enough.
     size_t const log = 31 - __builtin_clz(lengths[num_of_lengths - 1]);
-    call_stack = mem_alloc(4 * log * sizeof(T *));  // Should be enough as 20 pointers was the most I've seen.
+    call_stack = mem_alloc(4 * log * sizeof(T *));
 
     test_algos(name, algos, num_of_algos, lengths, num_of_lengths, buffers, args);
 }
@@ -426,8 +392,8 @@ void test_wram_sorts(triple_buffers * const buffers, struct dpu_arguments * cons
 void test_very_small_sorts(triple_buffers * const buffers, struct dpu_arguments * const args) {
     if (me() != 0) return;
 
-    char name[] = "CUSTOM SHELLSORTS";
-    struct algos_to_test algos[] = {
+    char name[] = "SMALL SORTING ALGORITHMS";
+    struct algo_to_test algos[] = {
         { insertion_sort_sentinel, "1" },
         { shell_sort_custom_step_2, "2" },
         { shell_sort_custom_step_3, "3" },
@@ -437,19 +403,24 @@ void test_very_small_sorts(triple_buffers * const buffers, struct dpu_arguments 
         { shell_sort_custom_step_7, "7" },
         { shell_sort_custom_step_8, "8" },
         { shell_sort_custom_step_9, "9" },
+        { insertion_sort_nosentinel, "1NoSentinel" },
         { bubble_sort_adaptive, "BubbleAdapt" },
         { bubble_sort_nonadaptive, "BubbleNonAdapt" },
         { selection_sort, "Selection" },
     };
-    size_t lengths[] = { 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24 };
+    size_t lengths[] = {
+        3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
+        15, 16, 17, 18, 19, 20, 21, 22, 23, 24
+    };
     size_t num_of_algos = sizeof algos / sizeof algos[0];
     size_t num_of_lengths = sizeof lengths / sizeof lengths[0];
 
     /* Add additional sentinel values. */
-    assert(lengths[num_of_lengths - 1] + num_of_algos <= (TRIPLE_BUFFER_SIZE >> DIV));
-    for (size_t i = 0; i < num_of_algos; i++)
+    size_t num_of_sentinels = 9;
+    assert(lengths[num_of_lengths - 1] + num_of_sentinels <= (TRIPLE_BUFFER_SIZE >> DIV));
+    for (size_t i = 0; i < num_of_sentinels; i++)
         buffers->cache[i] = T_MIN;
-    buffers->cache += num_of_algos;
+    buffers->cache += num_of_sentinels;
 
     test_algos(name, algos, num_of_algos, lengths, num_of_lengths, buffers, args);
 }
