@@ -25,7 +25,7 @@ typedef struct mram_range {
  * @param i Current index, i. e. the start of the current block.
  * @param curr_length Length of the current block as number of elements.
  * @param curr_size Size of the current block, aligned on 8 bytes.
- * @param range Start and end of the tasklet's range.
+ * @param range Start and end of the tasklet’s range.
 **/
 #define LOOP_ON_MRAM(i, curr_length, curr_size, range)                                              \
 for (                                                                                               \

@@ -64,9 +64,9 @@ int main(void) {
     const size_t length = DPU_INPUT_ARGUMENTS.length ?: 0x600;
     // maximum number of elements in the subarray filled by each tasklet
     const size_t part_length = align(DIV_CEIL(length, NR_TASKLETS));
-    // start of the tasklet's subarray
+    // start of the tasklet’s subarray
     const size_t part_start = me() * part_length;
-    // end of the tasklet's subarray
+    // end of the tasklet’s subarray
 #ifdef UINT32
     const size_t part_end = (me() == NR_TASKLETS - 1) ? ROUND_UP_POW2(length, 2) : part_start + part_length;
 #else

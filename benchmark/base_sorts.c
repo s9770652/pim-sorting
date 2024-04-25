@@ -338,7 +338,7 @@ static void heapify(T heap[], size_t const n, size_t const root) {
 **/
 static void heap_sort(T * const start, T * const end) {
     size_t n = end - start + 1;
-    /* Build a heap using Floyd's method. */
+    /* Build a heap using Floyd’s method. */
     for (size_t r = n / 2; r > 0; r--) {
         heapify(start, n, r - 1);
     }
@@ -381,7 +381,7 @@ void test_wram_sorts(triple_buffers * const buffers, struct dpu_arguments * cons
     buffers->cache += num_of_sentinels;
 
     /* Reserve memory for custom call stack, which is needed by the iterative QuickSort. */
-    // 20 pointers on the stack was the most I've seen for 1024 elements
+    // 20 pointers on the stack was the most I’ve seen for 1024 elements
     // so the space reserved here should be enough.
     size_t const log = 31 - __builtin_clz(lengths[num_of_lengths - 1]);
     call_stack = mem_alloc(4 * log * sizeof(T *));

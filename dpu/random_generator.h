@@ -23,7 +23,7 @@ struct xorshift {
 };
 
 /**
- * @brief Uses the tasklet's ID to set the inital word of state.
+ * @brief Uses the tasklet’s ID to set the inital word of state.
  * Adds a constant to introduce more 1s, which supposedly improve the seed.
  *
  * @return A seeded state.
