@@ -224,7 +224,7 @@ static inline T *get_pivot(T const * const start, T const * const end) {
     (void)end;  // … but suppresses potential warnings about unused functions.
     /* Always the rightmost element. */
     return (T *)end;
-    /* The median of the leftmost, middle and rightmost element. */  // todo: breaks iterative QuickSort
+    // /* The median of the leftmost, middle and rightmost element. */
     // T *middle = (T *)(((uintptr_t)start + (uintptr_t)end) / 2 & ~(sizeof(T)-1));
     // if ((*start > *middle) ^ (*start > *end))
     //     return (T *)start;
@@ -290,8 +290,8 @@ static void quick_sort_iterative(T * const start, T * const end) {
         swap(pivot, right);
         T *i = left - 1, *j = right;
         while (true) {
-            while (*++i < *pivot);
-            while (*--j > *pivot);
+            while (*++i < *right);
+            while (*--j > *right);
             if (i >= j) break;
             swap(i, j);
         }
