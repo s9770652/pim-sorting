@@ -4,6 +4,8 @@
 #include <alloc.h>
 #include <defs.h>
 
+#include "random_generator.h"
+
 #include "base_sorts.h"
 #include "tester.h"
 
@@ -221,8 +223,8 @@ SHELL_SORT_CUSTOM_STEP_X(9)
 static inline T *get_pivot(T const * const start, T const * const end) {
     (void)start;  // Gets optimised away …
     (void)end;  // … but suppresses potential warnings about unused functions.
-    /* Always the rightmost element. */
-    return (T *)end;
+    // /* Always the rightmost element. */
+    // return (T *)end;
     // /* The median of the leftmost, middle and rightmost element. */
     // T *middle = (T *)(((uintptr_t)start + (uintptr_t)end) / 2 & ~(sizeof(T)-1));
     // if ((*start > *middle) ^ (*start > *end))
@@ -231,6 +233,10 @@ static inline T *get_pivot(T const * const start, T const * const end) {
     //     return (T *)middle;
     // else
     //     return (T *)end;
+    /* Pick a random element. */
+    size_t n = end - start + 1;
+    size_t offset = rr(n, &pivot_rng_state);
+    return (T *)(start + offset);
 }
 
 /**
@@ -360,7 +366,6 @@ void test_wram_sorts(triple_buffers * const buffers, struct dpu_arguments * cons
         // { shell_sort_ciura, "ShellCiura" },
         { quick_sort_recursive, "QuickRec" },
         { quick_sort_iterative, "QuickIt" },
-        // { no_fallback, "QuickNoFallb." },
         // { heap_sort, "Heap" },
     };
     size_t lengths[] = { 20, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };

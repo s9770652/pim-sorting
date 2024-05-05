@@ -1,5 +1,11 @@
+#ifndef _TESTER_H_
+#define _TESTER_H_
+
 #include "buffers.h"
 #include "common.h"
+#include "random_generator.h"
+
+extern struct xorshift pivot_rng_state;
 
 /// @brief Every WRAM sorting functions must adher to this pattern.
 typedef void base_sort_algo(T *, T *);
@@ -30,3 +36,5 @@ struct algo_to_test {
 void test_algos(char const name[], struct algo_to_test const algos[], size_t num_of_algos,
         size_t const lengths[], size_t num_of_lengths, triple_buffers const *buffers,
         struct dpu_arguments const *args);
+
+#endif  // _TESTER_H_

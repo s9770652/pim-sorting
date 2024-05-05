@@ -12,6 +12,7 @@
 #include "tester.h"
 
 struct xorshift rngs[NR_TASKLETS];
+struct xorshift pivot_rng_state;
 
 /**
  * @brief An empty functions used when calculating the function call overhead.
@@ -160,6 +161,7 @@ void test_algos(char const name[], struct algo_to_test const algos[], size_t con
             for (size_t id = 0; id < num_of_algos; id++) {
                 // generate_uniform_distribution_wram(start, end, args->upper_bound);
                 generate_almost_sorted_distribution_wram(start, end, args->upper_bound);
+                pivot_rng_state = seed_xs(rep + 0b1011100111010);
                 curr_time = perfcounter_get();
                 algos[id].algo(start, end);
                 curr_time = perfcounter_get() - curr_time - overhead;
