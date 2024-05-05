@@ -23,6 +23,15 @@ struct xorshift {
 };
 
 /**
+ * @brief Set the inital word of state. Seeds with more 1s are better.
+ * 
+ * @param seed The initial word of state.
+ *
+ * @return A seeded state.
+**/
+struct xorshift seed_xs(T const seed);
+
+/**
  * @brief Uses the tasklet’s ID to set the inital word of state.
  * Adds a constant to introduce more 1s, which supposedly improve the seed.
  *

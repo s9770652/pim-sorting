@@ -18,12 +18,10 @@ T __mram_noinit input[LOAD_INTO_MRAM];  // array of random numbers
 T __mram_noinit output[LOAD_INTO_MRAM];
 
 __host struct dpu_arguments DPU_INPUT_ARGUMENTS;
-struct xorshift rngs[NR_TASKLETS];
 
 int main(void) {
     triple_buffers buffers;
     allocate_triple_buffer(&buffers);
-    rngs[me()] = seed_with_tasklet_id();
     perfcounter_config(COUNT_CYCLES, false);
 
     if (DPU_INPUT_ARGUMENTS.mode == 0) {  // called via debugger?

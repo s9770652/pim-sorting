@@ -9,6 +9,8 @@
 
 #include "tester.h"
 
+struct xorshift rngs[NR_TASKLETS];
+
 /**
  * @brief An empty functions used when calculating the function call overhead.
  * 
@@ -170,6 +172,7 @@ void test_algos(char const name[], struct algo_to_test const algos[], size_t con
         size_t const length = lengths[li];
         T * const start = cache, * const end = &cache[length - 1];
         for (uint32_t rep = 0; rep < args->n_reps; rep++) {
+            rngs[0] = seed_xs(rep + 0b1011100111010);
             for (size_t id = 0; id < num_of_algos; id++) {
                 generate_uniform_distribution_wram(start, end, args->upper_bound);
                 curr_time = perfcounter_get();
