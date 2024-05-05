@@ -8,11 +8,11 @@
 #include "tester.h"
 
 // The input length at which QuickSort changes to InsertionSort.
-#define QUICK_TO_INSERTION (12)
+#define QUICK_TO_INSERTION (16)
 // The input length at which HeapSort changes to InsertionSort.
 #define HEAP_TO_INSERTION (12)
 // The call stack for iterative QuickSort.
-T **call_stack;
+static T **call_stack;
 
 /**
  * @brief Swaps the content of two addresses.
@@ -80,7 +80,6 @@ void selection_sort(T * const start, T * const end) {
         swap(i, min);
     }
 }
-
 
 /**
  * @brief An implementation of standard InsertionSort.
@@ -188,7 +187,7 @@ static void shell_sort_ciura(T * const start, T * const end) {
 #define SHELL_SORT_CUSTOM_STEP_X(step)                                      \
 static void shell_sort_custom_step_##step(T * const start, T * const end) { \
     if (BIG_STEP >= step) {                                                 \
-        _Pragma("nounroll")                                                 \
+        _Pragma("nounroll")  /* The .text region may overflow otherwise. */ \
         for (size_t j = 0; j < BIG_STEP; j++)                               \
             insertion_sort_with_steps_sentinel(&start[j], end, BIG_STEP);   \
     }                                                                       \
@@ -248,7 +247,7 @@ static void quick_sort_recursive(T * const start, T * const end) {
     if (end - start + 1 <= QUICK_TO_INSERTION) {
         insertion_sort_sentinel(start, end);
         return;
-    };
+    }
     /* Put elements into respective partitions. */
     T * const pivot = get_pivot(start, end);
     swap(pivot, end);  // Pivot acts as sentinel value.
@@ -356,19 +355,20 @@ void test_wram_sorts(triple_buffers * const buffers, struct dpu_arguments * cons
 
     char name[] = "BASE SORTING ALGORITHMS";
     struct algo_to_test const algos[] = {
-        { insertion_sort_nosentinel, "Insert" },
-        { insertion_sort_sentinel, "InsertSent" },
-        { shell_sort_ciura, "ShellCiura" },
+        // { insertion_sort_nosentinel, "Insert" },
+        // { insertion_sort_sentinel, "InsertSent" },
+        // { shell_sort_ciura, "ShellCiura" },
         { quick_sort_recursive, "QuickRec" },
         { quick_sort_iterative, "QuickIt" },
-        { heap_sort, "Heap" },
+        // { no_fallback, "QuickNoFallb." },
+        // { heap_sort, "Heap" },
     };
-    // size_t lengths[] = { 8, 12, 16, 24, 32, 48, 64, 96, 128, 256, 384, 512, 768, 1024, 1280 };
+    size_t lengths[] = { 20, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };
     // size_t lengths[] = { 24, 32, 48, 64, 96, 128 };
-    size_t lengths[] = {
-        24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68, 72, 76, 80,
-        84, 88, 92, 96, 100, 104, 108, 112, 116, 120, 124, 128
-    };
+    // size_t lengths[] = {
+    //     16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68, 72, 76, 80,
+    //     84, 88, 92, 96, 100, 104, 108, 112, 116, 120, 124, 128
+    // };
     size_t num_of_algos = sizeof algos / sizeof algos[0];
     size_t num_of_lengths = sizeof lengths / sizeof lengths[0];
     assert(lengths[num_of_lengths - 1] <= (TRIPLE_BUFFER_SIZE >> DIV));

@@ -9,6 +9,7 @@
 #include "random_generator.h"
 
 #include "base_sorts.h"
+#include "quick_sorts.h"
 
 typedef void test_function(triple_buffers *, struct dpu_arguments *);
 
@@ -30,10 +31,10 @@ int main(void) {
         DPU_INPUT_ARGUMENTS.upper_bound = 4;
     }
     test_function *testers[] = {
-        NULL, test_wram_sorts, test_very_small_sorts
+        NULL, test_wram_sorts, test_very_small_sorts, test_quick_sorts
     };
     if (DPU_INPUT_ARGUMENTS.mode > (sizeof testers / sizeof testers[0])) {
-        printf("'%u' is no known benchmark ID!\n", DPU_INPUT_ARGUMENTS.mode);
+        printf("‘%u’ is no known benchmark ID!\n", DPU_INPUT_ARGUMENTS.mode);
         return EXIT_SUCCESS;
     }
     testers[DPU_INPUT_ARGUMENTS.mode](&buffers, &DPU_INPUT_ARGUMENTS);
