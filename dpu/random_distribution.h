@@ -33,4 +33,13 @@ void generate_uniform_distribution_wram(T *start, T *end, T upper_bound);
 void generate_uniform_distribution_mram(T __mram_ptr *array, T *cache, mram_range const *range,
         T upper_bound);
 
+/**
+ * @brief Generates a range of ascending numbers, then swaps some neighbours.
+ * 
+ * @param start The first element of the array where to store the random data.
+ * @param length The last element of said array.
+ * @param swaps The number of swaps of neighboured numbers. If zero, √n swaps are made.
+**/
+void generate_almost_sorted_distribution_wram(T * const start, T * const end, size_t swaps);
+
 #endif  // _RANDOM_DISTRIBUTION_H_

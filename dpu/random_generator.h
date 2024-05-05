@@ -12,6 +12,8 @@
 #ifndef _RANDOM_H_
 #define _RANDOM_H_
 
+#include <assert.h>
+
 #include "common.h"
 
 /**
@@ -23,21 +25,18 @@ struct xorshift {
 };
 
 /**
- * @brief Set the inital word of state. Seeds with more 1s are better.
+ * @brief Sets the initial word of state.
  * 
- * @param seed The initial word of state.
- *
- * @return A seeded state.
+ * @param seed The initial word of state. Must be positive.
+ * More 1s in the binary representation are better.
+ * 
+ * @returns A seeded state.
 **/
-struct xorshift seed_xs(T const seed);
-
-/**
- * @brief Uses the tasklet’s ID to set the inital word of state.
- * Adds a constant to introduce more 1s, which supposedly improve the seed.
- *
- * @return A seeded state.
-**/
-struct xorshift seed_with_tasklet_id(void);
+static inline struct xorshift seed_xs(T const seed) {
+    assert(seed > 0);
+    struct xorshift rng = { seed };
+    return rng;
+}
 
 /**
  * @brief The XorShift generator generates a 32-bit / 64-bit uniformly drawn random number.
@@ -46,7 +45,19 @@ struct xorshift seed_with_tasklet_id(void);
  * 
  * @returns A uniformly drawn integer beween `1` and `0xFF...FF`.
 **/
-T gen_xs(struct xorshift *rng);
+static inline T gen_xs(struct xorshift *rng) {
+    T x = rng->x;
+#ifdef UINT32
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+#else
+    x ^= x << 13;
+	x ^= x >> 7;
+	x ^= x << 17;
+#endif
+    return rng->x = x;
+}
 
 /**
  * @brief RoundReject uniformly draws an integer
@@ -57,6 +68,17 @@ T gen_xs(struct xorshift *rng);
  * 
  * @returns A uniformly drawn integer between `0` and `s-1`.
 **/
-T rr(const T s, struct xorshift *state);
+static inline T rr(T const s, struct xorshift *state) {
+#ifdef UINT32
+    T mask = (1 << (32 - __builtin_clz(s))) - 1;
+#else
+    T mask = (1 << (64 - __builtin_clzl(s))) - 1;
+#endif
+    T x = gen_xs(state) & mask;
+    while (x >= s) {
+        x = gen_xs(state) & mask;
+    }
+    return x;
+}
 
 #endif  // _RANDOM_H_

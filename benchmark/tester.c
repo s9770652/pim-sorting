@@ -5,7 +5,9 @@
 #include <attributes.h>
 #include <perfcounter.h>
 
+#include "dpu_math.h"
 #include "random_distribution.h"
+#include "random_generator.h"
 
 #include "tester.h"
 
@@ -18,24 +20,6 @@ struct xorshift rngs[NR_TASKLETS];
  * @param end Any WRAM address.
 **/
 __noinline static void empty_sort(T *start, T *end) { (void)start; (void)end; }
-
-/**
- * @brief An approximation of the square root using the Babylonian method.
- * This function is needed as `math.h` is not provided for DPUs.
- * 
- * @param square The number of which to take the root.
- * 
- * @return The approximation of the square root after 16 iterations.
-**/
-static float sqroot_on_dpu(float const square) {
-    float root = square / 3, prev_root;
-    if (square <= 0) return 0;
-    do {
-        prev_root = root;
-        root = (root + square / root) / 2;
-    } while (root - prev_root > 1 || root - prev_root < -1 );
-    return root;
-}
 
 /**
  * @brief The arithmetic mean of measured times.
@@ -174,7 +158,8 @@ void test_algos(char const name[], struct algo_to_test const algos[], size_t con
         for (uint32_t rep = 0; rep < args->n_reps; rep++) {
             rngs[0] = seed_xs(rep + 0b1011100111010);
             for (size_t id = 0; id < num_of_algos; id++) {
-                generate_uniform_distribution_wram(start, end, args->upper_bound);
+                // generate_uniform_distribution_wram(start, end, args->upper_bound);
+                generate_almost_sorted_distribution_wram(start, end, args->upper_bound);
                 curr_time = perfcounter_get();
                 algos[id].algo(start, end);
                 curr_time = perfcounter_get() - curr_time - overhead;

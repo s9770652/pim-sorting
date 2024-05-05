@@ -4,7 +4,9 @@
 #include <defs.h>
 #include <mram.h>
 
+#include "dpu_math.h"
 #include "random_distribution.h"
+#include "random_generator.h"
 
 void generate_uniform_distribution_wram(T * const start, T * const end, T const upper_bound) {
     bool const is_power_of_two = (upper_bound & (upper_bound - 1)) == 0;
@@ -29,5 +31,19 @@ void generate_uniform_distribution_mram(T __mram_ptr *array, T * const cache,
     LOOP_ON_MRAM(i, curr_length, curr_size, (*range)) {
         generate_uniform_distribution_wram(cache, &cache[curr_length-1], upper_bound);
         mram_write(cache, &array[i], curr_size);
+    }
+}
+
+void generate_almost_sorted_distribution_wram(T * const start, T * const end, size_t swaps) {
+    size_t const n = end - start + 1;
+    for (size_t i = 0; i <= n; i++) {
+        start[i] = i;
+    }
+    swaps = (swaps) ? : sqroot_on_dpu(n);
+    for (size_t s = 0; s < swaps; s++) {
+        size_t const i = rr(n - 1, &rngs[me()]);
+        T temp = start[i];
+        start[i] = start[i + 1];
+        start[i + 1] = temp;
     }
 }

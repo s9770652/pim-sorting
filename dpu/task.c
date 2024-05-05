@@ -78,7 +78,7 @@ int main(void) {
     ranges[me()].end = part_end;
 
     /* Write random elements onto the MRAM. */
-    rngs[me()] = seed_with_tasklet_id();
+    rngs[me()] = seed_xs(me() + 0b1011100111010);
     triple_buffers buffers;
     allocate_triple_buffer(&buffers);
     T *cache = buffers.cache;
