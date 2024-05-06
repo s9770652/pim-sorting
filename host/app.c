@@ -30,10 +30,10 @@ static void free_dpus(struct dpu_set_t set) {
 }
 
 static void alloc_dpus(struct dpu_set_t *set, uint32_t *nr_dpus, unsigned const mode) {
-    char binaries[] = BINARIES, *binary = strtok(binaries, " ");
+    char binaries[] = BINARIES, *binary = strtok(binaries, ",");
     unsigned found_binaries = 0;
     while (binary != NULL && found_binaries++ != mode) {
-        binary = strtok(NULL, " ");
+        binary = strtok(NULL, ",");
     }
     if (binary == NULL) {
         printf("‘%u’ is no known benchmark ID!\n", mode);
