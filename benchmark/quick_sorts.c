@@ -1,28 +1,23 @@
+/**
+ * @file
+ * @brief Measures some implementations of QuickSort.
+**/
+
 #include <assert.h>
+#include <stdlib.h>
 #include <stdbool.h>
 
 #include <alloc.h>
 #include <defs.h>
+#include <perfcounter.h>
 
-#include "quick_sorts.h"
 #include "tester.h"
 
+__host struct dpu_arguments DPU_INPUT_ARGUMENTS;
 // The input length at which QuickSort changes to InsertionSort.
 #define QUICK_TO_INSERTION (13)
 // The call stack for iterative QuickSort.
 static T **call_stack;
-
-/**
- * @brief Swaps the content of two addresses.
- * 
- * @param a First WRAM address.
- * @param b Second WRAM address.
-**/
-static void swap(T * const a, T * const b) {
-    T const temp = *a;
-    *a = *b;
-    *b = temp;
-}
 
 /**
  * @brief An implementation of standard InsertionSort.
@@ -45,34 +40,6 @@ static void insertion_sort_sentinel(T * const start, T * const end) {
         }
         *curr = to_sort;
     }
-}
-
-/**
- * @brief Returns a pivot element for a WRAM array.
- * Used by QuickSort.
- * Currently, the method of choosing must be changed by (un-)commenting the respective code lines.
- * Possible are:
- * - always the rightmost element
- * - the median of the leftmost, middle and rightmost element
- * 
- * @param start The first element of the WRAM array to sort.
- * @param end The last element of said array.
- *
- * @return The pivot element.
-**/
-static inline T *get_pivot(T const * const start, T const * const end) {
-    (void)start;  // Gets optimised away …
-    (void)end;  // … but suppresses potential warnings about unused functions.
-    /* Always the rightmost element. */
-    // return (T *)end;
-    // /* The median of the leftmost, middle and rightmost element. */
-    T *middle = (T *)(((uintptr_t)start + (uintptr_t)end) / 2 & ~(sizeof(T)-1));
-    if ((*start > *middle) ^ (*start > *end))
-        return (T *)start;
-    else if ((*start > *middle) ^ (*end > *middle))
-        return (T *)middle;
-    else
-        return (T *)end;
 }
 
 /**
@@ -368,19 +335,27 @@ static void quick_sort_iterative(T * const start, T * const end) {
     } while (call_stack != start_of_call_stack);
 }
 
-void test_quick_sorts(triple_buffers * const buffers, struct dpu_arguments * const args) {
-    if (me() != 0) return;
+int main() {
+    triple_buffers buffers;
+    allocate_triple_buffer(&buffers);
+    if (me() != 0) return EXIT_SUCCESS;
+    if (DPU_INPUT_ARGUMENTS.mode == 0) {  // called via debugger?
+        DPU_INPUT_ARGUMENTS.mode = 2;
+        DPU_INPUT_ARGUMENTS.n_reps = 10;
+        DPU_INPUT_ARGUMENTS.upper_bound = 4;
+    }
+    perfcounter_config(COUNT_CYCLES, false);
 
     char name[] = "BASE SORTING ALGORITHMS";
     struct algo_to_test const algos[] = {
         { quick_sort, "Normal" },
-        // { quick_sort_check_trivial_before_call, "TrivialBC" },
-        // { quick_sort_no_triviality, "NoTrivial" },
-        // { sort_with_one_insertion_sort, "OneInsertion" },
-        // { quick_sort_check_threshold_before_call, "ThreshBC" },
-        // { quick_sort_check_triviality_and_threshold_before_call, "ThreshTrivBC" },
-        // { quick_sort_triviality_after_threshold, "ThreshThenTriv" },
-        // { quick_sort_triviality_within_threshold, "TrivInThresh" },
+        { quick_sort_check_trivial_before_call, "TrivialBC" },
+        { quick_sort_no_triviality, "NoTrivial" },
+        { sort_with_one_insertion_sort, "OneInsertion" },
+        { quick_sort_check_threshold_before_call, "ThreshBC" },
+        { quick_sort_check_triviality_and_threshold_before_call, "ThreshTrivBC" },
+        { quick_sort_triviality_after_threshold, "ThreshThenTriv" },
+        { quick_sort_triviality_within_threshold, "TrivInThresh" },
         { quick_sort_iterative, "QuickIt" },
     };
     size_t lengths[] = { 20, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };
@@ -394,5 +369,6 @@ void test_quick_sorts(triple_buffers * const buffers, struct dpu_arguments * con
     size_t const log = 31 - __builtin_clz(lengths[num_of_lengths - 1]);
     call_stack = mem_alloc(4 * log * sizeof(T *));
 
-    test_algos(name, algos, num_of_algos, lengths, num_of_lengths, buffers, args);
+    test_algos(name, algos, num_of_algos, lengths, num_of_lengths, &buffers, &DPU_INPUT_ARGUMENTS);
+    return EXIT_SUCCESS;
 }

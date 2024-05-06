@@ -5,8 +5,6 @@
 #include "common.h"
 #include "random_generator.h"
 
-extern struct xorshift pivot_rng_state;
-
 /// @brief Every WRAM sorting functions must adher to this pattern.
 typedef void base_sort_algo(T *, T *);
 
@@ -36,5 +34,48 @@ struct algo_to_test {
 void test_algos(char const name[], struct algo_to_test const algos[], size_t num_of_algos,
         size_t const lengths[], size_t num_of_lengths, triple_buffers const *buffers,
         struct dpu_arguments const *args);
+
+/**
+ * @brief Swaps the content of two addresses.
+ * 
+ * @param a First WRAM address.
+ * @param b Second WRAM address.
+**/
+static inline void swap(T * const a, T * const b) {
+    T const temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+/// @brief The state of the generator used for drawing a pivot element.
+extern struct xorshift pivot_rng_state;
+
+/**
+ * @brief Returns a pivot element for a WRAM array.
+ * Used by QuickSort.
+ * Currently, the method of choosing must be changed by (un-)commenting the respective code lines.
+ * Possible are:
+ * - always the rightmost element
+ * - the median of the leftmost, middle and rightmost element
+ * 
+ * @param start The first element of the WRAM array to sort.
+ * @param end The last element of said array.
+ *
+ * @return The pivot element.
+**/
+static inline T *get_pivot(T const * const start, T const * const end) {
+    (void)start;  // Gets optimised away …
+    (void)end;  // … but suppresses potential warnings about unused functions.
+    /* Always the rightmost element. */
+    // return (T *)end;
+    // /* The median of the leftmost, middle and rightmost element. */
+    T *middle = (T *)(((uintptr_t)start + (uintptr_t)end) / 2 & ~(sizeof(T)-1));
+    if ((*start > *middle) ^ (*start > *end))
+        return (T *)start;
+    else if ((*start > *middle) ^ (*end > *middle))
+        return (T *)middle;
+    else
+        return (T *)end;
+}
 
 #endif  // _TESTER_H_

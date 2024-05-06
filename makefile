@@ -17,15 +17,26 @@ define conf_filename
 endef
 CONF := ${call conf_filename,${NR_DPUS},${NR_TASKLETS},${TYPE},${BLOCK_SIZE},${SEQREAD_CACHE_SIZE}}
 
+space :=
+space +=
+define join-with  # Concatenates a list ${2} into a string wiht ${1} as delimiter.
+	$(subst $(space),$1,$(strip $2))
+endef
+
+# The list (as string) of all binaries created. Used by the host.
+BENCHMARKS := base_sorts quick_sorts wram_sorts
+BINARIES := $(call join-with,\ ,sorting ${BENCHMARKS})
+BINARIES := ${patsubst %,./${BUILD_DIR}/%,${BINARIES}}
+
 HOST_TARGET := ${BUILD_DIR}/host
 SORTING_TARGET := ${BUILD_DIR}/sorting
-BENCHMARK_TARGET := ${BUILD_DIR}/benchmark
+BENCHMARK_TARGETS := ${patsubst %,${BUILD_DIR}/%,${BENCHMARKS}}
 
 COMMON_INCLUDES := support
 HOST_SRC := ${wildcard ${HOST_DIR}/*.c}
 DPU_SRC := ${filter-out %/task.c, ${wildcard ${DPU_DIR}/*.c}}
 SORTING_SRC := ${DPU_DIR}/task.c
-BENCHMARK_SRC := ${wildcard ${BENCHMARK_DIR}/*.c}
+BENCHMARK_SRC := ${BENCHMARK_DIR}/tester.c
 
 HOST_OBJ := ${patsubst ${HOST_DIR}/%.c,${OBJ_DIR}/${HOST_DIR}/%.o,${HOST_SRC}}
 DPU_OBJ := ${patsubst ${DPU_DIR}/%.c,${OBJ_DIR}/${DPU_DIR}/%.o,${DPU_SRC}}
@@ -42,8 +53,7 @@ HOST_FLAGS := ${COMMON_FLAGS} -std=c11 -O3 `dpu-pkg-config --cflags --libs dpu` 
 	-DNR_DPUS=${NR_DPUS} \
 	-DBLOCK_SIZE=${BLOCK_SIZE} \
 	-D${TYPE} \
-	-DSORTING_BINARY=\"./${SORTING_TARGET}\" \
-	-DBENCHMARK_BINARY=\"./${BENCHMARK_TARGET}\"
+	-DBINARIES=\"${BINARIES}\"
 DPU_FLAGS := ${COMMON_FLAGS} -O3 \
 	-DNR_TASKLETS=${NR_TASKLETS} \
 	-DBLOCK_SIZE=${BLOCK_SIZE} \
@@ -54,7 +64,7 @@ DPU_FLAGS := ${COMMON_FLAGS} -O3 \
 SORTING_FLAGS := ${DPU_FLAGS} -DSTACK_SIZE_DEFAULT=512
 BENCHMARK_FLAGS := ${DPU_FLAGS} -Idpu -DSTACK_SIZE_DEFAULT=768
 
-all: ${CONF} ${HOST_TARGET} ${SORTING_TARGET} ${BENCHMARK_TARGET}
+all: ${CONF} ${HOST_TARGET} ${SORTING_TARGET} ${BENCHMARK_TARGETS}
 
 ${CONF}:
 	${RM} ${call conf_filename,*,*}
@@ -66,8 +76,8 @@ ${HOST_TARGET}: ${HOST_OBJ} ${COMMON_INCLUDES}
 ${SORTING_TARGET}: ${SORTING_OBJ} ${DPU_OBJ} ${COMMON_INCLUDES}
 	dpu-upmem-dpurte-clang ${SORTING_FLAGS} -o $@ ${SORTING_OBJ} ${DPU_OBJ}
 
-${BENCHMARK_TARGET}: ${BENCHMARK_OBJ} ${DPU_OBJ} ${COMMON_INCLUDES}
-	dpu-upmem-dpurte-clang ${BENCHMARK_FLAGS} -o $@ ${BENCHMARK_OBJ} ${DPU_OBJ}
+${BUILD_DIR}/%: ${OBJ_DIR}/${BENCHMARK_DIR}/%.o ${BENCHMARK_OBJ} ${DPU_OBJ} ${COMMON_INCLUDES}
+	dpu-upmem-dpurte-clang ${BENCHMARK_FLAGS} -o $@ $< ${BENCHMARK_OBJ} ${DPU_OBJ}
 
 ${OBJ_DIR}/${HOST_DIR}/%.o: ${HOST_DIR}/%.c
 	${CC} -c -o $@ $< ${HOST_FLAGS}

@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include <dpu.h>
 #include <dpu_log.h>
@@ -28,13 +30,21 @@ static void free_dpus(struct dpu_set_t set) {
 }
 
 static void alloc_dpus(struct dpu_set_t *set, uint32_t *nr_dpus, unsigned const mode) {
-    char *binary = mode ? BENCHMARK_BINARY : SORTING_BINARY;
+    char binaries[] = BINARIES, *binary = strtok(binaries, " ");
+    unsigned found_binaries = 0;
+    while (binary != NULL && found_binaries++ != mode) {
+        binary = strtok(NULL, " ");
+    }
+    if (binary == NULL) {
+        printf("‘%u’ is no known benchmark ID!\n", mode);
+        abort();
+    }
     DPU_ASSERT(dpu_alloc(1, NULL, set));
     DPU_ASSERT(dpu_load(*set, binary, NULL));
     DPU_ASSERT(dpu_get_nr_dpus(*set, nr_dpus));
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
     struct Params p = input_params(argc, argv);
     struct dpu_set_t set, dpu;
     uint32_t nr_dpus;
@@ -59,5 +69,5 @@ int main(int argc, char** argv) {
 
     free_dpus(set);
 
-    return 0;
+    return EXIT_SUCCESS;
 }

@@ -33,8 +33,9 @@ static void show_modes(void) {
     fprintf(stderr,
         "\nBenchmark IDs:"
         "\n     0   None/Run normal sorting program (default)"
-        "\n     1   Sorting on a full WRAM cache"
-        "\n     2   Custom ShellSorts"
+        "\n     1   Base sorting algorithms"
+        "\n     2   QuickSorts"
+        "\n     3   Sorting on a full WRAM cache"
         "\n");
 }
 
