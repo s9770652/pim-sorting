@@ -57,6 +57,7 @@ extern struct xorshift pivot_rng_state;
  * Possible are:
  * - always the rightmost element
  * - the median of the leftmost, middle and rightmost element
+ * - a random element
  * 
  * @param start The first element of the WRAM array to sort.
  * @param end The last element of said array.
@@ -68,7 +69,7 @@ static inline T *get_pivot(T const * const start, T const * const end) {
     (void)end;  // … but suppresses potential warnings about unused functions.
     /* Always the rightmost element. */
     // return (T *)end;
-    // /* The median of the leftmost, middle and rightmost element. */
+    /* The median of the leftmost, middle and rightmost element. */
     T *middle = (T *)(((uintptr_t)start + (uintptr_t)end) / 2 & ~(sizeof(T)-1));
     if ((*start > *middle) ^ (*start > *end))
         return (T *)start;
@@ -76,6 +77,10 @@ static inline T *get_pivot(T const * const start, T const * const end) {
         return (T *)middle;
     else
         return (T *)end;
+    /* Pick a random element. */
+    // size_t n = end - start + 1;
+    // size_t offset = rr(n, &pivot_rng_state);
+    // return (T *)(start + offset);
 }
 
 #endif  // _TESTER_H_
