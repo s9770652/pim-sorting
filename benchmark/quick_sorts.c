@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Measures some implementations of QuickSort.
+ * @brief Measures runtimes of some implementations of QuickSort.
 **/
 
 #include <assert.h>

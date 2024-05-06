@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Measures sorting algorithms intended for small input arrays.
+ * @brief Measures runtimes of sorting algorithms intended for small input arrays.
  * 
  * The tested algorithms are:
  * - InsertionSort

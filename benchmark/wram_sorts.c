@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Measures sorting algorithms used on full WRAM.
+ * @brief Measures runtimes of sorting algorithms used on full WRAM.
 **/
 
 #include <assert.h>
