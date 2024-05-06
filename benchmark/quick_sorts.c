@@ -256,7 +256,7 @@ static void quick_sort_check_triviality_and_threshold_before_call(T * const star
         quick_sort_check_triviality_and_threshold_before_call(start, i - 1);
     if (end - (i + 1) + 1 <= QUICK_TO_INSERTION) {
         if (end > i + 1)
-            insertion_sort_sentinel(start, i - 1);
+            insertion_sort_sentinel(i + 1, end);
     } else
         quick_sort_check_triviality_and_threshold_before_call(i + 1, end);
 }
