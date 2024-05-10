@@ -19,6 +19,60 @@ __host struct dpu_arguments DPU_INPUT_ARGUMENTS;
 // The call stack for iterative QuickSort.
 static T **call_stack;
 
+/* Defining building blocks for QuickSort, which remain the same. */
+#define RECURSIVE (true)
+
+// The main body of QuickSort remains the same no matter the implementation variant.
+#define QUICK_BODY()                                     \
+T * const pivot = get_pivot(left, right);                \
+swap(pivot, right);  /* Pivot acts as sentinel value. */ \
+T *i = left - 1, *j = right;                             \
+while (true) {                                           \
+    while (*++i < *right);                               \
+    while (*--j > *right);                               \
+    if (i >= j) break;                                   \
+    swap(i, j);                                          \
+}                                                        \
+swap(i, right)
+
+#if RECURSIVE  // recursive variant
+
+// Sets up `left` and `right` as synonyms for `start` and `end`.
+// They are distinct only in the iterative variant.
+#define QUICK_HEAD() left = start; right = end
+
+// Performs a recursive call.
+#define QUICK_CALL(name, l, r) name(l, r)
+
+// Unneeded for the recursive variant.
+#define QUICK_TAIL()
+
+// Obviously, ending the current QuickSort is done via `return`.
+#define QUICK_STOP() return
+
+#else  // iterative variant
+
+// A “call” stack for holding the values of `left` and `right` is maintained.
+// Its memory must be reserved beforehand.
+#define QUICK_HEAD()                                 \
+T **start_of_call_stack = call_stack;                \
+*call_stack++ = start;                               \
+*call_stack++ = end;                                 \
+do {                                                 \
+    right = *--call_stack, left = *--call_stack
+
+// Instead of recursive calls, the required variables are put on the stack.
+#define QUICK_CALL(name, l, r) do {*call_stack++ = l; *call_stack++ = r;} while (false)
+
+// Closing the loop which pops from the stack.
+#define QUICK_TAIL() } while (call_stack != start_of_call_stack)
+
+// Obviously, ending the current QuickSort is done via `continue`.
+#define QUICK_STOP() continue
+
+#endif
+
+
 /**
  * @brief An implementation of standard InsertionSort.
  * @attention This algorithm relies on `start[-1]` being a sentinel value,
@@ -49,26 +103,17 @@ static void insertion_sort_sentinel(T * const start, T * const end) {
  * @param end The last element of said array.
 **/
 static void quick_sort(T * const start, T * const end) {
-    /* Detect base cases. */
-    if (end <= start) return;
-    if (end - start + 1 <= QUICK_TO_INSERTION) {
-        insertion_sort_sentinel(start, end);
-        return;
+    T *left, *right;
+    QUICK_HEAD();
+    if (right <= left) QUICK_STOP();
+    if (right - left + 1 <= QUICK_TO_INSERTION) {
+        insertion_sort_sentinel(left, right);
+        QUICK_STOP();
     }
-    /* Put elements into respective partitions. */
-    T * const pivot = get_pivot(start, end);
-    swap(pivot, end);  // Pivot acts as sentinel value.
-    T *i = start - 1, *j = end;
-    while (true) {
-        while (*++i < *end);
-        while (*--j > *end);
-        if (i >= j) break;
-        swap(i, j);
-    }
-    swap(i, end);
-    /* Sort left and right partitions. */
-    quick_sort(start, i - 1);
-    quick_sort(i + 1, end);
+    QUICK_BODY();
+    QUICK_CALL(quick_sort, left, i - 1);
+    QUICK_CALL(quick_sort, i + 1, right);
+    QUICK_TAIL();
 }
 
 /**
@@ -78,27 +123,16 @@ static void quick_sort(T * const start, T * const end) {
  * @param end The last element of said array.
 **/
 static void quick_sort_no_triviality(T * const start, T * const end) {
-    /* Detect base cases. */
-    ptrdiff_t length = end - start;
-    if (length + 1 <= QUICK_TO_INSERTION) {
-        if (end <= start) return;
-        insertion_sort_sentinel(start, end);
-        return;
+    T *left, *right;
+    QUICK_HEAD();
+    if (right - left + 1 <= QUICK_TO_INSERTION) {
+        insertion_sort_sentinel(left, right);
+        QUICK_STOP();
     }
-    /* Put elements into respective partitions. */
-    T * const pivot = get_pivot(start, end);
-    swap(pivot, end);  // Pivot acts as sentinel value.
-    T *i = start - 1, *j = end;
-    while (true) {
-        while (*++i < *end);
-        while (*--j > *end);
-        if (i >= j) break;
-        swap(i, j);
-    }
-    swap(i, end);
-    /* Sort left and right partitions. */
-    quick_sort_no_triviality(start, i - 1);
-    quick_sort_no_triviality(i + 1, end);
+    QUICK_BODY();
+    QUICK_CALL(quick_sort_no_triviality, left, i - 1);
+    QUICK_CALL(quick_sort_no_triviality, i + 1, right);
+    QUICK_TAIL();
 }
 
 /**
@@ -108,26 +142,17 @@ static void quick_sort_no_triviality(T * const start, T * const end) {
  * @param end The last element of said array.
 **/
 static void quick_sort_triviality_after_threshold(T * const start, T * const end) {
-    /* Detect base cases. */
-    if (end - start + 1 <= QUICK_TO_INSERTION) {
-        insertion_sort_sentinel(start, end);
-        return;
+    T *left, *right;
+    QUICK_HEAD();
+    if (right - left + 1 <= QUICK_TO_INSERTION) {
+        insertion_sort_sentinel(left, right);
+        QUICK_STOP();
     }
-    if (end <= start) return;
-    /* Put elements into respective partitions. */
-    T * const pivot = get_pivot(start, end);
-    swap(pivot, end);  // Pivot acts as sentinel value.
-    T *i = start - 1, *j = end;
-    while (true) {
-        while (*++i < *end);
-        while (*--j > *end);
-        if (i >= j) break;
-        swap(i, j);
-    }
-    swap(i, end);
-    /* Sort left and right partitions. */
-    quick_sort_triviality_after_threshold(start, i - 1);
-    quick_sort_triviality_after_threshold(i + 1, end);
+    if (right <= left) return;
+    QUICK_BODY();
+    QUICK_CALL(quick_sort_triviality_after_threshold, left, i - 1);
+    QUICK_CALL(quick_sort_triviality_after_threshold, i + 1, right);
+    QUICK_TAIL();
 }
 
 /**
@@ -138,27 +163,18 @@ static void quick_sort_triviality_after_threshold(T * const start, T * const end
  * @param end The last element of said array.
 **/
 static void quick_sort_check_trivial_before_call(T * const start, T * const end) {
-    /* Detect base cases. */
-    if (end - start + 1 <= QUICK_TO_INSERTION) {
-        insertion_sort_sentinel(start, end);
-        return;
+    T *left, *right;
+    QUICK_HEAD();
+    if (right - left + 1 <= QUICK_TO_INSERTION) {
+        insertion_sort_sentinel(left, right);
+        QUICK_STOP();
     }
-    /* Put elements into respective partitions. */
-    T * const pivot = get_pivot(start, end);
-    swap(pivot, end);  // Pivot acts as sentinel value.
-    T *i = start - 1, *j = end;
-    while (true) {
-        while (*++i < *end);
-        while (*--j > *end);
-        if (i >= j) break;
-        swap(i, j);
-    }
-    swap(i, end);
-    /* Sort left and right partitions. */
-    if (i - 1 > start)
-        quick_sort_check_trivial_before_call(start, i - 1);
-    if (end > i + 1)
-        quick_sort_check_trivial_before_call(i + 1, end);
+    QUICK_BODY();
+    if (i - 1 > left)
+        QUICK_CALL(quick_sort_check_trivial_before_call, left, i - 1);
+    if (right > i + 1)
+        QUICK_CALL(quick_sort_check_trivial_before_call, i + 1, right);
+    QUICK_TAIL();
 }
 
 /**
@@ -169,22 +185,13 @@ static void quick_sort_check_trivial_before_call(T * const start, T * const end)
  * @param end The last element of said array.
 **/
 static void quick_sort_no_insertion_sort(T * const start, T * const end) {
-    /* Detect base cases. */
-    if (end - start + 1 <= QUICK_TO_INSERTION) return;
-    /* Put elements into respective partitions. */
-    T * const pivot = get_pivot(start, end);
-    swap(pivot, end);  // Pivot acts as sentinel value.
-    T *i = start - 1, *j = end;
-    while (true) {
-        while (*++i < *end);
-        while (*--j > *end);
-        if (i >= j) break;
-        swap(i, j);
-    }
-    swap(i, end);
-    /* Sort left and right partitions. */
-    quick_sort_no_insertion_sort(start, i - 1);
-    quick_sort_no_insertion_sort(i + 1, end);
+    T *left, *right;
+    QUICK_HEAD();
+    if (right - left + 1 <= QUICK_TO_INSERTION) QUICK_STOP();
+    QUICK_BODY();
+    QUICK_CALL(quick_sort_no_insertion_sort, left, i - 1);
+    QUICK_CALL(quick_sort_no_insertion_sort, i + 1, right);
+    QUICK_TAIL();
 }
 
 /**
@@ -207,26 +214,18 @@ static void sort_with_one_insertion_sort(T * const start, T * const end) {
  * @param end The last element of said array.
 **/
 static void quick_sort_check_threshold_before_call(T * const start, T * const end) {
-    /* Put elements into respective partitions. */
-    T * const pivot = get_pivot(start, end);
-    swap(pivot, end);  // Pivot acts as sentinel value.
-    T *i = start - 1, *j = end;
-    while (true) {
-        while (*++i < *end);
-        while (*--j > *end);
-        if (i >= j) break;
-        swap(i, j);
-    }
-    swap(i, end);
-    /* Sort left and right partitions. */
-    if ((i - 1) - start + 1 <= QUICK_TO_INSERTION)
-        insertion_sort_sentinel(start, i - 1);
+    T *left, *right;
+    QUICK_HEAD();
+    QUICK_BODY();
+    if ((i - 1) - left + 1 <= QUICK_TO_INSERTION)
+        insertion_sort_sentinel(left, i - 1);
     else
-        quick_sort_check_threshold_before_call(start, i - 1);
-    if (end - (i + 1) + 1 <= QUICK_TO_INSERTION)
-        insertion_sort_sentinel(i + 1, end);
+        QUICK_CALL(quick_sort_check_threshold_before_call, left, i - 1);
+    if (right - (i + 1) + 1 <= QUICK_TO_INSERTION)
+        insertion_sort_sentinel(i + 1, right);
     else
-        quick_sort_check_threshold_before_call(i + 1, end);
+        QUICK_CALL(quick_sort_check_threshold_before_call, i + 1, right);
+    QUICK_TAIL();
 }
 
 /**
@@ -237,28 +236,20 @@ static void quick_sort_check_threshold_before_call(T * const start, T * const en
  * @param end The last element of said array.
 **/
 static void quick_sort_check_triviality_and_threshold_before_call(T * const start, T * const end) {
-    /* Put elements into respective partitions. */
-    T * const pivot = get_pivot(start, end);
-    swap(pivot, end);  // Pivot acts as sentinel value.
-    T *i = start - 1, *j = end;
-    while (true) {
-        while (*++i < *end);
-        while (*--j > *end);
-        if (i >= j) break;
-        swap(i, j);
-    }
-    swap(i, end);
-    /* Sort left and right partitions. */
-    if ((i - 1) - start + 1 <= QUICK_TO_INSERTION) {
-        if (i - 1 > start)
-            insertion_sort_sentinel(start, i - 1);
+    T *left, *right;
+    QUICK_HEAD();
+    QUICK_BODY();
+    if ((i - 1) - left + 1 <= QUICK_TO_INSERTION) {
+        if (i - 1 > left)
+            insertion_sort_sentinel(left, i - 1);
     } else
-        quick_sort_check_triviality_and_threshold_before_call(start, i - 1);
-    if (end - (i + 1) + 1 <= QUICK_TO_INSERTION) {
-        if (end > i + 1)
-            insertion_sort_sentinel(i + 1, end);
+        QUICK_CALL(quick_sort_check_triviality_and_threshold_before_call, left, i - 1);
+    if (right - (i + 1) + 1 <= QUICK_TO_INSERTION) {
+        if (right > i + 1)
+            insertion_sort_sentinel(i + 1, right);
     } else
-        quick_sort_check_triviality_and_threshold_before_call(i + 1, end);
+        QUICK_CALL(quick_sort_check_triviality_and_threshold_before_call, i + 1, right);
+    QUICK_TAIL();
 }
 
 /**
@@ -269,70 +260,17 @@ static void quick_sort_check_triviality_and_threshold_before_call(T * const star
  * @param end The last element of said array.
 **/
 static void quick_sort_triviality_within_threshold(T * const start, T * const end) {
-    /* Detect base cases. */
-    if (end - start + 1 <= QUICK_TO_INSERTION) {
-        if (end > start)
-            insertion_sort_sentinel(start, end);
-        return;
-    }
-    /* Put elements into respective partitions. */
-    T * const pivot = get_pivot(start, end);
-    swap(pivot, end);  // Pivot acts as sentinel value.
-    T *i = start - 1, *j = end;
-    while (true) {
-        while (*++i < *end);
-        while (*--j > *end);
-        if (i >= j) break;
-        swap(i, j);
-    }
-    swap(i, end);
-    /* Sort left and right partitions. */
-    quick_sort_triviality_within_threshold(start, i - 1);
-    quick_sort_triviality_within_threshold(i + 1, end);
-}
-
-/**
- * @brief An implementation of QuickSort with a manual call stack.
- * To this end, enough memory should be reserved and saved in the file-wide variable `call_stack`.
- * 
- * @param start The first element of the WRAM array to sort.
- * @param end The last element of said array.
-**/
-static void quick_sort_iterative(T * const start, T * const end) {
-    // A “call” call_stack for holding the values of `left` and `right` is maintained.
-    // Since QuickSort works in-place, it is stored right after the end.
-    T **start_of_call_stack = call_stack;
-    *call_stack++ = start;
-    *call_stack++ = end;
-    do {
-        T *right = *--call_stack, *left = *--call_stack;  // Pop from call stack.
-        /* Detect base cases. */
-        if (right - left + 1 <= QUICK_TO_INSERTION) {
+    T *left, *right;
+    QUICK_HEAD();
+    if (right - left + 1 <= QUICK_TO_INSERTION) {
+        if (right > left)
             insertion_sort_sentinel(left, right);
-            continue;
-        }
-        /* Put elements into respective partitions. */
-        T * const pivot = get_pivot(left, right);  // Pivot acts as sentinel value.
-        swap(pivot, right);
-        T *i = left - 1, *j = right;
-        while (true) {
-            while (*++i < *right);
-            while (*--j > *right);
-            if (i >= j) break;
-            swap(i, j);
-        }
-        swap(i, right);
-        /* Put right partition on call stack. */
-        if (right > i + 1) {
-            *call_stack++ = i + 1;
-            *call_stack++ = right;
-        }
-        /* Put left partition on call stack. */
-        if (i - 1 > left) {
-            *call_stack++ = left;
-            *call_stack++ = i - 1;
-        }
-    } while (call_stack != start_of_call_stack);
+        QUICK_STOP();
+    }
+    QUICK_BODY();
+    QUICK_CALL(quick_sort_triviality_within_threshold, left, i - 1);
+    QUICK_CALL(quick_sort_triviality_within_threshold, i + 1, right);
+    QUICK_TAIL();
 }
 
 int main() {
@@ -341,10 +279,9 @@ int main() {
     if (me() != 0) return EXIT_SUCCESS;
     if (DPU_INPUT_ARGUMENTS.mode == 0) {  // called via debugger?
         DPU_INPUT_ARGUMENTS.mode = 2;
-        DPU_INPUT_ARGUMENTS.n_reps = 10;
-        DPU_INPUT_ARGUMENTS.upper_bound = 4;
+        DPU_INPUT_ARGUMENTS.n_reps = 10000;
+        DPU_INPUT_ARGUMENTS.upper_bound = 0;
     }
-    perfcounter_config(COUNT_CYCLES, false);
 
     char name[] = "BASE SORTING ALGORITHMS";
     struct algo_to_test const algos[] = {
@@ -356,7 +293,6 @@ int main() {
         { quick_sort_check_triviality_and_threshold_before_call, "ThreshTrivBC" },
         { quick_sort_triviality_after_threshold, "ThreshThenTriv" },
         { quick_sort_triviality_within_threshold, "TrivInThresh" },
-        { quick_sort_iterative, "QuickIt" },
     };
     size_t lengths[] = { 20, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };
     size_t num_of_algos = sizeof algos / sizeof algos[0];
@@ -364,10 +300,14 @@ int main() {
     assert(lengths[num_of_lengths - 1] <= (TRIPLE_BUFFER_SIZE >> DIV));
 
     /* Reserve memory for custom call stack, which is needed by the iterative QuickSort. */
+#if (!RECURSIVE)
     // 20 pointers on the stack was the most I’ve seen for 1024 elements
     // so the space reserved here should be enough.
     size_t const log = 31 - __builtin_clz(lengths[num_of_lengths - 1]);
     call_stack = mem_alloc(4 * log * sizeof(T *));
+#else
+    (void)call_stack;
+#endif
 
     test_algos(name, algos, num_of_algos, lengths, num_of_lengths, &buffers, &DPU_INPUT_ARGUMENTS);
     return EXIT_SUCCESS;
