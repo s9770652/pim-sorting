@@ -20,7 +20,7 @@ __host struct dpu_arguments DPU_INPUT_ARGUMENTS;
 static T **call_stack;
 
 /* Defining building blocks for QuickSort, which remain the same. */
-#define RECURSIVE (true)
+#define RECURSIVE (false)
 
 // The main body of QuickSort remains the same no matter the implementation variant.
 #define QUICK_BODY()                                     \
@@ -273,6 +273,30 @@ static void quick_sort_triviality_within_threshold(T * const start, T * const en
     QUICK_TAIL();
 }
 
+#if (!RECURSIVE)
+/**
+ * @brief An implementation of the fastest variant of the iterative QuickSort
+ * where the last push to the call stack is replaced by a simple jump.
+ * 
+ * @param start 
+ * @param end 
+ */
+static void quick_sort_optimised_iterative(T * const start, T * const end) {
+    T *left, *right;
+    QUICK_HEAD();
+optimised_label:
+    if (right - left + 1 <= QUICK_TO_INSERTION) {
+        insertion_sort_sentinel(left, right);
+        QUICK_STOP();
+    }
+    QUICK_BODY();
+    QUICK_CALL(quick_sort_triviality_within_threshold, left, i - 1);
+    left = i + 1;
+    goto optimised_label;
+    QUICK_TAIL();
+}
+#endif
+
 int main() {
     triple_buffers buffers;
     allocate_triple_buffer(&buffers);
@@ -293,6 +317,9 @@ int main() {
         { quick_sort_check_triviality_and_threshold_before_call, "ThreshTrivBC" },
         { quick_sort_triviality_after_threshold, "ThreshThenTriv" },
         { quick_sort_triviality_within_threshold, "TrivInThresh" },
+#if (!RECURSIVE)
+        { quick_sort_optimised_iterative, "Optimised" }
+#endif
     };
     size_t lengths[] = { 20, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };
     size_t num_of_algos = sizeof algos / sizeof algos[0];
