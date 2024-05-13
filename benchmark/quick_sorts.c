@@ -22,6 +22,9 @@ static T **call_stack;
 /* Defining building blocks for QuickSort, which remain the same. */
 #define RECURSIVE (false)
 
+// Wether the left or right partition is done first has an impact on the runtime.
+#define _SWITCH_SIDES_ (false)
+
 // The main body of QuickSort remains the same no matter the implementation variant.
 #define QUICK_BODY()                                     \
 T * const pivot = get_pivot(left, right);                \
@@ -35,11 +38,21 @@ while (true) {                                           \
 }                                                        \
 swap(i, right)
 
+// Whether the partition has a length below the threshold.
+#define QUICK_IS_THRESHOLD_UNDERCUT() (right - left + 1 <= QUICK_TO_INSERTION)
+
+// Whether the partition has a length in { 1, 0, -1 }.
+#define QUICK_IS_TRIVIAL() (right <= left)
+
+#define QUICK_FALLBACK() insertion_sort_sentinel(left, right)
+
 #if RECURSIVE  // recursive variant
+
+#define SWITCH_SIDES (_SWITCH_SIDES_)
 
 // Sets up `left` and `right` as synonyms for `start` and `end`.
 // They are distinct only in the iterative variant.
-#define QUICK_HEAD() left = start; right = end
+#define QUICK_HEAD() T *left = start, *right = end
 
 // Performs a recursive call.
 #define QUICK_CALL(name, l, r) name(l, r)
@@ -50,7 +63,35 @@ swap(i, right)
 // Obviously, ending the current QuickSort is done via `return`.
 #define QUICK_STOP() return
 
-#else  // iterative variant
+#if (!SWITCH_SIDES)
+
+#define QUICK_IS_TRIVIAL_LEFT() (i - 1 <= left)
+#define QUICK_IS_TRIVIAL_RIGHT() (right <= i + 1)
+
+#define QUICK_IS_THRESHOLD_UNDERCUT_LEFT() ((i - 1) - left + 1 <= QUICK_TO_INSERTION)
+#define QUICK_IS_THRESHOLD_UNDERCUT_RIGHT() (right - (i + 1) + 1 <= QUICK_TO_INSERTION)
+
+#define QUICK_CALL_LEFT(name) name(left, i - 1)
+#define QUICK_CALL_RIGHT(name) name(i+ 1, right)
+
+#else  // !SWITCH_SIDES
+
+#define QUICK_IS_TRIVIAL_RIGHT() (i - 1 <= left)
+#define QUICK_IS_TRIVIAL_LEFT() (right <= i + 1)
+
+#define QUICK_IS_THRESHOLD_UNDERCUT_RIGHT() ((i - 1) - left + 1 <= QUICK_TO_INSERTION)
+#define QUICK_IS_THRESHOLD_UNDERCUT_LEFT() (right - (i + 1) + 1 <= QUICK_TO_INSERTION)
+
+#define QUICK_CALL_RIGHT(name) name(left, i - 1)
+#define QUICK_CALL_LEFT(name) name(i+ 1, right)
+
+#endif  // !SWITCH_SIDES
+
+#else  // RECURSIVE
+
+// Switching the sides for iterative implementations
+// makes them traverse their ‘recursion’ tree in the same way as their recursive counterparts.
+#define SWITCH_SIDES (!_SWITCH_SIDES_)
 
 // A “call” stack for holding the values of `left` and `right` is maintained.
 // Its memory must be reserved beforehand.
@@ -59,7 +100,7 @@ T **start_of_call_stack = call_stack;                \
 *call_stack++ = start;                               \
 *call_stack++ = end;                                 \
 do {                                                 \
-    right = *--call_stack, left = *--call_stack
+    T *right = *--call_stack, *left = *--call_stack
 
 // Instead of recursive calls, the required variables are put on the stack.
 #define QUICK_CALL(name, l, r) do {*call_stack++ = l; *call_stack++ = r;} while (false)
@@ -69,6 +110,42 @@ do {                                                 \
 
 // Obviously, ending the current QuickSort is done via `continue`.
 #define QUICK_STOP() continue
+
+#if (!SWITCH_SIDES)
+
+#define QUICK_IS_TRIVIAL_LEFT() (i - 1 <= left)
+#define QUICK_IS_TRIVIAL_RIGHT() (right <= i + 1)
+
+#define QUICK_IS_THRESHOLD_UNDERCUT_LEFT() ((i - 1) - left + 1 <= QUICK_TO_INSERTION)
+#define QUICK_IS_THRESHOLD_UNDERCUT_RIGHT() (right - (i + 1) + 1 <= QUICK_TO_INSERTION)
+
+#define QUICK_CALL_LEFT(name) do { *call_stack++ = left; *call_stack++ = i - 1; } while (false)
+#define QUICK_CALL_RIGHT(name) do { *call_stack++ = i + 1; *call_stack++ = right; } while (false)
+
+#else  // !SWITCH_SIDES
+
+#define QUICK_IS_TRIVIAL_RIGHT() (i - 1 <= left)
+#define QUICK_IS_TRIVIAL_LEFT() (right <= i + 1)
+
+#define QUICK_IS_THRESHOLD_UNDERCUT_RIGHT() ((i - 1) - left + 1 <= QUICK_TO_INSERTION)
+#define QUICK_IS_THRESHOLD_UNDERCUT_LEFT() (right - (i + 1) + 1 <= QUICK_TO_INSERTION)
+
+#define QUICK_CALL_RIGHT(name) do { *call_stack++ = left; *call_stack++ = i - 1; } while (false)
+#define QUICK_CALL_LEFT(name) do { *call_stack++ = i + 1; *call_stack++ = right; } while (false)
+
+#endif  // !SWITCH_SIDES
+
+#endif  // RECURSIVE
+
+#if (!SWITCH_SIDES)
+
+#define QUICK_FALLBACK_LEFT() insertion_sort_sentinel(left, i - 1)
+#define QUICK_FALLBACK_RIGHT() insertion_sort_sentinel(i + 1, right)
+
+#else
+
+#define QUICK_FALLBACK_RIGHT() insertion_sort_sentinel(left, i - 1)
+#define QUICK_FALLBACK_LEFT() insertion_sort_sentinel(i + 1, right)
 
 #endif
 
@@ -103,16 +180,15 @@ static void insertion_sort_sentinel(T * const start, T * const end) {
  * @param end The last element of said array.
 **/
 static void quick_sort(T * const start, T * const end) {
-    T *left, *right;
     QUICK_HEAD();
-    if (right <= left) QUICK_STOP();
-    if (right - left + 1 <= QUICK_TO_INSERTION) {
-        insertion_sort_sentinel(left, right);
+    if (QUICK_IS_TRIVIAL()) QUICK_STOP();
+    if (QUICK_IS_THRESHOLD_UNDERCUT()) {
+        QUICK_FALLBACK();
         QUICK_STOP();
     }
     QUICK_BODY();
-    QUICK_CALL(quick_sort, left, i - 1);
-    QUICK_CALL(quick_sort, i + 1, right);
+    QUICK_CALL_LEFT(quick_sort);
+    QUICK_CALL_RIGHT(quick_sort);
     QUICK_TAIL();
 }
 
@@ -123,15 +199,14 @@ static void quick_sort(T * const start, T * const end) {
  * @param end The last element of said array.
 **/
 static void quick_sort_no_triviality(T * const start, T * const end) {
-    T *left, *right;
     QUICK_HEAD();
-    if (right - left + 1 <= QUICK_TO_INSERTION) {
-        insertion_sort_sentinel(left, right);
+    if (QUICK_IS_THRESHOLD_UNDERCUT()) {
+        QUICK_FALLBACK();
         QUICK_STOP();
     }
     QUICK_BODY();
-    QUICK_CALL(quick_sort_no_triviality, left, i - 1);
-    QUICK_CALL(quick_sort_no_triviality, i + 1, right);
+    QUICK_CALL_LEFT(quick_sort_no_triviality);
+    QUICK_CALL_RIGHT(quick_sort_no_triviality);
     QUICK_TAIL();
 }
 
@@ -142,16 +217,15 @@ static void quick_sort_no_triviality(T * const start, T * const end) {
  * @param end The last element of said array.
 **/
 static void quick_sort_triviality_after_threshold(T * const start, T * const end) {
-    T *left, *right;
     QUICK_HEAD();
-    if (right - left + 1 <= QUICK_TO_INSERTION) {
-        insertion_sort_sentinel(left, right);
+    if (QUICK_IS_THRESHOLD_UNDERCUT()) {
+        QUICK_FALLBACK();
         QUICK_STOP();
     }
-    if (right <= left) return;
+    if (QUICK_IS_TRIVIAL()) QUICK_STOP();
     QUICK_BODY();
-    QUICK_CALL(quick_sort_triviality_after_threshold, left, i - 1);
-    QUICK_CALL(quick_sort_triviality_after_threshold, i + 1, right);
+    QUICK_CALL_LEFT(quick_sort_triviality_after_threshold);
+    QUICK_CALL_RIGHT(quick_sort_triviality_after_threshold);
     QUICK_TAIL();
 }
 
@@ -163,17 +237,16 @@ static void quick_sort_triviality_after_threshold(T * const start, T * const end
  * @param end The last element of said array.
 **/
 static void quick_sort_check_trivial_before_call(T * const start, T * const end) {
-    T *left, *right;
     QUICK_HEAD();
-    if (right - left + 1 <= QUICK_TO_INSERTION) {
-        insertion_sort_sentinel(left, right);
+    if (QUICK_IS_THRESHOLD_UNDERCUT()) {
+        QUICK_FALLBACK();
         QUICK_STOP();
     }
     QUICK_BODY();
-    if (i - 1 > left)
-        QUICK_CALL(quick_sort_check_trivial_before_call, left, i - 1);
-    if (right > i + 1)
-        QUICK_CALL(quick_sort_check_trivial_before_call, i + 1, right);
+    if (!QUICK_IS_TRIVIAL_LEFT())
+        QUICK_CALL_LEFT(quick_sort_check_trivial_before_call);
+    if (!QUICK_IS_TRIVIAL_RIGHT())
+        QUICK_CALL_RIGHT(quick_sort_check_trivial_before_call);
     QUICK_TAIL();
 }
 
@@ -185,12 +258,12 @@ static void quick_sort_check_trivial_before_call(T * const start, T * const end)
  * @param end The last element of said array.
 **/
 static void quick_sort_no_insertion_sort(T * const start, T * const end) {
-    T *left, *right;
     QUICK_HEAD();
-    if (right - left + 1 <= QUICK_TO_INSERTION) QUICK_STOP();
+    if (QUICK_IS_THRESHOLD_UNDERCUT())
+        QUICK_STOP();
     QUICK_BODY();
-    QUICK_CALL(quick_sort_no_insertion_sort, left, i - 1);
-    QUICK_CALL(quick_sort_no_insertion_sort, i + 1, right);
+    QUICK_CALL_LEFT(quick_sort_no_insertion_sort);
+    QUICK_CALL_RIGHT(quick_sort_no_insertion_sort);
     QUICK_TAIL();
 }
 
@@ -214,17 +287,16 @@ static void sort_with_one_insertion_sort(T * const start, T * const end) {
  * @param end The last element of said array.
 **/
 static void quick_sort_check_threshold_before_call(T * const start, T * const end) {
-    T *left, *right;
     QUICK_HEAD();
     QUICK_BODY();
-    if ((i - 1) - left + 1 <= QUICK_TO_INSERTION)
-        insertion_sort_sentinel(left, i - 1);
+    if (QUICK_IS_THRESHOLD_UNDERCUT_LEFT())
+        QUICK_FALLBACK_LEFT();
     else
-        QUICK_CALL(quick_sort_check_threshold_before_call, left, i - 1);
-    if (right - (i + 1) + 1 <= QUICK_TO_INSERTION)
-        insertion_sort_sentinel(i + 1, right);
+        QUICK_CALL_LEFT(quick_sort_check_threshold_before_call);
+    if (QUICK_IS_THRESHOLD_UNDERCUT_RIGHT())
+        QUICK_FALLBACK_RIGHT();
     else
-        QUICK_CALL(quick_sort_check_threshold_before_call, i + 1, right);
+        QUICK_CALL_RIGHT(quick_sort_check_threshold_before_call);
     QUICK_TAIL();
 }
 
@@ -236,19 +308,18 @@ static void quick_sort_check_threshold_before_call(T * const start, T * const en
  * @param end The last element of said array.
 **/
 static void quick_sort_check_triviality_and_threshold_before_call(T * const start, T * const end) {
-    T *left, *right;
     QUICK_HEAD();
     QUICK_BODY();
-    if ((i - 1) - left + 1 <= QUICK_TO_INSERTION) {
-        if (i - 1 > left)
-            insertion_sort_sentinel(left, i - 1);
+    if (QUICK_IS_THRESHOLD_UNDERCUT_LEFT()) {
+        if (!QUICK_IS_TRIVIAL_LEFT())
+            QUICK_FALLBACK_LEFT();
     } else
-        QUICK_CALL(quick_sort_check_triviality_and_threshold_before_call, left, i - 1);
-    if (right - (i + 1) + 1 <= QUICK_TO_INSERTION) {
-        if (right > i + 1)
-            insertion_sort_sentinel(i + 1, right);
+        QUICK_CALL_LEFT(quick_sort_check_triviality_and_threshold_before_call);
+    if (QUICK_IS_THRESHOLD_UNDERCUT_RIGHT()) {
+        if (!QUICK_IS_TRIVIAL_RIGHT())
+            QUICK_FALLBACK_RIGHT();
     } else
-        QUICK_CALL(quick_sort_check_triviality_and_threshold_before_call, i + 1, right);
+        QUICK_CALL_RIGHT(quick_sort_check_triviality_and_threshold_before_call);
     QUICK_TAIL();
 }
 
@@ -260,16 +331,15 @@ static void quick_sort_check_triviality_and_threshold_before_call(T * const star
  * @param end The last element of said array.
 **/
 static void quick_sort_triviality_within_threshold(T * const start, T * const end) {
-    T *left, *right;
     QUICK_HEAD();
-    if (right - left + 1 <= QUICK_TO_INSERTION) {
-        if (right > left)
-            insertion_sort_sentinel(left, right);
+    if (QUICK_IS_THRESHOLD_UNDERCUT()) {
+        if (!QUICK_IS_TRIVIAL())
+            QUICK_FALLBACK();
         QUICK_STOP();
     }
     QUICK_BODY();
-    QUICK_CALL(quick_sort_triviality_within_threshold, left, i - 1);
-    QUICK_CALL(quick_sort_triviality_within_threshold, i + 1, right);
+    QUICK_CALL_LEFT(quick_sort_triviality_within_threshold);
+    QUICK_CALL_RIGHT(quick_sort_triviality_within_threshold);
     QUICK_TAIL();
 }
 
@@ -282,7 +352,6 @@ static void quick_sort_triviality_within_threshold(T * const start, T * const en
  * @param end 
  */
 static void quick_sort_optimised_iterative(T * const start, T * const end) {
-    T *left, *right;
     QUICK_HEAD();
 optimised_label:
     if (right - left + 1 <= QUICK_TO_INSERTION) {
@@ -318,7 +387,7 @@ int main() {
         { quick_sort_triviality_after_threshold, "ThreshThenTriv" },
         { quick_sort_triviality_within_threshold, "TrivInThresh" },
 #if (!RECURSIVE)
-        { quick_sort_optimised_iterative, "Optimised" }
+        // { quick_sort_optimised_iterative, "Optimised" }
 #endif
     };
     size_t lengths[] = { 20, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };
