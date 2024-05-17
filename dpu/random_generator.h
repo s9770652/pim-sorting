@@ -81,4 +81,60 @@ static inline T rr(T const s, struct xorshift *state) {
     return x;
 }
 
+/**
+ * @brief A struct that contains a word of state for XorShift generators.
+ * Used for generating a random memory address offsets.
+ * Should not be altered manually.
+**/
+struct xorshift_offset {
+    size_t x;
+};
+
+/**
+ * @brief Sets the initial word of state.
+ * 
+ * @param seed The initial word of state. Must be positive.
+ * More 1s in the binary representation are better.
+ * 
+ * @returns A seeded state.
+**/
+static inline struct xorshift_offset seed_xs_offset(size_t const seed) {
+    assert(seed > 0);
+    struct xorshift_offset rng = { seed };
+    return rng;
+}
+
+/**
+ * @brief The XorShift generator generates a 32-bit uniformly drawn random number.
+ * 
+ * @param rng Word of state.
+ * 
+ * @returns A uniformly drawn integer beween `1` and `0xFF...FF`.
+**/
+static inline size_t gen_xs_offset(struct xorshift_offset *rng) {
+    size_t x = rng->x;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    return rng->x = x;
+}
+
+/**
+ * @brief RoundReject uniformly draws an unsigned 32-bit integer
+ * by rounding `s` to the next highest power of 2 and using rejection sampling.
+ * 
+ * @param s The upper limit (inclusive) of the range to draw from.
+ * @param state The state from which to take the random integer.
+ * 
+ * @returns A uniformly drawn, unsigned 32-bit integer between `0` and `s`.
+**/
+static inline size_t rr_offset(size_t const s, struct xorshift_offset *state) {
+    size_t mask = (1 << (32 - __builtin_clz(s))) - 1;
+    size_t x = gen_xs_offset(state) & mask;
+    while (x > s) {
+        x = gen_xs_offset(state) & mask;
+    }
+    return x;
+}
+
 #endif  // _RANDOM_H_

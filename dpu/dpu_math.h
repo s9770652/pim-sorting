@@ -20,7 +20,7 @@ static inline float sqroot_on_dpu(float const square) {
     do {
         prev_root = root;
         root = (root + square / root) / 2;
-    } while (root - prev_root > 1 || root - prev_root < -1 );
+    } while (root - prev_root > 1 || root - prev_root < -1);
     return root;
 }
 

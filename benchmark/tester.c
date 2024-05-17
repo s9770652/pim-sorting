@@ -12,7 +12,7 @@
 #include "tester.h"
 
 struct xorshift rngs[NR_TASKLETS];
-struct xorshift pivot_rng_state;
+struct xorshift_offset pivot_rng_state;
 
 /**
  * @brief An empty functions used when calculating the function call overhead.
@@ -50,7 +50,7 @@ static perfcounter_t get_std_of_time(perfcounter_t const zeroth, perfcounter_t c
 }
 
 #ifndef PRINT_IN_FILE_FRIENDLY_FORMAT
-#define PRINT_IN_FILE_FRIENDLY_FORMAT (0)
+#define PRINT_IN_FILE_FRIENDLY_FORMAT (1)
 #endif
 
 /**
@@ -64,10 +64,12 @@ static perfcounter_t get_std_of_time(perfcounter_t const zeroth, perfcounter_t c
 **/
 static void print_header(char const name[], struct algo_to_test const algos[],
         size_t const num_of_algos, struct dpu_arguments const * const args) {
+    char *pivot_methods[] = { "end", "middle", "median_of_three", "random" };
     printf(
-        "# reps=%d, upper bound=%d, TYPE=%s, BLOCK_SIZE=%d, SEQREAD_CACHE_SIZE=%d, NR_TASKLETS=%d\n",
+        "# reps=%d, upper bound=%d, PIVOT=%s, TYPE=%s, BLOCK_SIZE=%d, SEQREAD_CACHE_SIZE=%d, NR_TASKLETS=%d\n",
         args->n_reps,
         args->upper_bound,
+        pivot_methods[PIVOT],
         TYPE_NAME,
         BLOCK_SIZE,
         SEQREAD_CACHE_SIZE,
@@ -158,8 +160,9 @@ void test_algos(char const name[], struct algo_to_test const algos[], size_t con
         T * const start = cache, * const end = &cache[length - 1];
         for (uint32_t rep = 0; rep < args->n_reps; rep++) {
             for (size_t id = 0; id < num_of_algos; id++) {
+                // Frequently reset as the counter register overflows after 196 seconds.
                 perfcounter_config(COUNT_CYCLES, true);
-                pivot_rng_state = seed_xs(rep + 0b1011100111010);
+                pivot_rng_state = seed_xs_offset(rep + 0b1011100111010);
                 rngs[0] = seed_xs(rep + 0b1011100111010);
                 generate_uniform_distribution_wram(start, end, args->upper_bound);
                 // generate_almost_sorted_distribution_wram(start, end, args->upper_bound);
@@ -173,6 +176,8 @@ void test_algos(char const name[], struct algo_to_test const algos[], size_t con
                 for (size_t i = 1; i < length; i++) {
                     if (cache[i] < smallest) {
                         printf("%s: Not sorted!\n", algos[id].name);
+                        #include "checkers.h"
+                        print_single_line(cache, length);
                         break;
                     }
                     smallest = cache[i];

@@ -48,7 +48,13 @@ static inline void swap(T * const a, T * const b) {
 }
 
 /// @brief The state of the generator used for drawing a pivot element.
-extern struct xorshift pivot_rng_state;
+extern struct xorshift_offset pivot_rng_state;
+
+#define END (0)
+#define MIDDLE (1)
+#define MEDIAN_OF_THREE (2)
+#define RANDOM (3)
+#define PIVOT MEDIAN_OF_THREE
 
 /**
  * @brief Returns a pivot element for a WRAM array.
@@ -67,20 +73,27 @@ extern struct xorshift pivot_rng_state;
 static inline T *get_pivot(T const * const start, T const * const end) {
     (void)start;  // Gets optimised away …
     (void)end;  // … but suppresses potential warnings about unused functions.
+#if (PIVOT == END)
     /* Always the rightmost element. */
-    // return (T *)end;
+    return (T *)end;
+#elif (PIVOT == MIDDLE)
+    /* Always the middle element. */
+    return (T *)(((uintptr_t)start + (uintptr_t)end) / 2 & ~(sizeof(T)-1));
+#elif (PIVOT == MEDIAN_OF_THREE)
     /* The median of the leftmost, middle and rightmost element. */
-    T *middle = (T *)(((uintptr_t)start + (uintptr_t)end) / 2 & ~(sizeof(T)-1));
+    T const * const middle = (T *)(((uintptr_t)start + (uintptr_t)end) / 2 & ~(sizeof(T)-1));
     if ((*start > *middle) ^ (*start > *end))
         return (T *)start;
     else if ((*start > *middle) ^ (*end > *middle))
         return (T *)middle;
     else
         return (T *)end;
+#elif (PIVOT == RANDOM)
     /* Pick a random element. */
-    // size_t n = end - start + 1;
-    // size_t offset = rr(n, &pivot_rng_state);
-    // return (T *)(start + offset);
+    size_t const n = end - start;
+    size_t const offset = rr_offset(n, &pivot_rng_state);
+    return (T *)(start + offset);
+#endif
 }
 
 #endif  // _TESTER_H_
