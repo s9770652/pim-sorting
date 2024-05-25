@@ -18,8 +18,37 @@ __host struct dpu_arguments DPU_INPUT_ARGUMENTS;
 #define QUICK_TO_INSERTION (16)
 // The input length at which HeapSort changes to InsertionSort.
 #define HEAP_TO_INSERTION (12)
+// The length of the first runs sorted by InsertionSort.
+#define MERGE_TO_INSERTION (12)
 // The call stack for iterative QuickSort.
 static T **call_stack;
+
+/**
+ * @brief An implementation of standard InsertionSort.
+ * @internal The compiler is iffy when it comes to this function.
+ * Using `curr = ++i` would algorithmically make sense as a list of length 1 is always sorted,
+ * yet it actually runs ~2% slower.
+ * And since moves and additions cost the same, the it does also does not benefit
+ * from being able to use `prev = i` instead of `prev = curr - 1`.
+ * The same slowdowns also happens when using `*i = start + 1`.
+ * Since only a few extra instructions are performed each call,
+ * I refrain from injecting Assembly code for the sake of maintainability and readability
+ * 
+ * @param start The first element of the WRAM array to sort.
+ * @param end The last element of said array.
+**/
+static void insertion_sort_nosentinel(T * const start, T * const end) {
+    T *curr, *i = start;
+    while ((curr = i++) <= end) {
+        T *prev = curr - 1;
+        T const to_sort = *curr;
+        while (prev >= start && *prev > to_sort) {
+            *curr = *prev;
+            curr = prev--;
+        }
+        *curr = to_sort;
+    }
+}
 
 /**
  * @brief An implementation of standard InsertionSort.
@@ -161,6 +190,89 @@ static void heap_sort(T * const start, T * const end) {
     insertion_sort_sentinel(start, &start[i]);
 }
 
+/**
+ * @brief Merges two runs ranging from [`start_1`, `start_2`[ and [`start_2`, `end_2`].
+ * @internal Using `end_1 = start_2 - 1` worsens the runtime
+ * but making `end_2` exclusive also worsens the runtime, hence the asymmetry.
+ * 
+ * @param start_1 The first element of the first run.
+ * @param start_2 The first element of the second run. Must be follow the end of the first run.
+ * @param end_2 The last element of the second run.
+ * @param out Whither the merged runs are written.
+**/
+static inline void merge(T * const start_1, T * const start_2, T * const end_2, T *out) {
+    T *i = start_1, *j = start_2;
+    while (i < start_2 && j <= end_2) {
+        if (*i <= *j) {
+            *out++ = *i++;
+            if (i >= start_2) {  // Pulling these if-statements out of the loop …
+                do {
+                    *out++ = *j++;
+                } while (j <= end_2);
+                return;
+            }
+        } else {
+            *out++ = *j++;
+            if (j > end_2) {  // … worsens the runtime.
+                do {
+                    *out++ = *i++;
+                } while (i < start_2);
+                return;
+            }
+        }
+    }
+}
+
+/**
+ * @brief An implementation of standard MergeSort.
+ * @note This function saves up to `n` elements after the end of the input array.
+ * For speed reasons, the sorted array may be stored after that very end.
+ * In other words, the sorted array is not written back to the start of the input array.
+ * 
+ * @param start The first element of the WRAM array to sort.
+ * @param end The last element of said array.
+**/
+static void merge_sort(T * const start, T * const end) {
+    /* Natural runs. */
+    if (start + MERGE_TO_INSERTION - 1 >= end) {
+        insertion_sort_sentinel(start, end);
+        return;
+    }
+    insertion_sort_sentinel(start, start + MERGE_TO_INSERTION - 1);
+    for (T *t = start + MERGE_TO_INSERTION; t < end; t += MERGE_TO_INSERTION) {
+        T * const run_end = (t + MERGE_TO_INSERTION - 1 > end) ? end : t + MERGE_TO_INSERTION - 1;
+        insertion_sort_nosentinel(t, run_end);
+    }
+    /* Merging. */
+    bool flag = false;
+    T *in = start, *out = end + 1, *until = end;  // `until`: Where the runs to sort finish.
+    size_t const n = end - start + 1;
+    for (size_t run_length = MERGE_TO_INSERTION; run_length < n; run_length *= 2) {
+        for (; in <= until; in += 2 * run_length, out += 2 * run_length) {
+            // Only one run left?
+            if (in + run_length - 1 >= until) {
+                do {
+                    *out++ = *in++;
+                } while (in <= until);
+                break;
+            }
+            // If not, merge the next two runs.
+            T * const run_2_end = (in + 2 * run_length - 1 > until) ? until : in + 2 * run_length - 1;
+            merge(in, in + run_length, run_2_end, out);
+        }
+        // Flipping the positions to read from and write to.
+        if ((flag = !flag)) {
+            in = end + 1;
+            until = end + n;
+            out = start;
+        } else {
+            in = start;
+            until = end;
+            out = end + 1;
+        }
+    }
+}
+
 int main() {
     triple_buffers buffers;
     allocate_triple_buffer(&buffers);
@@ -177,8 +289,11 @@ int main() {
         { quick_sort_recursive, "QuickRec" },
         { quick_sort_iterative, "QuickIt" },
         { heap_sort, "Heap" },
+        { merge_sort, "Merge" },
     };
-    size_t lengths[] = { 20, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };
+    // size_t lengths[] = { 20, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };
+    size_t lengths[] = { 20, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768 };
+    // size_t lengths[] = { 512 };
     // size_t lengths[] = { 24, 32, 48, 64, 96, 128 };
     // size_t lengths[] = {
     //     16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68, 72, 76, 80,

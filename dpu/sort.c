@@ -231,7 +231,7 @@ static __noinline void flush(T __mram_ptr *input, T __mram_ptr *output, T *cache
     } while (input < end);
 }
 
-bool merge(T __mram_ptr *input, T __mram_ptr *output, triple_buffers *buffers, const mram_range ranges[NR_TASKLETS]) {
+static bool merge(T __mram_ptr *input, T __mram_ptr *output, triple_buffers *buffers, const mram_range ranges[NR_TASKLETS]) {
     T *cache = buffers->cache;
     seqreader_t sr[2];
     bool flipped = false;  // Whether `input` or `output` contain the sorted elements.
