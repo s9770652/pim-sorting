@@ -17,7 +17,7 @@ __host struct dpu_arguments DPU_INPUT_ARGUMENTS;
 // The input length at which QuickSort changes to InsertionSort.
 #define QUICK_TO_INSERTION (13)
 // The call stack for iterative QuickSort.
-static T **call_stack;
+static T **start_of_call_stack;
 
 /* Defining building blocks for QuickSort, which remain the same. */
 #define RECURSIVE (false)
@@ -95,11 +95,11 @@ swap(i, right)
 
 // A “call” stack for holding the values of `left` and `right` is maintained.
 // Its memory must be reserved beforehand.
-#define QUICK_HEAD()                                 \
-T **start_of_call_stack = call_stack;                \
-*call_stack++ = start;                               \
-*call_stack++ = end;                                 \
-do {                                                 \
+#define QUICK_HEAD()                                \
+T **call_stack = start_of_call_stack;               \
+*call_stack++ = start;                              \
+*call_stack++ = end;                                \
+do {                                                \
     T *right = *--call_stack, *left = *--call_stack
 
 // Instead of recursive calls, the required variables are put on the stack.
@@ -400,7 +400,7 @@ int main() {
     // 20 pointers on the stack was the most I’ve seen for 1024 elements
     // so the space reserved here should be enough.
     size_t const log = 31 - __builtin_clz(lengths[num_of_lengths - 1]);
-    call_stack = mem_alloc(4 * log * sizeof(T *));
+    start_of_call_stack = mem_alloc(4 * log * sizeof(T *));
 #else
     (void)call_stack;
 #endif
