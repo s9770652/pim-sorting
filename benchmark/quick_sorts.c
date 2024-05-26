@@ -26,16 +26,16 @@ static T **start_of_call_stack;
 #define _SWITCH_SIDES_ (false)
 
 // The main body of QuickSort remains the same no matter the implementation variant.
-#define QUICK_BODY()                                     \
-T * const pivot = get_pivot(left, right);                \
-swap(pivot, right);  /* Pivot acts as sentinel value. */ \
-T *i = left - 1, *j = right;                             \
-while (true) {                                           \
-    while (*++i < *right);                               \
-    while (*--j > *right);                               \
-    if (i >= j) break;                                   \
-    swap(i, j);                                          \
-}                                                        \
+#define QUICK_BODY()                                         \
+T * const pivot = get_pivot(left, right);                    \
+swap(pivot, right);  /* The pivot acts as sentinel value. */ \
+T *i = left - 1, *j = right;                                 \
+while (true) {                                               \
+    while (*++i < *right);                                   \
+    while (*--j > *right);                                   \
+    if (i >= j) break;                                       \
+    swap(i, j);                                              \
+}                                                            \
 swap(i, right)
 
 // Whether the partition has a length below the threshold.

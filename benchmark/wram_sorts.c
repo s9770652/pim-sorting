@@ -15,13 +15,13 @@
 
 __host struct dpu_arguments DPU_INPUT_ARGUMENTS;
 // The input length at which QuickSort changes to InsertionSort.
-#define QUICK_TO_INSERTION (16)
+#define QUICK_TO_INSERTION (13)
 // The input length at which HeapSort changes to InsertionSort.
 #define HEAP_TO_INSERTION (12)
 // The length of the first runs sorted by InsertionSort.
 #define MERGE_TO_INSERTION (12)
 // The call stack for iterative QuickSort.
-static T **call_stack;
+static T **start_of_call_stack;
 
 /**
  * @brief An implementation of standard InsertionSort.
@@ -74,58 +74,28 @@ static void insertion_sort_sentinel(T * const start, T * const end) {
 }
 
 /**
- * @brief An implementation of standard QuickSort.
- * @internal Again, the compiler is iffy.
- * Detecting the base cases before doing a recursive calls worsens the performance.
- *
- * @param start The first element of the WRAM array to sort.
- * @param end The last element of said array.
-**/
-static void quick_sort_recursive(T * const start, T * const end) {
-    /* Detect base cases. */
-    if (end <= start) return;
-    if (end - start + 1 <= QUICK_TO_INSERTION) {
-        insertion_sort_sentinel(start, end);
-        return;
-    }
-    /* Put elements into respective partitions. */
-    T * const pivot = get_pivot(start, end);
-    swap(pivot, end);  // Pivot acts as sentinel value.
-    T *i = start - 1, *j = end;
-    while (true) {
-        while (*++i < *end);
-        while (*--j > *end);
-        if (i >= j) break;
-        swap(i, j);
-    }
-    swap(i, end);
-    /* Sort left and right partitions. */
-    quick_sort_recursive(start, i - 1);
-    quick_sort_recursive(i + 1, end);
-}
-
-/**
- * @brief An implementation of QuickSort with a manual call stack.
+ * @brief The fastest implementation of QuickSort, which uses a manual call stack.
  * To this end, enough memory should be reserved and saved in the file-wide variable `call_stack`.
  * 
  * @param start The first element of the WRAM array to sort.
  * @param end The last element of said array.
 **/
-static void quick_sort_iterative(T * const start, T * const end) {
-    // A “call” call_stack for holding the values of `left` and `right` is maintained.
-    // Since QuickSort works in-place, it is stored right after the end.
-    T **start_of_call_stack = call_stack;
+static void quick_sort(T * const start, T * const end) {
+    T **call_stack = start_of_call_stack;
     *call_stack++ = start;
     *call_stack++ = end;
     do {
-        T *right = *--call_stack, *left = *--call_stack;  // Pop from call stack.
+        /* Pop from call stack. */
+        T *right = *--call_stack;
+        T*left = *--call_stack;
         /* Detect base cases. */
-        if (right - left + 1 <= QUICK_TO_INSERTION) {
-            insertion_sort_sentinel(left, right);
+        if ((right - left + 1 <= (QUICK_TO_INSERTION))) {
+            if ((right > left))
+                insertion_sort_sentinel(left, right);
             continue;
         }
         /* Put elements into respective partitions. */
-        T * const pivot = get_pivot(left, right);  // Pivot acts as sentinel value.
+        T * const pivot = get_pivot(left, right);  // The pivot acts as sentinel value.
         swap(pivot, right);
         T *i = left - 1, *j = right;
         while (true) {
@@ -135,16 +105,12 @@ static void quick_sort_iterative(T * const start, T * const end) {
             swap(i, j);
         }
         swap(i, right);
-        /* Put right partition on call stack. */
-        if (right > i + 1) {
-            *call_stack++ = i + 1;
-            *call_stack++ = right;
-        }
-        /* Put left partition on call stack. */
-        if (i - 1 > left) {
-            *call_stack++ = left;
-            *call_stack++ = i - 1;
-        }
+        /* Push left partition to call stack. */
+        *call_stack++ = left;
+        *call_stack++ = i - 1;
+        /* Push right partition to call stack. */
+        *call_stack++ = i + 1;
+        *call_stack++ = right;
     } while (call_stack != start_of_call_stack);
 }
 
@@ -286,15 +252,11 @@ int main() {
 
     char name[] = "BASE SORTING ALGORITHMS";
     struct algo_to_test const algos[] = {
-        { quick_sort_recursive, "QuickRec" },
-        { quick_sort_iterative, "QuickIt" },
+        { quick_sort, "Quick" },
         { heap_sort, "Heap" },
         { merge_sort, "Merge" },
     };
-    // size_t lengths[] = { 20, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };
-    size_t lengths[] = { 20, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768 };
-    // size_t lengths[] = { 512 };
-    // size_t lengths[] = { 24, 32, 48, 64, 96, 128 };
+    size_t lengths[] = { 20, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, };// 1024 };
     // size_t lengths[] = {
     //     16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68, 72, 76, 80,
     //     84, 88, 92, 96, 100, 104, 108, 112, 116, 120, 124, 128
@@ -314,7 +276,7 @@ int main() {
     // 20 pointers on the stack was the most I’ve seen for 1024 elements
     // so the space reserved here should be enough.
     size_t const log = 31 - __builtin_clz(lengths[num_of_lengths - 1]);
-    call_stack = mem_alloc(4 * log * sizeof(T *));
+    start_of_call_stack = mem_alloc(4 * log * sizeof(T *));
 
     test_algos(name, algos, num_of_algos, lengths, num_of_lengths, &buffers, &DPU_INPUT_ARGUMENTS);
     return EXIT_SUCCESS;
