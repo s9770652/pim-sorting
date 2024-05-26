@@ -402,7 +402,7 @@ int main() {
     size_t const log = 31 - __builtin_clz(lengths[num_of_lengths - 1]);
     start_of_call_stack = mem_alloc(4 * log * sizeof(T *));
 #else
-    (void)call_stack;
+    (void)start_of_call_stack;
 #endif
 
     test_algos(name, algos, num_of_algos, lengths, num_of_lengths, &buffers, &DPU_INPUT_ARGUMENTS);
