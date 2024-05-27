@@ -189,58 +189,56 @@ static inline void merge(T * const start_1, T * const start_2, T * const end_2, 
     }
 }
 
-#define MERGE_SORT()                                                                               \
-/* Natural runs. */                                                                                \
-if (start + MERGE_TO_INSERTION - 1 >= end) {                                                       \
-    insertion_sort_sentinel(start, end);                                                           \
-    return;                                                                                        \
-}                                                                                                  \
-insertion_sort_sentinel(start, start + MERGE_TO_INSERTION - 1);                                    \
-for (T *t = start + MERGE_TO_INSERTION; t < end; t += MERGE_TO_INSERTION) {                        \
-    T * const run_end = (t + MERGE_TO_INSERTION - 1 > end) ? end : t + MERGE_TO_INSERTION - 1;     \
-    insertion_sort_nosentinel(t, run_end);                                                         \
-}                                                                                                  \
-/* Merging. */                                                                                     \
-T *in, *out, *until;  /* `until`: Where the runs to sort finish. */                                \
-bool flag = true;  /* Used to determine the initial positions of `in`, `out`, and `until`. */      \
-size_t const n = end - start + 1;                                                                  \
-for (size_t run_length = MERGE_TO_INSERTION; run_length < n; run_length *= 2) {                    \
-    /* Set the positions to read from and write to. */                                             \
-    if ((flag = !flag)) {                                                                          \
-        in = end + 1;                                                                              \
-        out = start;                                                                               \
-        until = end + n;                                                                           \
-    } else {                                                                                       \
-        in = start;                                                                                \
-        out = end + 1;                                                                             \
-        until = end;                                                                               \
-    }                                                                                              \
-    /* Merge pairs of adjacent runs. */                                                            \
-    for (; in <= until; in += 2 * run_length, out += 2 * run_length) {                             \
-        /* Only one run left? */                                                                   \
-        if (in + run_length - 1 >= until) {                                                        \
-            do {                                                                                   \
-                *out++ = *in++;                                                                    \
-            } while (in <= until);                                                                 \
-            break;                                                                                 \
-        }                                                                                          \
-        /* If not, merge the next two runs. */                                                     \
-        T * const run_2_end = (in + 2 * run_length - 1 > until) ? until : in + 2 * run_length - 1; \
-        merge(in, in + run_length, run_2_end, out);                                                \
-    }                                                                                              \
-}
-
 /**
  * @brief An implementation of standard MergeSort.
  * @note This function saves up to `n` elements after the end of the input array.
  * For speed reasons, the sorted array may be stored after that very end.
  * In other words, the sorted array is not written back to the start of the input array.
+ * @internal `inline` does seem to help‽ I only measured the runtimes, though.
  * 
  * @param start The first element of the WRAM array to sort.
  * @param end The last element of said array.
 **/
-static void merge_sort_no_write_back(T * const start, T * const end) {
-    MERGE_SORT();
+static inline void merge_sort_no_write_back(T * const start, T * const end) {
+    /* Natural runs. */
+    if (start + MERGE_TO_INSERTION - 1 >= end) {
+        insertion_sort_sentinel(start, end);
+        return;
+    }
+    insertion_sort_sentinel(start, start + MERGE_TO_INSERTION - 1);
+    for (T *t = start + MERGE_TO_INSERTION; t < end; t += MERGE_TO_INSERTION) {
+        T * const run_end = (t + MERGE_TO_INSERTION - 1 > end) ? end : t + MERGE_TO_INSERTION - 1;
+        insertion_sort_nosentinel(t, run_end);
+    }
+    /* Merging. */
+    T *in, *until, *out;  // Runs from `in` to `until` are merged and stored in `out`.
+    bool flag = true;  // Used to determine the initial positions of `in`, `out`, and `until`.
+    size_t const n = end - start + 1;
+    for (size_t run_length = MERGE_TO_INSERTION; run_length < n; run_length *= 2) {
+        // Set the positions to read from and write to.
+        if ((flag = !flag)) {
+            in = end + 1;
+            until = end + n;
+            out = start;
+        } else {
+            in = start;
+            until = end;
+            out = end + 1;
+        }
+        // Merge pairs of adjacent runs.
+        for (; in <= until; in += 2 * run_length, out += 2 * run_length) {
+            // Only one run left?
+            if (in + run_length - 1 >= until) {
+                do {
+                    *out++ = *in++;
+                } while (in <= until);
+                break;
+            }
+            // If not, merge the next two runs.
+            T * const run_2_end = (in + 2 * run_length - 1 > until) ? until : in + 2 * run_length - 1;
+            merge(in, in + run_length, run_2_end, out);
+        }
+    }
 }
 
 /**
@@ -251,12 +249,11 @@ static void merge_sort_no_write_back(T * const start, T * const end) {
  * @param end The last element of said array.
 **/
 static void merge_sort_write_back(T * const start, T * const end) {
-    MERGE_SORT();
+    merge_sort_no_write_back(start, end);
     /* Writing back. */
-    if (!flag) {
-        in = end + 1;
-        until = end + n;
-        out = start;
+    size_t const n = end - start + 1, log = 31 - __builtin_clz(n);
+    if (!(log % 2)) {
+        T *in = end + 1, *until = end + n, *out = start;
         do {
             *out++ = *in++;
         } while (in <= until);
