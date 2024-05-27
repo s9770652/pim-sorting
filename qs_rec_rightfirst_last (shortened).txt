@@ -1,0 +1,55 @@
+quick_sort:                             // @quick_sort
+	sd r22, 16, d22
+	add r22, r22, 24
+	sd r22, -16, d14
+	sd r22, -24, d16
+	move r14, r0
+	jleu r1, r14, .LBB1_13
+	add r15, r14, -4, true, .LBB1_2
+.LBB1_12:                               //   in Loop: Header=BB1_2 Depth=1
+	sw r16, 0, r2
+	sw r1, 0, r3
+	add r0, r16, 4
+	call r23, quick_sort
+	add r1, r16, -4
+	jleu r1, r14, .LBB1_13
+.LBB1_2:                                // =>This Loop Header: Depth=1
+	move r16, r15
+	move r0, r1
+	sub r2, r1, r14
+	jlts r2, 52, .LBB1_3
+.LBB1_7:                                //   Parent Loop BB1_2 Depth=1
+	lw r2, r1, 0
+.LBB1_8:                                //   Parent Loop BB1_2 Depth=1
+	lw r3, r16, 4
+	add r16, r16, 4
+	jltu r3, r2, .LBB1_8
+.LBB1_9:                                //   Parent Loop BB1_2 Depth=1
+	lw r4, r0, -4
+	add r0, r0, -4
+	jgtu r4, r2, .LBB1_9
+	jgeu r16, r0, .LBB1_12
+	sw r16, 0, r4
+	sw r0, 0, r3
+	jump .LBB1_7
+.LBB1_6:                                //   in Loop: Header=BB1_3 Depth=1
+	add r14, r14, 4
+	sw r2, 0, r0
+	jgtu r14, r1, .LBB1_13
+.LBB1_3:                                // =>This Loop Header: Depth=1
+	lw r0, r14, 0
+	lw r3, r14, -4
+	move r2, r14
+	jleu r3, r0, .LBB1_6
+	move r2, r14
+.LBB1_5:                                //   Parent Loop BB1_3 Depth=1
+	sw r2, 0, r3
+	lw r3, r2, -8
+	add r2, r2, -4
+	jgtu r3, r0, .LBB1_5
+	jump .LBB1_6
+.LBB1_13:
+	ld d16, r22, -24
+	ld d14, r22, -16
+	ld d22, r22, -8
+	jump r23
