@@ -25,33 +25,6 @@ static T **start_of_call_stack;
 
 /**
  * @brief An implementation of standard InsertionSort.
- * @internal The compiler is iffy when it comes to this function.
- * Using `curr = ++i` would algorithmically make sense as a list of length 1 is always sorted,
- * yet it actually runs ~2% slower.
- * And since moves and additions cost the same, the it does also does not benefit
- * from being able to use `prev = i` instead of `prev = curr - 1`.
- * The same slowdowns also happens when using `*i = start + 1`.
- * Since only a few extra instructions are performed each call,
- * I refrain from injecting Assembly code for the sake of maintainability and readability
- * 
- * @param start The first element of the WRAM array to sort.
- * @param end The last element of said array.
-**/
-static void insertion_sort_nosentinel(T * const start, T * const end) {
-    T *curr, *i = start;
-    while ((curr = i++) <= end) {
-        T *prev = curr - 1;
-        T const to_sort = *curr;
-        while (prev >= start && *prev > to_sort) {
-            *curr = *prev;
-            curr = prev--;
-        }
-        *curr = to_sort;
-    }
-}
-
-/**
- * @brief An implementation of standard InsertionSort.
  * @attention This algorithm relies on `start[-1]` being a sentinel value,
  * i.e. being at least as small as any value in the array.
  * For this reason, `cache[-1]` is set to `T_MIN`.
@@ -201,14 +174,13 @@ static inline void merge(T * const start_1, T * const start_2, T * const end_2, 
 **/
 static inline void merge_sort_no_write_back(T * const start, T * const end) {
     /* Natural runs. */
-    if (start + MERGE_TO_INSERTION - 1 >= end) {
-        insertion_sort_sentinel(start, end);
-        return;
-    }
     insertion_sort_sentinel(start, start + MERGE_TO_INSERTION - 1);
     for (T *t = start + MERGE_TO_INSERTION; t < end; t += MERGE_TO_INSERTION) {
+        T const before_sentinel = *(t - 1);
+        *(t - 1) = T_MIN;  // Set sentinel value.
         T * const run_end = (t + MERGE_TO_INSERTION - 1 > end) ? end : t + MERGE_TO_INSERTION - 1;
-        insertion_sort_nosentinel(t, run_end);
+        insertion_sort_sentinel(t, run_end);
+        *(t - 1) = before_sentinel;
     }
     /* Merging. */
     T *in, *until, *out;  // Runs from `in` to `until` are merged and stored in `out`.
