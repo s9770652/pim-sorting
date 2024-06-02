@@ -141,7 +141,7 @@ static void heap_sort(T * const start, T * const end) {
 **/
 static inline void merge(T * const start_1, T * const start_2, T * const end_2, T *out) {
     T *i = start_1, *j = start_2;
-    while (i < start_2 && j <= end_2) {
+    while (true) {
         if (*i <= *j) {
             *out++ = *i++;
             if (i >= start_2) {  // Pulling these if-statements out of the loop …
