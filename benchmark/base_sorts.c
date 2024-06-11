@@ -185,7 +185,7 @@ static void shell_sort_ciura(T * const start, T * const end) {
 **/
 #define SHELL_SORT_CUSTOM_STEP_X(step)                                      \
 static void shell_sort_custom_step_##step(T * const start, T * const end) { \
-    if (BIG_STEP >= step) {                                                 \
+    if (BIG_STEP > step) {                                                  \
         _Pragma("nounroll")  /* The .text region may overflow otherwise. */ \
         for (size_t j = 0; j < BIG_STEP; j++)                               \
             insertion_sort_with_steps_sentinel(&start[j], end, BIG_STEP);   \
