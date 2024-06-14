@@ -66,7 +66,7 @@ static void print_header(char const name[], struct algo_to_test const algos[],
         size_t const num_of_algos, struct dpu_arguments const * const args) {
     char *pivot_methods[] = { "end", "middle", "median_of_three", "random" };
     printf(
-        "# reps=%d, upper bound=%d, PIVOT=%s, TYPE=%s, BLOCK_SIZE=%d, SEQREAD_CACHE_SIZE=%d, NR_TASKLETS=%d\n",
+        "# reps=%u, upper bound=%"T_QUALIFIER", PIVOT=%s, TYPE=%s, BLOCK_SIZE=%d, SEQREAD_CACHE_SIZE=%d, NR_TASKLETS=%d\n",
         args->n_reps,
         args->upper_bound,
         pivot_methods[PIVOT],

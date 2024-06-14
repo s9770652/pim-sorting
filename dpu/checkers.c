@@ -42,11 +42,7 @@ void print_single_line(T *cache, size_t length) {
     mutex_lock(printing_mutex);
     for (size_t i = 0; i < length; i++) {
         colour = (cache[i] < 8) ? colours[cache[i]] : ANSI_COLOR_RESET;
-#if UINT32
-        printf("%s%3u ", colour, cache[i]);
-#else
-        printf("%s%3lu ", colour, cache[i]);
-#endif
+        printf("%s%3"T_QUALIFIER" ", colour, cache[i]);
     }
     printf(ANSI_COLOR_RESET "\n");
     mutex_unlock(printing_mutex);
