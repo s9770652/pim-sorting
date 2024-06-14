@@ -155,6 +155,35 @@ static void insertion_sort_with_steps_sentinel(T * const start, T * const end, s
 }
 
 /**
+ * @brief An implementation of InsertionSort which needs no predefined sentinel value.
+ * Instead if the current element is the smallest known one, it is moved to the front immediately.
+ * If not, the current first element must be bigger and thus is a sentinel value.
+ * @note Of dropping the predefined sentinel value is made a mockery
+ * since `++i` worsens the compilation.
+ * 
+ * @param start The first element of the WRAM array to sort.
+ * @param end The last element of said array.
+**/
+static void insertion_sort_implicit_sentinel(T * const start, T * const end) {
+    T *curr, *i = start;
+    while ((curr = i++) <= end) {
+        T const to_sort = *curr;
+        if (*curr < *start) {  // Is the current element the new minimum?
+            for (T *t = curr; t > start; t--)  // Move all previous elements backwards.
+                *t = *(t - 1);
+            *start = to_sort;  // Place the new minimum at the start.
+        } else {  // Otherwise, do a regular InsertionSort.
+            T *prev = curr - 1;
+            while (*prev > to_sort) {
+                *curr = *prev;
+                curr = prev--;
+            }
+            *curr = to_sort;
+        }
+    }
+}
+
+/**
  * @brief An implementation of ShellSort using Ciura’s optimal sequence for 128 elements.
  * 
  * @param start The first element of the WRAM array to sort.
@@ -228,6 +257,7 @@ int main() {
         { shell_sort_custom_step_9, "9" },
         { shell_sort_ciura, "Ciura" },
         { insertion_sort_nosentinel, "1NoSentinel" },
+        { insertion_sort_implicit_sentinel, "1Implicit" },
         { bubble_sort_adaptive, "BubbleAdapt" },
         { bubble_sort_nonadaptive, "BubbleNonAdapt" },
         { selection_sort, "Selection" },
