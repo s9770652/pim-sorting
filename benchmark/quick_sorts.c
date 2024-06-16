@@ -349,10 +349,10 @@ static void quick_sort_triviality_within_threshold(T * const start, T * const en
  * @brief An implementation of the fastest variant of the iterative QuickSort
  * where the last push to the call stack is replaced by a simple jump.
  * 
- * @param start 
- * @param end 
- */
-static void quick_sort_optimised_iterative(T * const start, T * const end) {
+ * @param start The first element of the WRAM array to sort.
+ * @param end The last element of said array.
+**/
+static __used void quick_sort_optimised_iterative(T * const start, T * const end) {
     QUICK_HEAD();
 optimised_label:
     if (right - left + 1 <= QUICK_TO_INSERTION) {
@@ -388,7 +388,7 @@ int main() {
         { quick_sort_triviality_after_threshold, "ThreshThenTriv" },
         { quick_sort_triviality_within_threshold, "TrivInThresh" },
 #if (!RECURSIVE)
-        // { quick_sort_optimised_iterative, "Optimised" }
+        // { quick_sort_optimised_iterative, "Optimised" },
 #endif
     };
     size_t lengths[] = { 20, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };

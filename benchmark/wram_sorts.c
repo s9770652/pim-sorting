@@ -79,7 +79,7 @@ static void insertion_sort_with_steps_sentinel(T * const start, T * const end, s
  * @param start The first element of the WRAM array to sort.
  * @param end The last element of said array.
 **/
-static void shell_sort(T * const start, T * const end) {
+static __used void shell_sort(T * const start, T * const end) {
     for (size_t j = 0; j < 4; j++)
         insertion_sort_with_steps_sentinel(&start[j], end, 4);
     insertion_sort_sentinel(start, end);
