@@ -14,13 +14,9 @@
 struct xorshift rngs[NR_TASKLETS];
 struct xorshift_offset pivot_rng_state;
 
-/**
- * @brief An empty functions used when calculating the function call overhead.
- * 
- * @param start Any WRAM address.
- * @param end Any WRAM address.
-**/
-__noinline static void empty_sort(T *start, T *end) { (void)start; (void)end; }
+/// @brief It takes 9 instructions to call the sorting algorithms.
+/// This number of cycles is deduced from the measured times.
+perfcounter_t const overhead = 9 * 11;
 
 /**
  * @brief The arithmetic mean of measured times.
@@ -66,14 +62,16 @@ static void print_header(char const name[], struct algo_to_test const algos[],
         size_t const num_of_algos, struct dpu_arguments const * const args) {
     char *pivot_methods[] = { "end", "middle", "median_of_three", "random" };
     printf(
-        "# reps=%u, upper bound=%"T_QUALIFIER", PIVOT=%s, TYPE=%s, BLOCK_SIZE=%d, SEQREAD_CACHE_SIZE=%d, NR_TASKLETS=%d\n",
+        "# reps=%u, upper bound=%"T_QUALIFIER", PIVOT=%s, TYPE=%s, BLOCK_SIZE=%d, "
+        "SEQREAD_CACHE_SIZE=%d, NR_TASKLETS=%d, overhead=%lu\n",
         args->n_reps,
         args->upper_bound,
         pivot_methods[PIVOT],
         TYPE_NAME,
         BLOCK_SIZE,
         SEQREAD_CACHE_SIZE,
-        NR_TASKLETS
+        NR_TASKLETS,
+        overhead
     );
 #if PRINT_IN_FILE_FRIENDLY_FORMAT
     (void)name;
@@ -138,17 +136,7 @@ void test_algos(char const name[], struct algo_to_test const algos[], size_t con
     size_t nb_of_bytes_for_moments = num_of_algos * sizeof(perfcounter_t);
     perfcounter_t *first_moments = mem_alloc(nb_of_bytes_for_moments);
     perfcounter_t *second_moments = mem_alloc(nb_of_bytes_for_moments);
-    perfcounter_t curr_time, overhead = 0;
-
-    /* Compute overhead. */
-    T * const start_empty = cache, * const end_empty = &cache[1];
-    for (uint32_t rep = 0; rep < args->n_reps; rep++) {
-        curr_time = perfcounter_get();
-        empty_sort(start_empty, end_empty);
-        curr_time = perfcounter_get() - curr_time;
-        overhead += curr_time;
-    }
-    overhead = get_mean_of_time(args->n_reps, overhead);
+    perfcounter_t curr_time;
 
     /* Do and time actual repetitions. */
     print_header(name, algos, num_of_algos, args);
@@ -166,6 +154,8 @@ void test_algos(char const name[], struct algo_to_test const algos[], size_t con
                 rngs[0] = seed_xs(rep + 0b1011100111010);
                 generate_uniform_distribution_wram(start, end, args->upper_bound);
                 // generate_almost_sorted_distribution_wram(start, end, args->upper_bound);
+                // generate_sorted_distribution_wram(start, end);
+                // generate_reverse_sorted_distribution_wram(start, end);
                 curr_time = perfcounter_get();
                 algos[id].algo(start, end);
                 curr_time = perfcounter_get() - curr_time - overhead;
@@ -186,6 +176,8 @@ void test_algos(char const name[], struct algo_to_test const algos[], size_t con
             }
         }
 
-        print_measurements(algos, num_of_algos, length, args->n_reps, first_moments, second_moments);
+        print_measurements(
+            algos, num_of_algos, length, args->n_reps, first_moments, second_moments
+        );
     }
 }
