@@ -70,7 +70,7 @@ static void bubble_sort_adaptive(T * const start, T * const end) {
  * @param start The first element of the WRAM array to sort.
  * @param end The last element of said array.
 **/
-void selection_sort(T * const start, T * const end) {
+static void selection_sort(T * const start, T * const end) {
     for (T *i = start; i < end; i++) {
         T *min = i;
         for (T *j = i + 1; j <= end; j++) {
@@ -90,8 +90,6 @@ void selection_sort(T * const start, T * const end) {
  * And since moves and additions cost the same, the it does also does not benefit
  * from being able to use `prev = i` instead of `prev = curr - 1`.
  * The same slowdowns also happens when using `*i = start + 1`.
- * Since only a few extra instructions are performed each call,
- * I refrain from injecting Assembly code for the sake of maintainability and readability
  * 
  * @param start The first element of the WRAM array to sort.
  * @param end The last element of said array.
@@ -115,12 +113,15 @@ static void insertion_sort_nosentinel(T * const start, T * const end) {
  * i.e. being at least as small as any value in the array.
  * For this reason, `cache[-1]` is set to `T_MIN`.
  * For QuickSort, the last value of the previous partition takes on that role.
+ * @internal Since `start` is not need later on, it is easy to inject assembler code
+ * which manually increases the starting position.
  * 
  * @param start The first element of the WRAM array to sort.
  * @param end The last element of said array.
 **/
 static void insertion_sort_sentinel(T * const start, T * const end) {
     T *curr, *i = start;
+    __asm__ ("\tadd %[i], %[i], 4" : : [i] "r"(i));  // Start at the second element.
     while ((curr = i++) <= end) {
         T *prev = curr - 1;  // always valid due to the sentinel value
         T const to_sort = *curr;
@@ -158,8 +159,6 @@ static void insertion_sort_with_steps_sentinel(T * const start, T * const end, s
  * @brief An implementation of InsertionSort which needs no predefined sentinel value.
  * Instead if the current element is the smallest known one, it is moved to the front immediately.
  * If not, the current first element must be bigger and thus is a sentinel value.
- * @note Of dropping the predefined sentinel value is made a mockery
- * since `++i` worsens the compilation.
  * 
  * @param start The first element of the WRAM array to sort.
  * @param end The last element of said array.

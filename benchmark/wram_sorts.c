@@ -37,6 +37,7 @@ static T **start_of_call_stack;
 **/
 static void insertion_sort_sentinel(T * const start, T * const end) {
     T *curr, *i = start;
+    __asm__ ("\tadd %[i], %[i], 4" : : [i] "r"(i));  // Start at the second element.
     while ((curr = i++) <= end) {
         T *prev = curr - 1;  // always valid due to the sentinel value
         T const to_sort = *curr;
@@ -464,7 +465,6 @@ static void merge_sort_half_space(T * const start, T * const end) {
         }
     }
 }
-
 
 int main() {
     triple_buffers buffers;
