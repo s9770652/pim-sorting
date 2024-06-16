@@ -14,9 +14,9 @@
 struct xorshift rngs[NR_TASKLETS];
 struct xorshift_offset pivot_rng_state;
 
-/// @brief It takes 9 instructions to call the sorting algorithms.
+/// @brief It takes 144 instructions to call the sorting algorithms.
 /// This number of cycles is deduced from the measured times.
-perfcounter_t const overhead = 9 * 11;
+perfcounter_t const overhead = 144;
 
 /**
  * @brief The arithmetic mean of measured times.
