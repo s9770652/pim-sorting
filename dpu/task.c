@@ -139,6 +139,7 @@ int main(void) {
     if (me() == 0) flipped = flipped_own;
     barrier_wait(&omni_barrier);
     T __mram_ptr *within = (flipped) ? output : input;
+    (void)within;  // Surpresses warning if no sanity checks are done.
 
     /* Validate sorted elements. */
 #if CHECK_SANITY
