@@ -54,8 +54,6 @@ void generate_almost_sorted_distribution_wram(T * const start, T * const end, si
     swaps = (swaps) ? : sqroot_on_dpu(n);
     for (size_t s = 0; s < swaps; s++) {
         size_t const i = rr(n - 1, &rngs[me()]);
-        T const temp = start[i];
-        start[i] = start[i + 1];
-        start[i + 1] = temp;
+        swap(start[i], start[i + 1]);
     }
 }

@@ -40,4 +40,18 @@ struct dpu_arguments {
 // `m` must be a power of two.
 #define ROUND_UP_POW2(n, m) (((n) + (m) - 1) & -(m))
 
+/**
+ * @brief Swaps the content of two addresses.
+ * @note If any address involved is a MRAM address,
+ * a solution with `mram_write/copy` should be employed.
+ * 
+ * @param a First address.
+ * @param b Second address.
+**/
+static inline void swap(T * const a, T * const b) {
+    T const temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
 #endif  // _COMMON_H_

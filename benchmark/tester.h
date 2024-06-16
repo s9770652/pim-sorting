@@ -35,18 +35,6 @@ void test_algos(char const name[], struct algo_to_test const algos[], size_t num
         size_t const lengths[], size_t num_of_lengths, triple_buffers const *buffers,
         struct dpu_arguments const *args);
 
-/**
- * @brief Swaps the content of two addresses.
- * 
- * @param a First WRAM address.
- * @param b Second WRAM address.
-**/
-static inline void swap(T * const a, T * const b) {
-    T const temp = *a;
-    *a = *b;
-    *b = temp;
-}
-
 /// @brief The state of the generator used for drawing a pivot element.
 extern struct xorshift_offset pivot_rng_state;
 

@@ -51,19 +51,6 @@ static void insertion_sort(T *start, T * const end) {
 }
 
 /**
- * @brief Swaps the content of two addresses.
- * 
- * @param a First WRAM address.
- * @param b Second WRAM address.
-**/
-static void swap(T * const a, T * const b) {
-    T const temp = *a;
-    *a = *b;
-    *b = temp;
-}
-
-
-/**
  * @brief Returns a pivot element for a WRAM array.
  * The method of choosing currently must be changed by (un-)commenting the respective code lines.
  * 
