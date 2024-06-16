@@ -34,15 +34,27 @@ void generate_uniform_distribution_mram(T __mram_ptr *array, T * const cache,
     }
 }
 
-void generate_almost_sorted_distribution_wram(T * const start, T * const end, size_t swaps) {
-    size_t const n = end - start + 1;
-    for (size_t i = 0; i <= n; i++) {
-        start[i] = i;
+void generate_sorted_distribution_wram(T * const start, T * const end) {
+    T counter = T_MIN;
+    for (T *t = start; t <= end; t++) {
+        *t = counter++;
     }
+}
+
+void generate_reverse_sorted_distribution_wram(T * const start, T * const end) {
+    T counter = T_MIN;
+    for (T *t = end; t >= start; t--) {
+        *t = counter++;
+    }
+}
+
+void generate_almost_sorted_distribution_wram(T * const start, T * const end, size_t swaps) {
+    generate_sorted_distribution_wram(start, end);
+    size_t const n = end - start + 1;
     swaps = (swaps) ? : sqroot_on_dpu(n);
     for (size_t s = 0; s < swaps; s++) {
         size_t const i = rr(n - 1, &rngs[me()]);
-        T temp = start[i];
+        T const temp = start[i];
         start[i] = start[i + 1];
         start[i + 1] = temp;
     }

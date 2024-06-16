@@ -14,16 +14,18 @@
 extern struct xorshift rngs[NR_TASKLETS];
 
 /**
- * @brief Uniformly draws numbers and stores them in a WRAM array.
+ * @brief Uniformly draws numbers.
+ * Stores them in a WRAM array.
  * 
  * @param start The first element of the array where to store the random data.
- * @param length The last element of said array.
+ * @param end The last element of said array.
  * @param upper_bound The (exclusive) upper limit of the range to draw from.
 **/
 void generate_uniform_distribution_wram(T *start, T *end, T upper_bound);
 
 /**
- * @brief Uniformly draws numbers and stores them in an MRAM array.
+ * @brief Uniformly draws numbers.
+ * Stores them in an MRAM array.
  * 
  * @param array The MRAM array where to store the random data.
  * @param cache A cache in WRAM.
@@ -34,12 +36,31 @@ void generate_uniform_distribution_mram(T __mram_ptr *array, T *cache, mram_rang
         T upper_bound);
 
 /**
- * @brief Generates a range of ascending numbers, then swaps some neighbours.
+ * @brief Generates a range of ascending numbers, starting from `T_MIN`.
+ * Stores them in a WRAM array.
  * 
  * @param start The first element of the array where to store the random data.
- * @param length The last element of said array.
+ * @param end The last element of said array.
+**/
+void generate_sorted_distribution_wram(T *start, T *end);
+
+/**
+ * @brief Generates a range of descending numbers, ending at `T_MIN`.
+ * Stores them in a WRAM array.
+ * 
+ * @param start The first element of the array where to store the random data.
+ * @param end The last element of said array.
+**/
+void generate_reverse_sorted_distribution_wram(T *start, T *end);
+
+/**
+ * @brief Generates a range of ascending numbers, then swaps some neighbours.
+ * Stores them in a WRAM array.
+ * 
+ * @param start The first element of the array where to store the random data.
+ * @param end The last element of said array.
  * @param swaps The number of swaps of neighboured numbers. If zero, √n swaps are made.
 **/
-void generate_almost_sorted_distribution_wram(T * const start, T * const end, size_t swaps);
+void generate_almost_sorted_distribution_wram(T *start, T *end, size_t swaps);
 
 #endif  // _RANDOM_DISTRIBUTION_H_
