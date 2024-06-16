@@ -76,27 +76,6 @@ static inline T get_pivot(T const * const start, T const * const end) {
     //     return *end;
 }
 
-static void quick_sort_recursive_2(T * const array, size_t const low, size_t const high) {
-    /* Detect base cases. */
-    if (high - low <= QUICK2_INSERTION_BASE) {  // false if `high < low` due to wrapping
-        insertion_sort(&array[low], &array[high]);
-        return;
-    } else if (high <= low) return;
-    /* Put elements into respective partitions. */
-    size_t i = low, j = high;
-    T pivot = get_pivot(&array[low], &array[high]);
-    do {
-        while (array[i] < pivot) i++;
-        while (array[j] > pivot) j--;
-
-        if (i <= j)
-            swap(&array[i++], &array[j--]);
-    } while (i <= j);
-    /* Sort left and right partitions. */
-    quick_sort_recursive_2(array, low, j);
-    quick_sort_recursive_2(array, i, high);
-}
-
 static void quick_sort_recursive_3(T * const start, T * const end) {
     /* Detect base cases. */
     if (end - start <= QUICK3_INSERTION_BASE) {  // false if `end < start` due to wrapping
@@ -116,70 +95,6 @@ static void quick_sort_recursive_3(T * const start, T * const end) {
     /* Sort left and right partitions. */
     quick_sort_recursive_3(start, j);
     quick_sort_recursive_3(i, end);
-}
-
-static void quick_sort_iterative(T * const start, T * const end) {
-    // A “call” stack for holding the values of `left` and `right` is maintained.
-    // Since QuickSort works in-place, it is stored right after the end.
-    T **stack = (T **)(uintptr_t)end;
-    *++stack = start;
-    *++stack = end;
-    do {
-        T *right = *stack--, *left = *stack--;  // Pop from stack.
-        /* Detect base cases. */
-        if (right - left <= QUICK3_INSERTION_BASE) {  // false if `right < left` due to wrapping
-            insertion_sort(left, right);
-            continue;
-        } else if (right <= left) return;
-        /* Put elements into respective partitions. */
-        T *i = left, *j = right;
-        T pivot = get_pivot(left, right);
-        do {
-            while (*i < pivot) i++;
-            while (*j > pivot) j--;
-
-            if (i <= j)
-                swap(i++, j--);
-        } while (i <= j);
-        /* Put left partition on stack. */
-        if (j > left) {
-            *++stack = left;
-            *++stack = j;
-        }
-        /* Put right partition on stack. */
-        if (right > i) {
-            *++stack = i;
-            *++stack = right;
-        }
-    } while (stack != (T **)(uintptr_t)end);
-}
-
-static void heapify(T *data, size_t const n, size_t const root) {
-    T old_root_value = data[root];
-    size_t father = root, son;
-    while ((son = father * 2 + 1) < n) {  // left son
-        if ((son + 1 < n) && (data[son + 1] > data[son]))  // Check if right son is bigger.
-            son++;
-        if (data[son] <= old_root_value)  // Stop if both sons are smaller than their father.
-            break;
-        data[father] = data[son];  // Shift son up.
-        father = son;
-    }
-    data[father] = old_root_value;
-}
-
-static void heap_sort(T *data, size_t const n) {
-    if (n < 2) return;
-    /* Build a heap using Floyd's method. */
-    for (size_t r = n / 2; r > 0; r--)
-        heapify(data, n, r - 1);
-    /* Sort by repeatedly putting the root at the end of the heap. */
-    size_t i;
-    for (i = n - 1; i > HEAP_INSERTION_BASE; i--) {
-        swap(&data[0], &data[i]);
-        heapify(data, i, 0);
-    }
-    insertion_sort(data, &data[i]);
 }
 
 static void base_sort(T *array, size_t const length) {
