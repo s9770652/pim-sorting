@@ -48,7 +48,7 @@ struct dpu_arguments {
  * @param a First address.
  * @param b Second address.
 **/
-static inline void swap(T * const a, T * const b) {
+static __attribute__((__always_inline__)) inline void swap(T * const a, T * const b) {
     T const temp = *a;
     *a = *b;
     *b = temp;
