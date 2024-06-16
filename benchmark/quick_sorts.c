@@ -371,9 +371,8 @@ int main() {
     triple_buffers buffers;
     allocate_triple_buffer(&buffers);
     if (me() != 0) return EXIT_SUCCESS;
-    if (DPU_INPUT_ARGUMENTS.mode == 0) {  // called via debugger?
-        DPU_INPUT_ARGUMENTS.mode = 2;
-        DPU_INPUT_ARGUMENTS.n_reps = 10000;
+    if (DPU_INPUT_ARGUMENTS.n_reps == 0) {  // called via debugger?
+        DPU_INPUT_ARGUMENTS.n_reps = 10;
         DPU_INPUT_ARGUMENTS.upper_bound = 0;
     }
 
