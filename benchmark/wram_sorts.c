@@ -25,6 +25,19 @@ __host struct dpu_arguments DPU_INPUT_ARGUMENTS;
 // The call stack for iterative QuickSort.
 static T **start_of_call_stack;
 
+/// @attention Never call this by yourself! Only ever call `insertion_sort_sentinel`!
+static void insertion_sort_sentinel_helper(T * const start, T * const end) {
+    T *curr, *i = start;
+    while ((curr = i++) <= end) {
+        T const to_sort = *curr;
+        while (*(curr - 1) > to_sort) {  // `-1` always valid due to the sentinel value
+            *curr = *(curr - 1);
+            curr--;
+        }
+        *curr = to_sort;
+    }
+}
+
 /**
  * @brief An implementation of standard InsertionSort.
  * @attention This algorithm relies on `start[-1]` being a sentinel value,
@@ -36,17 +49,7 @@ static T **start_of_call_stack;
  * @param end The last element of said array.
 **/
 static void insertion_sort_sentinel(T * const start, T * const end) {
-    T *curr, *i = start;
-    __asm__ ("\tadd %[i], %[i], 4" : : [i] "r"(i));  // Start at the second element.
-    while ((curr = i++) <= end) {
-        T *prev = curr - 1;  // always valid due to the sentinel value
-        T const to_sort = *curr;
-        while (*prev > to_sort) {
-            *curr = *prev;
-            curr = prev--;  // always valid due to the sentinel value
-        }
-        *curr = to_sort;
-    }
+    insertion_sort_sentinel_helper(start + 1, end);
 }
 
 /**
@@ -180,7 +183,7 @@ static void quick_sort_stable_with_arrays(T * const start, T * const end) {
 static void quick_sort_stable_with_ids(T * const start, T * const end) {
     /* Create array of indices used for distinguishing equivalent elements. */
     for (T *t = end + 1; t <= end + (end - start + 1); t++) {
-        *t = t;
+        *t = (T)t;
     }
     uintptr_t offset = end - start + 1;
     /* Start of actual QuickSort. */
@@ -265,19 +268,19 @@ static void heap_sort(T * const start, T * const end) {
 // Creating the starting runs for MergeSort …
 #if (MERGE_TO_INSERTION <= 20)
 // … using InsertionSort.
-#define CREATE_STARTING_RUNS()                                                                     \
-if (end - start + 1 <= MERGE_TO_INSERTION) {                                                       \
-    insertion_sort_sentinel(start, end);                                                           \
-    flag = true;                                                                                   \
-    return;                                                                                        \
-}                                                                                                  \
-insertion_sort_sentinel(start, start + MERGE_TO_INSERTION - 1);                                    \
-for (T *t = start + MERGE_TO_INSERTION; t < end; t += MERGE_TO_INSERTION) {                        \
-    T const before_sentinel = *(t - 1);                                                            \
-    *(t - 1) = T_MIN;  /* Set sentinel value. */                                                   \
-    T * const run_end = (t + MERGE_TO_INSERTION - 1 > end) ? end : t + MERGE_TO_INSERTION - 1;     \
-    insertion_sort_sentinel(t, run_end);                                                           \
-    *(t - 1) = before_sentinel;  /* Restore old value. */                                          \
+#define CREATE_STARTING_RUNS()                                                                 \
+if (end - start + 1 <= MERGE_TO_INSERTION) {                                                   \
+    insertion_sort_sentinel(start, end);                                                       \
+    flag = true;                                                                               \
+    return;                                                                                    \
+}                                                                                              \
+insertion_sort_sentinel(start, start + MERGE_TO_INSERTION - 1);                                \
+for (T *t = start + MERGE_TO_INSERTION; t < end; t += MERGE_TO_INSERTION) {                    \
+    T const before_sentinel = *(t - 1);                                                        \
+    *(t - 1) = T_MIN;  /* Set sentinel value. */                                               \
+    T * const run_end = (t + MERGE_TO_INSERTION - 1 > end) ? end : t + MERGE_TO_INSERTION - 1; \
+    insertion_sort_sentinel(t, run_end);                                                       \
+    *(t - 1) = before_sentinel;  /* Restore old value. */                                      \
 }
 #else
 // … using ShellSort.

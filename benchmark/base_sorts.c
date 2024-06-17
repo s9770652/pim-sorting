@@ -83,25 +83,49 @@ static void selection_sort(T * const start, T * const end) {
 }
 
 /**
- * @brief An implementation of standard InsertionSort.
+ * @attention Never call this by yourself! Only ever call `insertion_sort_nosentinel_helper`!
  * @internal The compiler is iffy when it comes to this function.
  * Using `curr = ++i` would algorithmically make sense as a list of length 1 is always sorted,
  * yet it actually runs ~2% slower.
- * And since moves and additions cost the same, the it does also does not benefit
+ * And since moves and additions cost the same, it does also does not benefit
  * from being able to use `prev = i` instead of `prev = curr - 1`.
  * The same slowdowns also happens when using `*i = start + 1`.
+ * There are two solutions:
+ * 1. Increment `i` via injected Assembler code,
+ * which is hard since due to the later dependence on `start`, the value of `i` is set very late.
+ * It also is more prone to breaking with future updates.
+ * 2. Use a helper function.
+**/
+static void insertion_sort_nosentinel_helper(T * const start, T * const end) {
+    T *curr, *i = start, * const true_start = start - 1;;
+    while ((curr = i++) <= end) {
+        T const to_sort = *curr;
+        while ((curr - 1) >= true_start && *(curr - 1) > to_sort) {
+            *curr = *(curr - 1);
+            curr--;
+        }
+        *curr = to_sort;
+    }
+}
+
+/**
+ * @brief An implementation of standard InsertionSort.
  * 
  * @param start The first element of the WRAM array to sort.
  * @param end The last element of said array.
 **/
 static void insertion_sort_nosentinel(T * const start, T * const end) {
+    insertion_sort_nosentinel_helper(start + 1, end);
+}
+
+/// @attention Never call this by yourself! Only ever call `insertion_sort_sentinel`!
+static void insertion_sort_sentinel_helper(T * const start, T * const end) {
     T *curr, *i = start;
     while ((curr = i++) <= end) {
-        T *prev = curr - 1;
         T const to_sort = *curr;
-        while (prev >= start && *prev > to_sort) {
-            *curr = *prev;
-            curr = prev--;
+        while (*(curr - 1) > to_sort) {  // `-1` always valid due to the sentinel value
+            *curr = *(curr - 1);
+            curr--;
         }
         *curr = to_sort;
     }
@@ -120,17 +144,7 @@ static void insertion_sort_nosentinel(T * const start, T * const end) {
  * @param end The last element of said array.
 **/
 static void insertion_sort_sentinel(T * const start, T * const end) {
-    T *curr, *i = start;
-    __asm__ ("\tadd %[i], %[i], 4" : : [i] "r"(i));  // Start at the second element.
-    while ((curr = i++) <= end) {
-        T *prev = curr - 1;  // always valid due to the sentinel value
-        T const to_sort = *curr;
-        while (*prev > to_sort) {
-            *curr = *prev;
-            curr = prev--;  // always valid due to the sentinel value
-        }
-        *curr = to_sort;
-    }
+    insertion_sort_sentinel_helper(start + 1, end);
 }
 
 /**
@@ -144,14 +158,33 @@ static void insertion_sort_sentinel(T * const start, T * const end) {
 static void insertion_sort_with_steps_sentinel(T * const start, T * const end, size_t const step) {
     T *curr, *i = start;
     while ((curr = (i += step)) <= end) {
-        T *prev = curr - step;
         T const to_sort = *curr;
-        while (*prev > to_sort) {
-            *curr = *prev;
-            curr = prev;
-            prev -= step;  // always valid due to the sentinel value
+        while (*(curr - step) > to_sort) {  // `-step` always valid due to the sentinel value
+            *curr = *(curr - step);
+            curr -= step;
         }
         *curr = to_sort;
+    }
+}
+
+/// @attention Never call this by yourself! Only ever call `insertion_sort_implicit_sentinel`!
+static void insertion_sort_implicit_sentinel_helper(T * const start, T * const end) {
+    T *curr, *i = start, * const true_start = start - 1;
+    while ((curr = i++) <= end) {
+        T const to_sort = *curr;
+        if (*curr < *true_start) {  // Is the current element the new minimum?
+            while (curr > true_start) {  // Move all previous elements backwards.
+                *curr = *(curr - 1);
+                curr--;
+            }
+            *true_start = to_sort;  // Place the new minimum at the start.
+        } else {  // Otherwise, do a regular InsertionSort.
+            while (*(curr - 1) > to_sort) {
+                *curr = *(curr - 1);
+                curr--;
+            }
+            *curr = to_sort;
+        }
     }
 }
 
@@ -164,22 +197,7 @@ static void insertion_sort_with_steps_sentinel(T * const start, T * const end, s
  * @param end The last element of said array.
 **/
 static void insertion_sort_implicit_sentinel(T * const start, T * const end) {
-    T *curr, *i = start;
-    while ((curr = i++) <= end) {
-        T const to_sort = *curr;
-        if (*curr < *start) {  // Is the current element the new minimum?
-            for (T *t = curr; t > start; t--)  // Move all previous elements backwards.
-                *t = *(t - 1);
-            *start = to_sort;  // Place the new minimum at the start.
-        } else {  // Otherwise, do a regular InsertionSort.
-            T *prev = curr - 1;
-            while (*prev > to_sort) {
-                *curr = *prev;
-                curr = prev--;
-            }
-            *curr = to_sort;
-        }
-    }
+    insertion_sort_implicit_sentinel_helper(start + 1, end);
 }
 
 /**

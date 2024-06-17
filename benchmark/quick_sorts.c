@@ -149,6 +149,18 @@ do {                                                \
 
 #endif
 
+/// @attention Never call this by yourself! Only ever call `insertion_sort_sentinel`!
+static void insertion_sort_sentinel_helper(T * const start, T * const end) {
+    T *curr, *i = start;
+    while ((curr = i++) <= end) {
+        T const to_sort = *curr;
+        while (*(curr - 1) > to_sort) {  // `-1` always valid due to the sentinel value
+            *curr = *(curr - 1);
+            curr--;
+        }
+        *curr = to_sort;
+    }
+}
 
 /**
  * @brief An implementation of standard InsertionSort.
@@ -161,17 +173,7 @@ do {                                                \
  * @param end The last element of said array.
 **/
 static void insertion_sort_sentinel(T * const start, T * const end) {
-    T *curr, *i = start;
-    __asm__ ("\tadd %[i], %[i], 4" : : [i] "r"(i));  // Start at the second element.
-    while ((curr = i++) <= end) {
-        T *prev = curr - 1;  // always valid due to the sentinel value
-        T const to_sort = *curr;
-        while (*prev > to_sort) {
-            *curr = *prev;
-            curr = prev--;  // always valid due to the sentinel value
-        }
-        *curr = to_sort;
-    }
+    insertion_sort_sentinel_helper(start + 1, end);
 }
 
 /**
