@@ -18,6 +18,29 @@ struct xorshift_offset pivot_rng_state;
 /// This number of cycles is deduced from the measured times.
 perfcounter_t const overhead = 144;
 
+#define UNIFORM (1)
+#define SORTED (2)
+#define REVERSE (3)
+#define ALMOST_SORTED (4)
+#define DIST REVERSE
+
+void generate_input(T *start, T *end, T upper_bound) {
+    (void)upper_bound;
+#if (DIST == UNIFORM)
+#define DIST_NAME "UNIFORM"
+    generate_uniform_distribution_wram(start, end, upper_bound);
+#elif (DIST == SORTED)
+#define DIST_NAME "SORTED"
+    generate_sorted_distribution_wram(start, end);
+#elif (DIST == REVERSE)
+#define DIST_NAME "REVERSE"
+    generate_reverse_sorted_distribution_wram(start, end);
+#elif (DIST == ALMOST_SORTED)
+#define DIST_NAME "ALMOST_SORTED"
+    generate_almost_sorted_distribution_wram(start, end, upper_bound);
+#endif
+}
+
 /**
  * @brief The arithmetic mean of measured times.
  * 
@@ -62,10 +85,11 @@ static void print_header(char const name[], struct algo_to_test const algos[],
         size_t const num_of_algos, struct dpu_arguments const * const args) {
     char *pivot_methods[] = { "end", "middle", "median_of_three", "random" };
     printf(
-        "# reps=%u, upper bound=%"T_QUALIFIER", PIVOT=%s, TYPE=%s, BLOCK_SIZE=%d, "
+        "# reps=%u, upper bound=%"T_QUALIFIER", DIST=%s, PIVOT=%s, TYPE=%s, BLOCK_SIZE=%d, "
         "SEQREAD_CACHE_SIZE=%d, NR_TASKLETS=%d, overhead=%lu\n",
         args->n_reps,
         args->upper_bound,
+        DIST_NAME,
         pivot_methods[PIVOT],
         TYPE_NAME,
         BLOCK_SIZE,
@@ -152,10 +176,7 @@ void test_algos(char const name[], struct algo_to_test const algos[], size_t con
                 perfcounter_config(COUNT_CYCLES, true);
                 pivot_rng_state = seed_xs_offset(rep + 0b1011100111010);
                 rngs[0] = seed_xs(rep + 0b1011100111010);
-                generate_uniform_distribution_wram(start, end, args->upper_bound);
-                // generate_almost_sorted_distribution_wram(start, end, args->upper_bound);
-                // generate_sorted_distribution_wram(start, end);
-                // generate_reverse_sorted_distribution_wram(start, end);
+                generate_input(start, end, args->upper_bound);
                 curr_time = perfcounter_get();
                 algos[id].algo(start, end);
                 curr_time = perfcounter_get() - curr_time - overhead;
