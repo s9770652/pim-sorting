@@ -54,7 +54,8 @@ void generate_sorted_distribution_wram(T *start, T *end);
 void generate_reverse_sorted_distribution_wram(T *start, T *end);
 
 /**
- * @brief Generates a range of ascending numbers, then swaps some neighbours.
+ * @brief Generates a range of ascending numbers, then swaps some pairs of numbers.
+ * Does not check whether some pairs have common elements.
  * Stores them in a WRAM array.
  * 
  * @param start The first element of the array where to store the random data.
