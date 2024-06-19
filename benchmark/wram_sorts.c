@@ -234,12 +234,15 @@ static void heapify(T heap[], size_t const n, size_t const root) {
     T const root_value = heap[root];
     size_t father = root, son;
     while ((son = father * 2 + 1) < n) {  // left son
-        if ((son + 1 < n) && (heap[son + 1] > heap[son]))  // Check if right son is bigger.
-            son++;
-        if (heap[son] <= root_value)  // Stop if both sons are smaller than their father.
-            break;
-        heap[father] = heap[son];  // Shift son up.
-        father = son;
+        if (heap[son + 1] > heap[son]) {  // Check if right son is bigger.
+            if (heap[son + 1] <= root_value) break;
+            heap[father] = heap[son + 1];  // Shift right son up.
+            father = son + 1;
+        } else {
+            if (heap[son] <= root_value) break;
+            heap[father] = heap[son];  // Shift left son up.
+            father = son;
+        }
     }
     heap[father] = root_value;
 }
@@ -253,14 +256,30 @@ static void heapify(T heap[], size_t const n, size_t const root) {
 static void heap_sort(T * const start, T * const end) {
     size_t n = end - start + 1;
     /* Build a heap using Floyd’s method. */
+    start[n] = T_MIN;
     for (size_t r = n / 2; r > 0; r--) {
         heapify(start, n, r - 1);
     }
     /* Sort by repeatedly putting the root at the end of the heap. */
+    if (!(n & 1)) {  // If `n' is even, the last leaf is a left one. (cf. loop below)
+        swap(&start[0], &start[--n]);
+        heapify(start, n, 0);
+    }
+    // `i` is always odd. When there is an odd number of elements, the last leaf is a right one.
+    // Pulling it to the front raises the need for a sentinel value,
+    // since the leaf with which one ends up at the end of `heapify` may be the last one,
+    // which is now a left one. Since the right brothers of nodes are checked,
+    // a sentinel value erases the need for an additional bounds check.
     size_t i;
-    for (i = n - 1; i > HEAP_TO_INSERTION; i--) {
-        swap(&start[0], &start[i]);
+    for (i = n - 1; i > HEAP_TO_INSERTION; i -= 2) {
+        T const biggest_element = start[0];
+        start[0] = start[i];
+        start[i] = T_MIN;
         heapify(start, i, 0);
+        start[i] = biggest_element;
+
+        swap(&start[0], &start[i - 1]);
+        heapify(start, i - 1, 0);
     }
     insertion_sort_sentinel(start, &start[i]);
 }
@@ -481,16 +500,16 @@ int main() {
 
     char name[] = "BASE SORTING ALGORITHMS";
     struct algo_to_test const algos[] = {
-        { quick_sort, "Quick" },
+        // { quick_sort, "Quick" },
         // { quick_sort_stable_with_arrays, "QuickStable" }
-        { quick_sort_stable_with_ids, "QuickStableIds" }
-        // { heap_sort, "Heap" },
+        // { quick_sort_stable_with_ids, "QuickStableIds" }1
+        { heap_sort, "Heap" },
         // { merge_sort_no_write_back, "Merge" },
         // { merge_sort_write_back, "MergeWriteBack" },
         // { merge_sort_half_space, "MergeHalfSpace" },
     };
     // size_t lengths[] = { 20, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768 };//, 1024 };
-    size_t lengths[] = { 20, 24, 32, 48, 64, 384 };//, 1024 };
+    size_t lengths[] = { 20, 24, 32, 48, 64, 383, 1024 };
     // size_t lengths[] = {
     //     16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68, 72, 76, 80,
     //     84, 88, 92, 96, 100, 104, 108, 112, 116, 120, 124, 128
