@@ -26,7 +26,7 @@ CONF := ${call conf_filename,${NR_DPUS},${NR_TASKLETS},${TYPE},${BLOCK_SIZE},${S
 comma := ,
 empty :=
 space := ${empty} ${empty}
-BENCHMARKS := base_sorts quick_sorts wram_sorts
+BENCHMARKS := base_sorts # quick_sorts wram_sorts
 BINARIES := ${patsubst %,./${BUILD_DIR}/%,sorting ${BENCHMARKS}}
 BINARIES := ${subst ${space},${comma},${BINARIES}}
 
@@ -40,7 +40,7 @@ COMMON_INCLUDES := support
 HOST_SRC := ${wildcard ${HOST_DIR}/*.c}
 DPU_SRC := ${filter-out %/task.c, ${wildcard ${DPU_DIR}/*.c}}
 SORTING_SRC := ${DPU_DIR}/task.c
-BENCHMARK_SRC := ${BENCHMARK_DIR}/tester.c
+BENCHMARK_SRC := #${BENCHMARK_DIR}/tester.c
 
 # The object files build from each of the source files.
 HOST_OBJ := ${patsubst ${HOST_DIR}/%.c,${OBJ_DIR}/${HOST_DIR}/%.o,${HOST_SRC}}

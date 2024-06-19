@@ -20,13 +20,6 @@ typedef uint64_t T;
 
 #define BLOCK_LENGTH (BLOCK_SIZE >> DIV)
 
-// Structures used by both the host and the dpu to communicate information
-struct dpu_arguments {
-    uint32_t length;  // number of elements to sort
-    T upper_bound;  // maximum value (exclusive) of range to draw from
-    uint32_t n_reps;  // benchmark: how often to repeat measurements
-};
-
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"
 #define ANSI_COLOR_RESET   "\x1b[0m"

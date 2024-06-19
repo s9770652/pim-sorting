@@ -7,6 +7,7 @@
 #include <perfcounter.h>
 
 #include "common.h"
+#include "communication.h"
 #include "buffers.h"
 #include "mram_loop.h"
 #include "sort.h"
@@ -18,9 +19,6 @@
 #if CHECK_SANITY
 #include "checkers.h"
 #endif
-
-// maximum number of elements loaded into MRAM (size must be divisible by 8)
-#define LOAD_INTO_MRAM ((1024 * 1024 * 25) >> DIV)
 
 __host struct dpu_arguments DPU_INPUT_ARGUMENTS;
 T __mram_noinit input[LOAD_INTO_MRAM];  // array of random numbers
@@ -87,7 +85,7 @@ int main(void) {
     cycles[me()] = perfcounter_get();
 #endif
 
-    generate_uniform_distribution_mram(input, cache, &ranges[me()], DPU_INPUT_ARGUMENTS.upper_bound);
+    generate_uniform_distribution_mram(input, cache, &ranges[me()], 0);
 #ifdef UINT32
     // Add a dummy variable such that the last initial run has a length disible by 8.
     // This way, depleting (cf. `sort.c`) need less meddling with unaligned addresses.

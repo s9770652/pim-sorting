@@ -19,13 +19,20 @@
 #include <defs.h>
 #include <perfcounter.h>
 
-#include "random_generator.h"
-
-#include "tester.h"
+#include "buffers.h"
+#include "communication.h"
+#include "pivot.h"
+#include "random_generator.h"  // todo: warum?
 
 #define BIG_STEP (-1)
 
-__host struct dpu_arguments DPU_INPUT_ARGUMENTS;
+struct dpu_arguments const __host DPU_INPUT_ARGUMENTS;
+// struct results __dma_aligned __host results;
+struct results results;
+T __mram_noinit input[LOAD_INTO_MRAM];  // array of random numbers
+T __mram_noinit output[LOAD_INTO_MRAM];
+
+struct xorshift_offset pivot_rng_state;
 
 /**
  * @brief An implementation of standard BubbleSort.
@@ -139,6 +146,7 @@ static void insertion_sort_sentinel_helper(T * const start, T * const end) {
  * For QuickSort, the last value of the previous partition takes on that role.
  * @internal Since `start` is not need later on, it is easy to inject assembler code
  * which manually increases the starting position.
+ * This, however, might become a problem if this function is inlined by other functions.
  * 
  * @param start The first element of the WRAM array to sort.
  * @param end The last element of said array.
@@ -250,40 +258,40 @@ SHELL_SORT_CUSTOM_STEP_X(7)
 SHELL_SORT_CUSTOM_STEP_X(8)
 SHELL_SORT_CUSTOM_STEP_X(9)
 
+algo_to_test const __host algos[] = {
+    {{ "1", insertion_sort_sentinel }},
+    {{ "2", shell_sort_custom_step_2 }},
+    {{ "3", shell_sort_custom_step_3 }},
+    {{ "4", shell_sort_custom_step_4 }},
+    {{ "5", shell_sort_custom_step_5 }},
+    {{ "6", shell_sort_custom_step_6 }},
+    {{ "7", shell_sort_custom_step_7 }},
+    {{ "8", shell_sort_custom_step_8 }},
+    {{ "9", shell_sort_custom_step_9 }},
+    // {{ "Ciura", shell_sort_ciura }},
+    {{ "1NoSentinel", insertion_sort_nosentinel }},
+    {{ "1Implicit", insertion_sort_implicit_sentinel }},
+    {{ "BubbleAdapt", bubble_sort_adaptive }},
+    {{ "BubbleNonAdapt", bubble_sort_nonadaptive }},
+    {{ "Selection", selection_sort }},
+};
+size_t const __host lengths[] = {
+    3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
+    15, 16, 17, 18, 19, 20, 21, 22, 23, 24
+};
+size_t const __host num_of_algos = sizeof algos / sizeof algos[0];
+size_t const __host num_of_lengths = sizeof lengths / sizeof lengths[0];
+
 int main() {
     triple_buffers buffers;
     allocate_triple_buffer(&buffers);
+    T * const cache = buffers.cache;
     if (me() != 0) return EXIT_SUCCESS;
-    if (DPU_INPUT_ARGUMENTS.n_reps == 0) {  // called via debugger?
-        DPU_INPUT_ARGUMENTS.n_reps = 10;
-        DPU_INPUT_ARGUMENTS.upper_bound = 4;
+    if (DPU_INPUT_ARGUMENTS.length == 0) {  // called via debugger?
+        assert(false && "Called via debugger!");
     }
-    perfcounter_config(COUNT_CYCLES, false);
-
-    char name[] = "SMALL SORTING ALGORITHMS";
-    struct algo_to_test algos[] = {
-        { insertion_sort_sentinel, "1" },
-        { shell_sort_custom_step_2, "2" },
-        { shell_sort_custom_step_3, "3" },
-        { shell_sort_custom_step_4, "4" },
-        { shell_sort_custom_step_5, "5" },
-        { shell_sort_custom_step_6, "6" },
-        { shell_sort_custom_step_7, "7" },
-        { shell_sort_custom_step_8, "8" },
-        { shell_sort_custom_step_9, "9" },
-        { shell_sort_ciura, "Ciura" },
-        { insertion_sort_nosentinel, "1NoSentinel" },
-        { insertion_sort_implicit_sentinel, "1Implicit" },
-        { bubble_sort_adaptive, "BubbleAdapt" },
-        { bubble_sort_nonadaptive, "BubbleNonAdapt" },
-        { selection_sort, "Selection" },
-    };
-    size_t lengths[] = {
-        3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
-        15, 16, 17, 18, 19, 20, 21, 22, 23, 24
-    };
-    size_t num_of_algos = sizeof algos / sizeof algos[0];
-    size_t num_of_lengths = sizeof lengths / sizeof lengths[0];
+    perfcounter_config(COUNT_CYCLES, true);
+    pivot_rng_state = seed_xs_offset(DPU_INPUT_ARGUMENTS.basic_seed + me());
 
     /* Add additional sentinel values. */
     size_t num_of_sentinels = 9;
@@ -292,6 +300,10 @@ int main() {
         buffers.cache[i] = T_MIN;
     buffers.cache += num_of_sentinels;
 
-    test_algos(name, algos, num_of_algos, lengths, num_of_lengths, &buffers, &DPU_INPUT_ARGUMENTS);
+    mram_read(input, cache, ROUND_UP_POW2(DPU_INPUT_ARGUMENTS.length, 8));
+    results.cycles[0] = perfcounter_get();
+    algos[DPU_INPUT_ARGUMENTS.algo_index].s.algo(cache, &cache[DPU_INPUT_ARGUMENTS.length - 1]);
+    results.cycles[0] = perfcounter_get() - results.cycles[0];
+
     return EXIT_SUCCESS;
 }
