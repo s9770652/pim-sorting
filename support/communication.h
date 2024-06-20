@@ -31,7 +31,7 @@ struct results {
 };
 
 /// @brief A sorting algorithm and its name.
-struct algo_to_test {
+struct algo_to_test_s {
     /// @brief The name of the algorithm to print in the console.
     char name[16];
     /// @brief A pointer to a sorting function of type `base_sort_algo`.
@@ -40,9 +40,9 @@ struct algo_to_test {
     base_sort_algo *algo;
 };
 
-typedef union {
-    struct algo_to_test s;
-    unsigned char padding[20];
-} algo_to_test;
+union algo_to_test {
+    struct algo_to_test_s data;
+    char padding[24];
+};
 
 #endif  // _COMMUNICATION_H_

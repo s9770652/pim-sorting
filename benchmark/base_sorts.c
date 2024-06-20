@@ -26,9 +26,8 @@
 
 #define BIG_STEP (-1)
 
-struct dpu_arguments const __host DPU_INPUT_ARGUMENTS;
-// struct results __dma_aligned __host results;
-struct results results;
+struct dpu_arguments __host host_to_dpu;
+struct results __host dpu_to_host;
 T __mram_noinit input[LOAD_INTO_MRAM];  // array of random numbers
 T __mram_noinit output[LOAD_INTO_MRAM];
 
@@ -258,7 +257,7 @@ SHELL_SORT_CUSTOM_STEP_X(7)
 SHELL_SORT_CUSTOM_STEP_X(8)
 SHELL_SORT_CUSTOM_STEP_X(9)
 
-algo_to_test const __host algos[] = {
+union algo_to_test __host algos[] = {
     {{ "1", insertion_sort_sentinel }},
     {{ "2", shell_sort_custom_step_2 }},
     {{ "3", shell_sort_custom_step_3 }},
@@ -275,35 +274,41 @@ algo_to_test const __host algos[] = {
     {{ "BubbleNonAdapt", bubble_sort_nonadaptive }},
     {{ "Selection", selection_sort }},
 };
-size_t const __host lengths[] = {
+size_t __host lengths[] = {
     3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
     15, 16, 17, 18, 19, 20, 21, 22, 23, 24
 };
-size_t const __host num_of_algos = sizeof algos / sizeof algos[0];
-size_t const __host num_of_lengths = sizeof lengths / sizeof lengths[0];
+size_t __host num_of_algos = sizeof algos / sizeof algos[0];
+size_t __host num_of_lengths = sizeof lengths / sizeof lengths[0];
 
 int main() {
     triple_buffers buffers;
     allocate_triple_buffer(&buffers);
-    T * const cache = buffers.cache;
+    T *cache = buffers.cache;
     if (me() != 0) return EXIT_SUCCESS;
-    if (DPU_INPUT_ARGUMENTS.length == 0) {  // called via debugger?
-        assert(false && "Called via debugger!");
+    mem_reset();
+    if (host_to_dpu.length == 0) {  // called via debugger?
+        host_to_dpu.length = 3;
+        host_to_dpu.basic_seed = 0b1011100111010;
+        host_to_dpu.algo_index = 8;
     }
     perfcounter_config(COUNT_CYCLES, true);
-    pivot_rng_state = seed_xs_offset(DPU_INPUT_ARGUMENTS.basic_seed + me());
+    pivot_rng_state = seed_xs_offset(host_to_dpu.basic_seed + me());
 
     /* Add additional sentinel values. */
     size_t num_of_sentinels = 9;
     assert(lengths[num_of_lengths - 1] + num_of_sentinels <= (TRIPLE_BUFFER_SIZE >> DIV));
     for (size_t i = 0; i < num_of_sentinels; i++)
-        buffers.cache[i] = T_MIN;
-    buffers.cache += num_of_sentinels;
+        cache[i] = T_MIN;
+    cache += num_of_sentinels;
 
-    mram_read(input, cache, ROUND_UP_POW2(DPU_INPUT_ARGUMENTS.length, 8));
-    results.cycles[0] = perfcounter_get();
-    algos[DPU_INPUT_ARGUMENTS.algo_index].s.algo(cache, &cache[DPU_INPUT_ARGUMENTS.length - 1]);
-    results.cycles[0] = perfcounter_get() - results.cycles[0];
+    mram_read(input, cache, ROUND_UP_POW2(host_to_dpu.length, 8));
+    dpu_to_host.cycles[0] = perfcounter_get();
+    algos[host_to_dpu.algo_index].data.algo(cache, &cache[host_to_dpu.length - 1]);
+    dpu_to_host.cycles[0] = perfcounter_get() - dpu_to_host.cycles[0];
+
+    #include "checkers.h"
+    print_single_line(cache, host_to_dpu.length);
 
     return EXIT_SUCCESS;
 }
