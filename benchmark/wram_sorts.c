@@ -12,6 +12,7 @@
 #include <perfcounter.h>
 
 #include "buffers.h"
+#include "checkers.h"
 #include "common.h"
 #include "communication.h"
 #include "pivot.h"
@@ -373,8 +374,8 @@ static inline void merge(T * const start_1, T * const start_2, T * const end_2, 
     }
 }
 
-// If true, the final sorted array is still in an auxiliary array, such that a write-back is needed.
-bool flag;
+// If false, the final sorted array is still in an auxiliary array, such that a write-back is needed.
+bool flag = true;
 
 /**
  * @brief An implementation of standard MergeSort.
@@ -505,8 +506,8 @@ static void merge_sort_half_space(T * const start, T * const end) {
 
 union algo_to_test __host algos[] = {
     {{ "Quick", quick_sort }},
-    {{ "QuickStable", quick_sort_stable_with_arrays }},
-    {{ "QuickStableIds", quick_sort_stable_with_ids }},
+    // {{ "QuickStable", quick_sort_stable_with_arrays }},
+    // {{ "QuickStableIds", quick_sort_stable_with_ids }},
     {{ "Heap", heap_sort }},
     {{ "Merge", merge_sort_no_write_back}},
     {{ "MergeWriteBack", merge_sort_write_back }},
@@ -546,9 +547,26 @@ int main() {
     /* Perform test. */
     pivot_rngs[me()] = seed_xs_offset(host_to_dpu.basic_seed + me());
     mram_read(input, cache, ROUND_UP_POW2(sizeof(T[host_to_dpu.length]), 8));
+
+    array_stats stats_before;
+    get_stats_unsorted_wram(cache, host_to_dpu.length, &stats_before);
+    print_single_line(cache, host_to_dpu.length);
+
     dpu_to_host = perfcounter_get();
     algos[host_to_dpu.algo_index].data.fct(cache, &cache[host_to_dpu.length - 1]);
     dpu_to_host = perfcounter_get() - dpu_to_host - CALL_OVERHEAD;
+
+    size_t offset = 0;  // Needed because of the MergeSort not writing back.
+    if (!flag) {
+        offset = host_to_dpu.length;
+        cache[host_to_dpu.length - 1] = T_MIN;  // `get_stats_sorted_wram` relies on sentinels.
+        flag = true;  // Following sorting algorithms may not reset this value.
+    }
+    array_stats stats_after;
+    get_stats_sorted_wram(cache + offset, host_to_dpu.length, &stats_after);
+    if (compare_stats(&stats_before, &stats_after, false) == EXIT_FAILURE) {
+        abort();
+    }
 
     return EXIT_SUCCESS;
 }

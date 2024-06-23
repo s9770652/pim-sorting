@@ -12,6 +12,7 @@
 #include <perfcounter.h>
 
 #include "buffers.h"
+#include "checkers.h"
 #include "common.h"
 #include "communication.h"
 #include "pivot.h"
@@ -426,9 +427,19 @@ int main() {
     /* Perform test. */
     pivot_rngs[me()] = seed_xs_offset(host_to_dpu.basic_seed + me());
     mram_read(input, cache, ROUND_UP_POW2(sizeof(T[host_to_dpu.length]), 8));
+
+    array_stats stats_before;
+    get_stats_unsorted_wram(cache, host_to_dpu.length, &stats_before);
+
     dpu_to_host = perfcounter_get();
     algos[host_to_dpu.algo_index].data.fct(cache, &cache[host_to_dpu.length - 1]);
     dpu_to_host = perfcounter_get() - dpu_to_host - CALL_OVERHEAD;
+
+    array_stats stats_after;
+    get_stats_sorted_wram(cache, host_to_dpu.length, &stats_after);
+    if (compare_stats(&stats_before, &stats_after, false) == EXIT_FAILURE) {
+        abort();
+    }
 
     return EXIT_SUCCESS;
 }

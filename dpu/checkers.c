@@ -48,6 +48,8 @@ void print_single_line(T *cache, size_t length) {
     mutex_unlock(printing_mutex);
 }
 
+#if (CHECK_SANITY)
+
 /**
  * @brief Reduces `sums`, `counts`, and `sorted`.
  * 
@@ -120,8 +122,44 @@ void get_stats_sorted(T __mram_ptr const * const array, T * const cache, mram_ra
     accumulate_stats(dummy, result);
 }
 
-void compare_stats(array_stats const * const stats_1, array_stats const * const stats_2) {
-    if (me() != 0) return;
+void get_stats_unsorted_wram(T const array[], size_t const length, array_stats *result) {
+    // Reset values.
+    sums[me()] = 0;
+    for (size_t i = 0; i < NR_COUNTS; i++) {
+        counts[me()][i] = 0;
+    }
+    // Calculate statistics.
+    for (size_t j = 0; j < length; j++) {
+        sums[me()] += array[j];
+        if (array[j] < 8) {
+            counts[me()][array[j]]++;
+        }
+    }
+    accumulate_stats(false, result);
+}
+
+void get_stats_sorted_wram(T const array[], size_t const length, array_stats *result) {
+    // Reset values.
+    sums[me()] = 0;
+    for (size_t i = 0; i < NR_COUNTS; i++) {
+        counts[me()][i] = 0;
+    }
+    sorted[me()] = true;
+    // Calculate statistics and check order.
+    for (size_t j = 0; j < length; j++) {
+        sums[me()] += array[j];
+        if (array[j] < 8) {
+            counts[me()][array[j]]++;
+        }
+        sorted[me()] &= array[j-1] <= array[j];  // `j-1` possible due to the sentinel value
+    }
+    barrier_wait(&checking_barrier);
+    accumulate_stats(false, result);
+}
+
+bool compare_stats(array_stats const * const stats_1, array_stats const * const stats_2,
+        bool const print_on_success) {
+    if (me() != 0) return EXIT_SUCCESS;
     bool same_elements = stats_1->sum == stats_2->sum;
     same_elements &= memcmp(stats_1->counts, stats_2->counts, NR_COUNTS * sizeof(size_t)) == 0;
     if (!same_elements) {
@@ -136,9 +174,15 @@ void compare_stats(array_stats const * const stats_1, array_stats const * const 
         printf("[" ANSI_COLOR_RED "ERROR" ANSI_COLOR_RESET "] Elements are not sorted.\n");
     }
     if (same_elements && stats_2->sorted) {
-        printf("[" ANSI_COLOR_GREEN "OK" ANSI_COLOR_RESET "] Elements are correctly sorted.\n");
+        if (print_on_success)
+            printf("[" ANSI_COLOR_GREEN "OK" ANSI_COLOR_RESET "] Elements are correctly sorted.\n");
+        return EXIT_SUCCESS;
+    } else {
+        return EXIT_FAILURE;
     }
 }
+
+#endif  // CHECK_SANITY
 
 bool is_uniform(T *array, size_t length, T upper_bound) {
     T *count = mem_alloc(upper_bound * sizeof(T *));

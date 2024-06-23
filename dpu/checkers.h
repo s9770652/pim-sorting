@@ -10,6 +10,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdlib.h>
 
 #include "common.h"
 #include "mram_loop.h"
@@ -48,6 +49,9 @@ typedef struct array_stats
     bool sorted;
 } array_stats;
 
+#if (!CHECK_SANITY)
+    static inline
+#endif  // !CHECK_SANITY
 /**
  * @brief Calcucates the sum and gets the value counts of an MRAM array.
  * 
@@ -60,8 +64,15 @@ typedef struct array_stats
  * The value for `sorted` is undefined.
 **/
 void get_stats_unsorted(T __mram_ptr const *array, T *cache, mram_range range,
-        bool dummy, array_stats *result);
+        bool dummy, array_stats *result)
+#if (!CHECK_SANITY)
+    { (void)array, (void)cache, (void)range, (void)dummy, (void)result; }
+#endif  // !CHECK_SANITY
+;
 
+#if (!CHECK_SANITY)
+    static inline
+#endif  // !CHECK_SANITY
 /**
  * @brief Calulcates the sum and gets the value counts of an MRAM array.
  * Also checks whether the array is sorted.
@@ -74,15 +85,64 @@ void get_stats_unsorted(T __mram_ptr const *array, T *cache, mram_range range,
  * @param result The struct where the results are stored.
 **/
 void get_stats_sorted(T __mram_ptr const *array, T *cache, mram_range range,
-        bool dummy, array_stats *result);
+        bool dummy, array_stats *result)
+#if (!CHECK_SANITY)
+    { (void)array, (void)cache, (void)range, (void)dummy, (void)result; }
+#endif  // !CHECK_SANITY
+;
 
+#if (!CHECK_SANITY)
+    static inline
+#endif  // !CHECK_SANITY
+/**
+ * @brief Calcucates the sum and gets the value counts of a WRAM array.
+ * 
+ * @param array The WRAM array to check.
+ * @param length The number of elements in the array.
+ * @param result The struct where the results are stored.
+ * The value for `sorted` is undefined.
+**/
+void get_stats_unsorted_wram(T const array[], size_t length, array_stats *result)
+#if (!CHECK_SANITY)
+    { (void)array, (void)length, (void)result; }
+#endif  // !CHECK_SANITY
+;
+
+#if (!CHECK_SANITY)
+    static inline
+#endif  // !CHECK_SANITY
+/**
+ * @brief Calulcates the sum and gets the value counts of a WRAM array.
+ * Also checks whether the array is sorted.
+ * 
+ * @param array The WRAM array to check.
+ * @param length The number of elements in the array.
+ * @param result The struct where the results are stored.
+**/
+void get_stats_sorted_wram(T const array[], size_t length, array_stats *result)
+#if (!CHECK_SANITY)
+    { (void)array, (void)length, (void)result; }
+#endif  // !CHECK_SANITY
+;
+
+#if (!CHECK_SANITY)
+    static inline
+#endif  // !CHECK_SANITY
 /**
  * @brief Compares two given stats and prints appropriate messages.
  * 
  * @param stats_unsorted The statistics of the unsorted array.
  * @param stats_sorted The statistics of the sorted array.
+ * @param bool Whether a message is to be printed if no problem was detected.
+ * 
+ * @return `EXIT_FAILURE` if a problem was detected, else `EXIT_SUCCESS`.
 **/
-void compare_stats(array_stats const *stats_unsorted, array_stats const *stats_sorted);
+bool compare_stats(array_stats const *stats_unsorted, array_stats const *stats_sorted,
+        bool print_on_success)
+#if (!CHECK_SANITY)
+    { (void)stats_unsorted, (void)stats_sorted, (void)print_on_success; return EXIT_SUCCESS; }
+#endif  // !CHECK_SANITY
+;
 
 /**
  * @brief Checks the mean and variance of an array of integers

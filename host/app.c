@@ -65,6 +65,7 @@ static void test(struct dpu_set_t *set, struct dpu_arguments *host_to_dpu, time 
         DPU_ASSERT(dpu_copy_to(dpu, "input", 0, input, ROUND_UP_POW2(sizeof(T[host_to_dpu->length]), 8)));
         DPU_ASSERT(dpu_launch(*set, DPU_SYNCHRONOUS));
         DPU_ASSERT(dpu_copy_from(dpu, "dpu_to_host", 0, &new_result, sizeof new_result));
+        // DPU_ASSERT(dpu_log_read(dpu, stdout));
     }
     *firsts += new_result;
     *seconds += new_result * new_result;

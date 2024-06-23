@@ -155,7 +155,7 @@ int main(void) {
     barrier_wait(&omni_barrier);
     print_time(cycles, "CHECK2");
 #endif
-    compare_stats(&stats_1, &stats_2);
+    compare_stats(&stats_1, &stats_2, true);
 #endif
     return EXIT_SUCCESS;
 }
