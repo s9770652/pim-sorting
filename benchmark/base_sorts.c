@@ -15,23 +15,23 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-#include <alloc.h>
 #include <defs.h>
 #include <perfcounter.h>
 
 #include "buffers.h"
 #include "communication.h"
 #include "pivot.h"
-#include "random_generator.h"  // todo: warum?
+#include "random_generator.h"
 
 #define BIG_STEP (-1)
 
 struct dpu_arguments __host host_to_dpu;
-struct results __host dpu_to_host;
+time __host dpu_to_host;
 T __mram_noinit input[LOAD_INTO_MRAM];  // array of random numbers
 T __mram_noinit output[LOAD_INTO_MRAM];
 
 struct xorshift_offset pivot_rng_state;
+triple_buffers buffers[NR_TASKLETS];
 
 /**
  * @brief An implementation of standard BubbleSort.
@@ -213,7 +213,7 @@ static void insertion_sort_implicit_sentinel(T * const start, T * const end) {
  * @param start The first element of the WRAM array to sort.
  * @param end The last element of said array.
 **/
-static void shell_sort_ciura(T * const start, T * const end) {
+static __attribute__((unused)) void shell_sort_ciura(T * const start, T * const end) {
     if (end - start + 1 <= 64) {
         for (size_t j = 0; j < 6; j++)
             insertion_sort_with_steps_sentinel(&start[j], end, 6);
@@ -257,7 +257,10 @@ SHELL_SORT_CUSTOM_STEP_X(7)
 SHELL_SORT_CUSTOM_STEP_X(8)
 SHELL_SORT_CUSTOM_STEP_X(9)
 
+static __attribute__((unused)) void empty_sort(T *start, T *end) { (void)start; (void)end; }
+
 union algo_to_test __host algos[] = {
+    // {{ "Empty", empty_sort }},
     {{ "1", insertion_sort_sentinel }},
     {{ "2", shell_sort_custom_step_2 }},
     {{ "3", shell_sort_custom_step_3 }},
@@ -276,39 +279,38 @@ union algo_to_test __host algos[] = {
 };
 size_t __host lengths[] = {
     3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
-    15, 16, 17, 18, 19, 20, 21, 22, 23, 24
+    15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
 };
 size_t __host num_of_algos = sizeof algos / sizeof algos[0];
 size_t __host num_of_lengths = sizeof lengths / sizeof lengths[0];
 
 int main() {
-    triple_buffers buffers;
-    allocate_triple_buffer(&buffers);
-    T *cache = buffers.cache;
     if (me() != 0) return EXIT_SUCCESS;
-    mem_reset();
+
+    if (buffers[me()].cache == 0)  // Only allocate on the first launch.
+        allocate_triple_buffer(&buffers[me()]);
+    T *cache = buffers[me()].cache;
+
     if (host_to_dpu.length == 0) {  // called via debugger?
-        host_to_dpu.length = 3;
+        host_to_dpu.length = 24;
         host_to_dpu.basic_seed = 0b1011100111010;
-        host_to_dpu.algo_index = 8;
+        host_to_dpu.algo_index = 0;
     }
     perfcounter_config(COUNT_CYCLES, true);
     pivot_rng_state = seed_xs_offset(host_to_dpu.basic_seed + me());
 
     /* Add additional sentinel values. */
-    size_t num_of_sentinels = 9;
-    assert(lengths[num_of_lengths - 1] + num_of_sentinels <= (TRIPLE_BUFFER_SIZE >> DIV));
+    size_t num_of_sentinels = 16;  // 9 is the maximum step, 16 ensures alignment.
     for (size_t i = 0; i < num_of_sentinels; i++)
         cache[i] = T_MIN;
     cache += num_of_sentinels;
+    assert(lengths[num_of_lengths - 1] + num_of_sentinels <= (TRIPLE_BUFFER_SIZE >> DIV));
+    assert(!((uintptr_t)cache & 7) && "Cache address not aligned on 8 bytes!");
 
-    mram_read(input, cache, ROUND_UP_POW2(host_to_dpu.length, 8));
-    dpu_to_host.cycles[0] = perfcounter_get();
-    algos[host_to_dpu.algo_index].data.algo(cache, &cache[host_to_dpu.length - 1]);
-    dpu_to_host.cycles[0] = perfcounter_get() - dpu_to_host.cycles[0];
-
-    #include "checkers.h"
-    print_single_line(cache, host_to_dpu.length);
+    mram_read(input, cache, ROUND_UP_POW2(sizeof(T[host_to_dpu.length]), 8));
+    dpu_to_host = perfcounter_get();
+    algos[host_to_dpu.algo_index].data.fct(cache, &cache[host_to_dpu.length - 1]);
+    dpu_to_host = perfcounter_get() - dpu_to_host - CALL_OVERHEAD;
 
     return EXIT_SUCCESS;
 }

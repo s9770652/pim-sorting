@@ -26,23 +26,28 @@ struct dpu_arguments {
     uint32_t algo_index;
 };
 
-struct results {
-    uint32_t cycles[NR_TASKLETS];
-};
+/// @brief The data type holding the performance counter count.
+/// This is needed since `perfcounter_t` is only available on a DPU.
+typedef uint64_t time;
 
 /// @brief A sorting algorithm and its name.
-struct algo_to_test_s {
+struct algo_data {
     /// @brief The name of the algorithm to print in the console.
     char name[16];
     /// @brief A pointer to a sorting function of type `base_sort_algo`.
     /// Since pointers have different sizes on the host and the DPU,
     /// a conversion to a normal integer is needed.
-    base_sort_algo *algo;
+    base_sort_algo *fct;
 };
 
+/// @brief Holds a sorting algorithm and its name.
+/// Has the same size on 32-bit systems (DPU) and 64-bit ones (probably the host).
 union algo_to_test {
-    struct algo_to_test_s data;
+    struct algo_data data;
     char padding[24];
 };
+
+/// @brief The experimentally determined overhead of calling a sorting function.
+#define CALL_OVERHEAD (223)
 
 #endif  // _COMMUNICATION_H_

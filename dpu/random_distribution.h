@@ -60,7 +60,7 @@ void generate_reverse_sorted_distribution_wram(T *start, T *end);
  * 
  * @param start The first element of the array where to store the random data.
  * @param end The last element of said array.
- * @param swaps The number of swaps of neighboured numbers. If zero, √n swaps are made.
+ * @param swaps The number of swaps. If zero, √n swaps are made.
 **/
 void generate_almost_sorted_distribution_wram(T *start, T *end, size_t swaps);
 

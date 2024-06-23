@@ -50,11 +50,12 @@ BENCHMARK_OBJ := ${patsubst ${BENCHMARK_DIR}/%.c,${OBJ_DIR}/${BENCHMARK_DIR}/%.o
 
 # The compilation flags.
 COMMON_FLAGS := -Wall -Wextra -g -I${COMMON_INCLUDES}
-HOST_FLAGS := ${COMMON_FLAGS} -std=c11 -O3 `dpu-pkg-config --cflags --libs dpu` \
+HOST_FLAGS := ${COMMON_FLAGS} -std=c11 -lm -O3 `dpu-pkg-config --cflags --libs dpu` \
 	-DNR_TASKLETS=${NR_TASKLETS} \
 	-DNR_DPUS=${NR_DPUS} \
 	-DBLOCK_SIZE=${BLOCK_SIZE} \
 	-D${TYPE} \
+	-DSEQREAD_CACHE_SIZE=${SEQREAD_CACHE_SIZE} \
 	-DBINARIES=\"${BINARIES}\"
 DPU_FLAGS := ${COMMON_FLAGS} -O3 \
 	-DNR_TASKLETS=${NR_TASKLETS} \

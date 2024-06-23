@@ -1,3 +1,8 @@
+/**
+ * @file
+ * @brief Drawing a pivot element for partitioning.
+**/
+
 #ifndef _PIVOT_H_
 #define _PIVOT_H_
 
@@ -11,6 +16,16 @@ extern struct xorshift_offset pivot_rng_state;
 #define MEDIAN_OF_THREE (2)
 #define RANDOM (3)
 #define PIVOT MEDIAN_OF_THREE
+
+#if (PIVOT == END)
+#define PIVOT_NAME "end"
+#elif (PIVOT == MIDDLE)
+#define PIVOT_NAME "middle"
+#elif (PIVOT == MEDIAN_OF_THREE)
+#define PIVOT_NAME "median of three"
+#elif (PIVOT == RANDOM)
+#define PIVOT_NAME "random"
+#endif
 
 /**
  * @brief Returns a pivot element for a WRAM array.
@@ -36,7 +51,7 @@ static inline T *get_pivot(T const * const start, T const * const end) {
     /* Always the middle element. */
     return (T *)(((uintptr_t)start + (uintptr_t)end) / 2 & ~(sizeof(T)-1));
 #elif (PIVOT == MEDIAN_OF_THREE)
-    /* The median of the leftmost, middle and rightmost element. */
+    /* The median of the leftmost, middle, and rightmost element. */
     T const * const middle = (T *)(((uintptr_t)start + (uintptr_t)end) / 2 & ~(sizeof(T)-1));
     if ((*start > *middle) ^ (*start > *end))
         return (T *)start;
