@@ -80,13 +80,13 @@ struct Params input_params(int argc, char **argv) {
             usage();
             exit(0);
             break;
-        case 'n': p.length = (uint32_t)atof(optarg); break;
+        case 'n': p.length = atof(optarg); break;
         case 't':
             if (strcmp(optarg, "-1") == 0) {
                 show_distributions();
                 exit(0);
             } else {
-                p.dist_type = (uint32_t)atof(optarg);
+                p.dist_type = atof(optarg);
                 break;
             }
         case 'p':
@@ -94,16 +94,16 @@ struct Params input_params(int argc, char **argv) {
                 show_param_meanings();
                 exit(0);
             } else {
-                p.dist_param = (T)atof(optarg);
+                p.dist_param = atof(optarg);
                 break;
             }
-        case 'r': p.n_reps = (uint32_t)atof(optarg); break;
+        case 'r': p.n_reps = atof(optarg); break;
         case 'B':
             if (strcmp(optarg, "-1") == 0) {
                 show_modes();
                 exit(0);
             } else {
-                p.mode = (uint32_t)atof(optarg);
+                p.mode = atof(optarg);
                 break;
             }
         default:
