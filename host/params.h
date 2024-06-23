@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "common.h"
+#include "random_distribution.h"
 
 struct Params {
     uint32_t length;  // number of elements to sort
@@ -113,6 +114,7 @@ struct Params input_params(int argc, char **argv) {
     }
     assert(p.length > 0 && "Input length must be positive!");
     assert(p.n_reps > 0 && "Invalid # of repetition iterations!");
+    assert(p.dist_type < nr_of_dists && "Invalid random distribution type!");
 
     return p;
 }
