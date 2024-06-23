@@ -6,6 +6,8 @@
 #ifndef _PIVOT_H_
 #define _PIVOT_H_
 
+#include <defs.h>
+
 #include "common.h"
 #include "random_generator.h"
 
@@ -14,7 +16,7 @@
 #endif
 
 /// @brief The state of the generator used for drawing a pivot element.
-extern struct xorshift_offset pivot_rng_state;
+extern struct xorshift_offset pivot_rng_state[NR_TASKLETS];
 
 /**
  * @brief Returns a pivot element for a WRAM array.
@@ -51,7 +53,7 @@ static inline T *get_pivot(T const * const start, T const * const end) {
 #elif defined(RANDOM)
     /* Pick a random element. */
     size_t const n = end - start;
-    size_t const offset = rr_offset(n, &pivot_rng_state);
+    size_t const offset = rr_offset(n, &pivot_rng_state[me()]);
     return (T *)(start + offset);
 #endif
 }

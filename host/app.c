@@ -39,7 +39,7 @@ static void alloc_dpus(struct dpu_set_t *set, uint32_t *nr_dpus, unsigned const 
         binary = strtok(NULL, ",");
     }
     if (binary == NULL) {
-        printf("‘%u’ is no known benchmark ID!\n", mode);
+        printf("‘%u’ is no known benchmark Id!\n", mode);
         abort();
     }
     DPU_ASSERT(dpu_alloc(1, NULL, set));
@@ -107,11 +107,11 @@ static time get_std_of_time(time const zeroth, time const first, time second) {
 static void print_header(union algo_to_test const algos[], size_t const num_of_algos,
         struct Params *params) {
     printf(
-        "# reps=%u, upper bound=%"T_QUALIFIER", DIST=%s, PIVOT=%s, TYPE=%s, BLOCK_SIZE=%d, "
-        "SEQREAD_CACHE_SIZE=%d, NR_TASKLETS=%d, overhead=%u\n",
+        "# reps=%u, dist name=%s, dist param=%"T_QUALIFIER", PIVOT=%s, TYPE=%s, BLOCK_SIZE=%d, "
+        "SEQREAD_CACHE_SIZE=%d, NR_TASKLETS=%d, CALL_OVERHEAD=%u\n",
         params->n_reps,
-        params->dist_param,
         get_dist_name(params->dist_type),
+        params->dist_param,
         PIVOT_NAME,
         TYPE_NAME,
         BLOCK_SIZE,
@@ -153,11 +153,7 @@ int main(int argc, char **argv) {
     uint32_t nr_dpus;
     alloc_dpus(&set, &nr_dpus, p.mode);
 
-    struct dpu_arguments host_to_dpu = {
-        .length = p.length,
-        .basic_seed = 0b1011100111010,
-    };
-
+    /* Read in test data. */
     uint32_t num_of_lengths, num_of_algos;
     uint32_t *lengths = NULL;
     union algo_to_test *algos = NULL;
@@ -173,11 +169,16 @@ int main(int argc, char **argv) {
         DPU_ASSERT(dpu_copy_from(dpu, "lengths", 0, lengths, sizeof(uint32_t[num_of_lengths])));
     }
 
+    /* Set up tests. */
     T *input = malloc(LOAD_INTO_MRAM * sizeof(T));
     time *firsts = malloc(sizeof(time[num_of_algos]));  // sums of measured times
     time *seconds = malloc(sizeof(time[num_of_algos]));  // sums of squares of measured times
-
+    struct dpu_arguments host_to_dpu = {
+        .basic_seed = 0b1011100111010,
+    };
     srand((unsigned)1961071919591017);
+
+    /* Perform tests. */
     print_header(algos, num_of_algos, &p);
     for (uint32_t li = 0; li < num_of_lengths; li++) {
         memset(firsts, 0, sizeof(time[num_of_algos]));
@@ -194,11 +195,7 @@ int main(int argc, char **argv) {
         print_measurements(num_of_algos, lengths[li], p.n_reps, firsts, seconds);
     }
 
-    // generate_input_distribution(input, 240, p.dist_type, p.dist_param);
-    // for (size_t i = 0; i < 240; i++)
-    //     printf("%d ", input[i]);
-    // printf("\n");
-
+    /* Clean up. */
     free_dpus(set);
     free(algos);
     free(lengths);

@@ -1,3 +1,4 @@
+#include <limits.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -14,7 +15,7 @@
  * @return A uniformly drawn integer between `0` and `s`.
 **/
 static inline int round_reject(int s) {
-    size_t const mask = (1 << ((sizeof(int) * 8) - __builtin_clz(s))) - 1;
+    size_t const mask = (1 << ((sizeof(int) * CHAR_BIT) - __builtin_clz(s))) - 1;
     int random;
     do {
         random = rand() & mask;

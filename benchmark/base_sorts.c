@@ -19,19 +19,22 @@
 #include <perfcounter.h>
 
 #include "buffers.h"
+#include "common.h"
 #include "communication.h"
 #include "pivot.h"
+#include "random_distribution.h"
 #include "random_generator.h"
-
-#define BIG_STEP (-1)
 
 struct dpu_arguments __host host_to_dpu;
 time __host dpu_to_host;
-T __mram_noinit input[LOAD_INTO_MRAM];  // array of random numbers
+T __mram_noinit input[LOAD_INTO_MRAM];  // set by the host
 T __mram_noinit output[LOAD_INTO_MRAM];
 
-struct xorshift_offset pivot_rng_state;
 triple_buffers buffers[NR_TASKLETS];
+struct xorshift rngs[NR_TASKLETS];
+struct xorshift_offset pivot_rng_state[NR_TASKLETS];
+
+#define BIG_STEP (-1)
 
 /**
  * @brief An implementation of standard BubbleSort.
@@ -286,27 +289,33 @@ size_t __host num_of_lengths = sizeof lengths / sizeof lengths[0];
 
 int main() {
     if (me() != 0) return EXIT_SUCCESS;
+    perfcounter_config(COUNT_CYCLES, true);
 
-    if (buffers[me()].cache == 0)  // Only allocate on the first launch.
+    /* Set up buffers. */
+    if (buffers[me()].cache == 0) {  // Only allocate on the first launch.
         allocate_triple_buffer(&buffers[me()]);
-    T *cache = buffers[me()].cache;
+        /* Add additional sentinel values. */
+        size_t num_of_sentinels = 16;  // 9 is the maximum step, 16 ensures alignment.
+        for (size_t i = 0; i < num_of_sentinels; i++)
+            buffers[me()].cache[i] = T_MIN;
+        buffers[me()].cache += num_of_sentinels;
+        assert(lengths[num_of_lengths - 1] + num_of_sentinels <= (TRIPLE_BUFFER_SIZE >> DIV));
+        assert(!((uintptr_t)buffers[me()].cache & 7) && "Cache address not aligned on 8 bytes!");
+    }
+    T * const cache = buffers[me()].cache;
 
-    if (host_to_dpu.length == 0) {  // called via debugger?
+    /* Set up dummy values if called via debugger. */
+    if (host_to_dpu.length == 0) {
         host_to_dpu.length = 24;
         host_to_dpu.basic_seed = 0b1011100111010;
         host_to_dpu.algo_index = 0;
+        rngs[me()] = seed_xs(host_to_dpu.basic_seed + me());
+        mram_range range = { 0, host_to_dpu.length };
+        generate_uniform_distribution_mram(input, cache, &range, 8);
     }
-    perfcounter_config(COUNT_CYCLES, true);
-    pivot_rng_state = seed_xs_offset(host_to_dpu.basic_seed + me());
 
-    /* Add additional sentinel values. */
-    size_t num_of_sentinels = 16;  // 9 is the maximum step, 16 ensures alignment.
-    for (size_t i = 0; i < num_of_sentinels; i++)
-        cache[i] = T_MIN;
-    cache += num_of_sentinels;
-    assert(lengths[num_of_lengths - 1] + num_of_sentinels <= (TRIPLE_BUFFER_SIZE >> DIV));
-    assert(!((uintptr_t)cache & 7) && "Cache address not aligned on 8 bytes!");
-
+    /* Perform test. */
+    pivot_rng_state[me()] = seed_xs_offset(host_to_dpu.basic_seed + me());
     mram_read(input, cache, ROUND_UP_POW2(sizeof(T[host_to_dpu.length]), 8));
     dpu_to_host = perfcounter_get();
     algos[host_to_dpu.algo_index].data.fct(cache, &cache[host_to_dpu.length - 1]);
