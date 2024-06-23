@@ -11,9 +11,22 @@
 #include <defs.h>
 #include <perfcounter.h>
 
-#include "tester.h"
+#include "buffers.h"
+#include "common.h"
+#include "communication.h"
+#include "pivot.h"
+#include "random_distribution.h"
+#include "random_generator.h"
 
-__host struct dpu_arguments DPU_INPUT_ARGUMENTS;
+struct dpu_arguments __host host_to_dpu;
+time __host dpu_to_host;
+T __mram_noinit input[LOAD_INTO_MRAM];  // set by the host
+T __mram_noinit output[LOAD_INTO_MRAM];
+
+triple_buffers buffers[NR_TASKLETS];
+struct xorshift rngs[NR_TASKLETS];
+struct xorshift_offset pivot_rng_state[NR_TASKLETS];
+
 // The input length at which QuickSort changes to InsertionSort.
 #define QUICK_TO_INSERTION (13)
 // The input length at which stable QuickSort changes to InsertionSort.
@@ -82,7 +95,7 @@ static void insertion_sort_with_steps_sentinel(T * const start, T * const end, s
  * @param start The first element of the WRAM array to sort.
  * @param end The last element of said array.
 **/
-static __used void shell_sort(T * const start, T * const end) {
+static __attribute__((unused)) void shell_sort(T * const start, T * const end) {
     for (size_t j = 0; j < 4; j++)
         insertion_sort_with_steps_sentinel(&start[j], end, 4);
     insertion_sort_sentinel(start, end);
@@ -488,42 +501,45 @@ static void merge_sort_half_space(T * const start, T * const end) {
     }
 }
 
+union algo_to_test __host algos[] = {
+    {{ "Quick", quick_sort }},
+    {{ "QuickStable", quick_sort_stable_with_arrays }},
+    {{ "QuickStableIds", quick_sort_stable_with_ids }},
+    {{ "Heap", heap_sort }},
+    {{ "Merge", merge_sort_no_write_back}},
+    {{ "MergeWriteBack", merge_sort_write_back }},
+    {{ "MergeHalfSpace", merge_sort_half_space }},
+};
+size_t __host lengths[] = { 20, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768 };//, 1024 };
+size_t __host num_of_algos = sizeof algos / sizeof algos[0];
+size_t __host num_of_lengths = sizeof lengths / sizeof lengths[0];
+
 int main() {
-    triple_buffers buffers;
-    allocate_triple_buffer(&buffers);
     if (me() != 0) return EXIT_SUCCESS;
-    if (DPU_INPUT_ARGUMENTS.n_reps == 0) {  // called via debugger?
-        DPU_INPUT_ARGUMENTS.n_reps = 10;
-        DPU_INPUT_ARGUMENTS.upper_bound = 4;
+    perfcounter_config(COUNT_CYCLES, true);
+
+    /* Set up buffers. */
+    if (buffers[me()].cache == 0) {  // Only allocate on the first launch.
+        allocate_triple_buffer(&buffers[me()]);
+        /* Add additional sentinel values. */
+        size_t num_of_sentinels = 8;  // 4 is the maximum step, 8 ensures alignment.
+        for (size_t i = 0; i < num_of_sentinels; i++)
+            buffers[me()].cache[i] = T_MIN;
+        buffers[me()].cache += num_of_sentinels;
+        assert(lengths[num_of_lengths - 1] + num_of_sentinels <= (TRIPLE_BUFFER_SIZE >> DIV));
+        assert(!((uintptr_t)buffers[me()].cache & 7) && "Cache address not aligned on 8 bytes!");
     }
-    perfcounter_config(COUNT_CYCLES, false);
+    T * const cache = buffers[me()].cache;
 
-    char name[] = "BASE SORTING ALGORITHMS";
-    struct algo_to_test const algos[] = {
-        // { quick_sort, "Quick" },
-        // { quick_sort_stable_with_arrays, "QuickStable" }
-        // { quick_sort_stable_with_ids, "QuickStableIds" }1
-        { heap_sort, "Heap" },
-        // { merge_sort_no_write_back, "Merge" },
-        // { merge_sort_write_back, "MergeWriteBack" },
-        // { merge_sort_half_space, "MergeHalfSpace" },
-    };
-    // size_t lengths[] = { 20, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768 };//, 1024 };
-    size_t lengths[] = { 20, 24, 32, 48, 64, 383, 1024 };
-    // size_t lengths[] = {
-    //     16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68, 72, 76, 80,
-    //     84, 88, 92, 96, 100, 104, 108, 112, 116, 120, 124, 128
-    // };
-    size_t num_of_algos = sizeof algos / sizeof algos[0];
-    size_t num_of_lengths = sizeof lengths / sizeof lengths[0];
-
-    /* Add additional sentinel values. */
-    // This is needed if MergeSort uses ShellSort.
-    size_t num_of_sentinels = 4;
-    assert(lengths[num_of_lengths - 1] + num_of_sentinels <= (TRIPLE_BUFFER_SIZE >> DIV));
-    for (size_t i = 0; i < num_of_sentinels; i++)
-        buffers.cache[i] = T_MIN;
-    buffers.cache += num_of_sentinels;
+    /* Set up dummy values if called via debugger. */
+    if (host_to_dpu.length == 0) {
+        host_to_dpu.length = 256;
+        host_to_dpu.basic_seed = 0b1011100111010;
+        host_to_dpu.algo_index = 0;
+        rngs[me()] = seed_xs(host_to_dpu.basic_seed + me());
+        mram_range range = { 0, host_to_dpu.length };
+        generate_uniform_distribution_mram(input, cache, &range, 8);
+    }
 
     /* Reserve memory for custom call stack, which is needed by the iterative QuickSort. */
     // 20 pointers on the stack was the most I’ve seen for 1024 elements
@@ -531,6 +547,12 @@ int main() {
     size_t const log = 31 - __builtin_clz(lengths[num_of_lengths - 1]);
     start_of_call_stack = mem_alloc(4 * log * sizeof(T *));
 
-    test_algos(name, algos, num_of_algos, lengths, num_of_lengths, &buffers, &DPU_INPUT_ARGUMENTS);
+    /* Perform test. */
+    pivot_rng_state[me()] = seed_xs_offset(host_to_dpu.basic_seed + me());
+    mram_read(input, cache, ROUND_UP_POW2(sizeof(T[host_to_dpu.length]), 8));
+    dpu_to_host = perfcounter_get();
+    algos[host_to_dpu.algo_index].data.fct(cache, &cache[host_to_dpu.length - 1]);
+    dpu_to_host = perfcounter_get() - dpu_to_host - CALL_OVERHEAD;
+
     return EXIT_SUCCESS;
 }
