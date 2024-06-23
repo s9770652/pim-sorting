@@ -9,7 +9,6 @@
 #include "common.h"
 #include "communication.h"
 #include "params.h"
-#include "pivot.h"
 #include "random_distribution.h"
 
 // Sanity Checks

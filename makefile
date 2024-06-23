@@ -15,6 +15,7 @@ NR_DPUS ?= 1
 NR_TASKLETS ?= 1
 PERF ?= 1
 CHECK_SANITY ?= 1
+PIVOT ?= MEDIAN
 
 # A file whose name reflects the set constants.
 define conf_filename
@@ -56,12 +57,15 @@ HOST_FLAGS := ${COMMON_FLAGS} -std=c11 -lm -O3 `dpu-pkg-config --cflags --libs d
 	-DBLOCK_SIZE=${BLOCK_SIZE} \
 	-D${TYPE} \
 	-DSEQREAD_CACHE_SIZE=${SEQREAD_CACHE_SIZE} \
+	-D${PIVOT} \
+	-DPIVOT_NAME=\"${PIVOT}\" \
 	-DBINARIES=\"${BINARIES}\"
 DPU_FLAGS := ${COMMON_FLAGS} -O3 \
 	-DNR_TASKLETS=${NR_TASKLETS} \
 	-DBLOCK_SIZE=${BLOCK_SIZE} \
 	-D${TYPE} \
 	-DSEQREAD_CACHE_SIZE=${SEQREAD_CACHE_SIZE} \
+	-D${PIVOT} \
 	-DPERF=${PERF} \
 	-DCHECK_SANITY=${CHECK_SANITY}
 SORTING_FLAGS := ${DPU_FLAGS} -DSTACK_SIZE_DEFAULT=512
