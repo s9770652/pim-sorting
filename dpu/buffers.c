@@ -8,7 +8,6 @@
 #include <assert.h>
 
 #include <alloc.h>
-#include <barrier.h>
 #include <mutex.h>
 /*
 #include <atomic_bit.h>
@@ -27,13 +26,9 @@ extern void *mem_alloc_nolock(size_t size);
 ATOMIC_BIT_EXTERN(__heap_pointer);
 */
 
-BARRIER_INIT(allocating_barrier, NR_TASKLETS);
 MUTEX_INIT(allocating_mutex);
 
 void allocate_triple_buffer(triple_buffers *buffers) {
-    // This barrier-mutex construction is needed to ensure
-    // that no call to `mem_alloc` happens somewhere else in between.
-    barrier_wait(&allocating_barrier);
     mutex_lock(allocating_mutex);
     // Initialise a local cache to store one MRAM block.
     // In front of the cache is a sentinel value, useful for sorting and checking the order.
@@ -43,7 +38,6 @@ void allocate_triple_buffer(triple_buffers *buffers) {
     buffers->seq_1 = seqread_alloc();
     buffers->seq_2 = seqread_alloc();
     mutex_unlock(allocating_mutex);
-    barrier_wait(&allocating_barrier);
     // Set the sentinel value and the missing members of `buffers`.
     *(cache_pointer-1) = T_MIN;
     buffers->cache = cache_pointer;

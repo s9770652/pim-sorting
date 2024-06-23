@@ -15,7 +15,7 @@
 
 uint64_t sums[NR_TASKLETS];
 size_t counts[NR_TASKLETS][NR_COUNTS];
-bool sorted[NR_TASKLETS];
+bool unsorted[NR_TASKLETS];
 
 MUTEX_INIT(printing_mutex);
 BARRIER_INIT(checking_barrier, NR_TASKLETS);
@@ -51,7 +51,7 @@ void print_single_line(T *cache, size_t length) {
 #if (CHECK_SANITY)
 
 /**
- * @brief Reduces `sums`, `counts`, and `sorted`.
+ * @brief Reduces `sums`, `counts`, and `unsorted`.
  * 
  * @param dummy Whether a dummy value was set.
  * @param result The struct where the results are stored.
@@ -64,13 +64,13 @@ static void accumulate_stats(bool dummy, array_stats *result) {
         for (size_t j = 0; j < NR_COUNTS; j++) {
             counts[me()][j] += counts[t][j];
         }
-        sorted[me()] &= sorted[t];
+        unsorted[me()] |= unsorted[t];
     }
     // Write statistics onto the appropriate memory address.
     result->sum = sums[me()];
     result->sum -= (dummy) ? UINT32_MAX : 0;  // The dummy value is at the end of the last range.
     memcpy(&result->counts, counts[me()], NR_COUNTS * sizeof(size_t));
-    result->sorted = sorted[me()];
+    result->unsorted = unsorted[me()];
 }
 
 void get_stats_unsorted(T __mram_ptr const * const array, T * const cache, mram_range const range,
@@ -102,19 +102,19 @@ void get_stats_sorted(T __mram_ptr const * const array, T * const cache, mram_ra
     for (size_t i = 0; i < NR_COUNTS; i++) {
         counts[me()][i] = 0;
     }
-    sorted[me()] = true;
+    unsorted[me()] = false;
     T prev = (me() == 0) ? T_MIN : array[range.start-1];
     // Calculate statistics and check order.
     size_t i, curr_length, curr_size;
     LOOP_ON_MRAM(i, curr_length, curr_size, range) {
         mram_read(&array[i], cache, curr_size);
-        sorted[me()] &= prev <= cache[0];
+        unsorted[me()] |= prev > cache[0];
         for (size_t j = 0; j < curr_length; j++) {
             sums[me()] += cache[j];
             if (cache[j] < 8) {
                 counts[me()][cache[j]]++;
             }
-            sorted[me()] &= cache[j-1] <= cache[j];  // `j-1` possible due to the sentinel value
+            unsorted[me()] |= cache[j-1] > cache[j];  // `j-1` possible due to the sentinel value
         }
         prev = cache[BLOCK_LENGTH-1];
     }
@@ -144,16 +144,15 @@ void get_stats_sorted_wram(T const array[], size_t const length, array_stats *re
     for (size_t i = 0; i < NR_COUNTS; i++) {
         counts[me()][i] = 0;
     }
-    sorted[me()] = true;
+    unsorted[me()] = false;
     // Calculate statistics and check order.
     for (size_t j = 0; j < length; j++) {
         sums[me()] += array[j];
         if (array[j] < 8) {
             counts[me()][array[j]]++;
         }
-        sorted[me()] &= array[j-1] <= array[j];  // `j-1` possible due to the sentinel value
+        unsorted[me()] |= array[j-1] > array[j];  // `j-1` possible due to the sentinel value
     }
-    barrier_wait(&checking_barrier);
     accumulate_stats(false, result);
 }
 
@@ -170,10 +169,10 @@ bool compare_stats(array_stats const * const stats_1, array_stats const * const 
         }
         printf("\n");
     }
-    if (!stats_2->sorted) {
+    if (stats_2->unsorted) {
         printf("[" ANSI_COLOR_RED "ERROR" ANSI_COLOR_RESET "] Elements are not sorted.\n");
     }
-    if (same_elements && stats_2->sorted) {
+    if (same_elements && !stats_2->unsorted) {
         if (print_on_success)
             printf("[" ANSI_COLOR_GREEN "OK" ANSI_COLOR_RESET "] Elements are correctly sorted.\n");
         return EXIT_SUCCESS;

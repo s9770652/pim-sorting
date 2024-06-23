@@ -550,7 +550,6 @@ int main() {
 
     array_stats stats_before;
     get_stats_unsorted_wram(cache, host_to_dpu.length, &stats_before);
-    print_single_line(cache, host_to_dpu.length);
 
     dpu_to_host = perfcounter_get();
     algos[host_to_dpu.algo_index].data.fct(cache, &cache[host_to_dpu.length - 1]);

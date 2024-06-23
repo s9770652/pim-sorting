@@ -42,6 +42,9 @@ typedef struct triple_buffers {
 /**
  * @brief Allocates contiguous memory for general-purpose buffer and two sequential-reader buffers.
  * Also sets a sentinel value for the general-purpose buffer.
+ * @note It is advisable not to call `mem_alloc`
+ * as long as not all tasklets have allocated their triple buffer.
+ * Otherwise, the rounding this function does can lead to siginificant waste of memory space.
  * 
  * @param buffers The struct where the addresses are stored.
 **/

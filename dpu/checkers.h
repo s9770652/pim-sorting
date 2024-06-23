@@ -38,6 +38,9 @@ void print_single_line(T *array, size_t length);
 
 /**
  * @brief Contains several statistical values about MRAM arrays.
+ * @internal `sorted` may be more intuitive than `unsorted`.
+ * This way, however, the default initial value, 0, is more convenient
+ * as tasklets can abort prematurely without messing up the logic of the other tasklets.
 **/
 typedef struct array_stats
 {
@@ -46,7 +49,7 @@ typedef struct array_stats
     /// @brief The counts of the values in the range `[0, 7]`.
     size_t counts[8];
     /// @brief Whether the array is sorted.
-    bool sorted;
+    bool unsorted;
 } array_stats;
 
 #if (!CHECK_SANITY)
@@ -61,7 +64,7 @@ typedef struct array_stats
  * @param dummy Whether a dummy variable was set.
  * If present, it is excluded from the statistics.
  * @param result The struct where the results are stored.
- * The value for `sorted` is undefined.
+ * The value for `unsorted` is undefined.
 **/
 void get_stats_unsorted(T __mram_ptr const *array, T *cache, mram_range range,
         bool dummy, array_stats *result)
@@ -100,7 +103,7 @@ void get_stats_sorted(T __mram_ptr const *array, T *cache, mram_range range,
  * @param array The WRAM array to check.
  * @param length The number of elements in the array.
  * @param result The struct where the results are stored.
- * The value for `sorted` is undefined.
+ * The value for `unsorted` is undefined.
 **/
 void get_stats_unsorted_wram(T const array[], size_t length, array_stats *result)
 #if (!CHECK_SANITY)
