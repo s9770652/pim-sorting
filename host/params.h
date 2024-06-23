@@ -1,3 +1,8 @@
+/**
+ * @file
+ * @brief Implementation of the command-line interface.
+**/
+
 #ifndef _PARAMS_H_
 #define _PARAMS_H_
 
@@ -28,7 +33,7 @@ static void usage(void) {
         "\n    -p <uint>   parameter to pass to distribution (set to -1 to show list of all Ids)"
         "\n    -w <uint>   # of untimed warm-up iterations [default: 1]"
         "\n    -r <uint>   # of timed repetition iterations [default: 3]"
-        "\n    -B <int>    Id of benchmark to run (set to -1 to show list of all Ids) [default: 0]"
+        "\n    -b <int>    Id of benchmark to run (set to -1 to show list of all Ids) [default: 0]"
         "\n"
     );
 }
@@ -51,6 +56,9 @@ static void show_param_meanings(void) {
         "\n     Reverse:        Value of the last element (i.e. the smallest) [default: 0]"
         "\n     AlmostSorted:   Number of swaps [default: √n]"
         "\n     Uniform:        Upper bound (exclusive) of range to draw from [default: maximum]"
+        "\n"
+        "\nNon-zero default values internally equal zero as well."
+        "\n"
     );
 }
 
@@ -74,19 +82,25 @@ struct Params input_params(int argc, char **argv) {
     p.mode = 0;
 
     int opt;
-    while ((opt = getopt(argc, argv, "hn:t:p:w:r:B:")) >= 0) {
+    while ((opt = getopt(argc, argv, "hn:t:p:w:r:b:")) >= 0) {
+        double value = atof(optarg);
         switch(opt) {
         case 'h':
             usage();
             exit(0);
             break;
-        case 'n': p.length = atof(optarg); break;
+        case 'n':
+            assert(value > 0 && "Input length must be positive!");
+            p.length = value;
+            break;
         case 't':
             if (strcmp(optarg, "-1") == 0) {
                 show_distributions();
                 exit(0);
             } else {
-                p.dist_type = atof(optarg);
+                assert(value < nr_of_dists && "Invalid random distribution type!");
+                assert(value >= 0 && "Invalid random distribution type!");
+                p.dist_type = value;
                 break;
             }
         case 'p':
@@ -94,16 +108,21 @@ struct Params input_params(int argc, char **argv) {
                 show_param_meanings();
                 exit(0);
             } else {
-                p.dist_param = atof(optarg);
+                assert(value >= 0 && "Distribution parameter must be non-negative!");
+                p.dist_param = value;
                 break;
             }
-        case 'r': p.n_reps = atof(optarg); break;
-        case 'B':
+        case 'r':
+            assert(value > 0 && "Number of iterations must be positive!");
+            p.n_reps = value;
+            break;
+        case 'b':
             if (strcmp(optarg, "-1") == 0) {
                 show_modes();
                 exit(0);
             } else {
-                p.mode = atof(optarg);
+                assert(value >= 0 && "Invalid benchmark Id!");  // Big values are caught in app.c.
+                p.mode = value;
                 break;
             }
         default:
@@ -112,10 +131,6 @@ struct Params input_params(int argc, char **argv) {
             exit(0);
         }
     }
-    assert(p.length > 0 && "Input length must be positive!");
-    assert(p.n_reps > 0 && "Invalid # of repetition iterations!");
-    assert(p.dist_type < nr_of_dists && "Invalid random distribution type!");
-
     return p;
 }
 
