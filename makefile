@@ -27,7 +27,7 @@ CONF := ${call conf_filename,${NR_DPUS},${NR_TASKLETS},${TYPE},${BLOCK_SIZE},${S
 comma := ,
 empty :=
 space := ${empty} ${empty}
-BENCHMARKS := base_sorts # quick_sorts wram_sorts
+BENCHMARKS := base_sorts quick_sorts # wram_sorts
 BINARIES := ${patsubst %,./${BUILD_DIR}/%,sorting ${BENCHMARKS}}
 BINARIES := ${subst ${space},${comma},${BINARIES}}
 

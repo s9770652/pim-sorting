@@ -4,16 +4,29 @@
 **/
 
 #include <assert.h>
-#include <stdlib.h>
 #include <stdbool.h>
+#include <stdlib.h>
 
 #include <alloc.h>
 #include <defs.h>
 #include <perfcounter.h>
 
-#include "tester.h"
+#include "buffers.h"
+#include "common.h"
+#include "communication.h"
+#include "pivot.h"
+#include "random_distribution.h"
+#include "random_generator.h"
 
-__host struct dpu_arguments DPU_INPUT_ARGUMENTS;
+struct dpu_arguments __host host_to_dpu;
+time __host dpu_to_host;
+T __mram_noinit input[LOAD_INTO_MRAM];  // set by the host
+T __mram_noinit output[LOAD_INTO_MRAM];
+
+triple_buffers buffers[NR_TASKLETS];
+struct xorshift rngs[NR_TASKLETS];
+struct xorshift_offset pivot_rng_state[NR_TASKLETS];
+
 // The input length at which QuickSort changes to InsertionSort.
 #define QUICK_TO_INSERTION (13)
 // The call stack for iterative QuickSort.
@@ -354,7 +367,7 @@ static void quick_sort_triviality_within_threshold(T * const start, T * const en
  * @param start The first element of the WRAM array to sort.
  * @param end The last element of said array.
 **/
-static __used void quick_sort_optimised_iterative(T * const start, T * const end) {
+static __attribute__((unused)) void quick_sort_optimised_iterative(T * const start, T * const end) {
     QUICK_HEAD();
 optimised_label:
     if (right - left + 1 <= QUICK_TO_INSERTION) {
@@ -369,33 +382,43 @@ optimised_label:
 }
 #endif
 
-int main() {
-    triple_buffers buffers;
-    allocate_triple_buffer(&buffers);
-    if (me() != 0) return EXIT_SUCCESS;
-    if (DPU_INPUT_ARGUMENTS.n_reps == 0) {  // called via debugger?
-        DPU_INPUT_ARGUMENTS.n_reps = 10;
-        DPU_INPUT_ARGUMENTS.upper_bound = 0;
-    }
-
-    char name[] = "BASE SORTING ALGORITHMS";
-    struct algo_to_test const algos[] = {
-        { quick_sort, "Normal" },
-        { quick_sort_check_trivial_before_call, "TrivialBC" },
-        { quick_sort_no_triviality, "NoTrivial" },
-        { sort_with_one_insertion_sort, "OneInsertion" },
-        { quick_sort_check_threshold_before_call, "ThreshBC" },
-        { quick_sort_check_triviality_and_threshold_before_call, "ThreshTrivBC" },
-        { quick_sort_triviality_after_threshold, "ThreshThenTriv" },
-        { quick_sort_triviality_within_threshold, "TrivInThresh" },
+union algo_to_test __host algos[] = {
+    {{ "Normal", quick_sort }},
+    {{ "TrivialBC", quick_sort_check_trivial_before_call }},
+    {{ "NoTrivial", quick_sort_no_triviality }},
+    {{ "OneInsertion", sort_with_one_insertion_sort }},
+    {{ "ThreshBC", quick_sort_check_threshold_before_call }},
+    {{ "ThreshTrivBC", quick_sort_check_triviality_and_threshold_before_call }},
+    {{ "ThreshThenTriv", quick_sort_triviality_after_threshold }},
+    {{ "TrivInThresh", quick_sort_triviality_within_threshold }},
 #if (!RECURSIVE)
-        // { quick_sort_optimised_iterative, "Optimised" },
+    // {{ "Optimised", quick_sort_optimised_iterative }},
 #endif
-    };
-    size_t lengths[] = { 20, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };
-    size_t num_of_algos = sizeof algos / sizeof algos[0];
-    size_t num_of_lengths = sizeof lengths / sizeof lengths[0];
-    assert(lengths[num_of_lengths - 1] <= (TRIPLE_BUFFER_SIZE >> DIV));
+};
+size_t __host lengths[] = { 20, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };
+size_t __host num_of_algos = sizeof algos / sizeof algos[0];
+size_t __host num_of_lengths = sizeof lengths / sizeof lengths[0];
+
+int main() {
+    if (me() != 0) return EXIT_SUCCESS;
+    perfcounter_config(COUNT_CYCLES, true);
+
+    /* Set up buffers. */
+    if (buffers[me()].cache == 0) {  // Only allocate on the first launch.
+        allocate_triple_buffer(&buffers[me()]);
+        assert(lengths[num_of_lengths - 1] <= (TRIPLE_BUFFER_SIZE >> DIV));
+    }
+    T * const cache = buffers[me()].cache;
+
+    /* Set up dummy values if called via debugger. */
+    if (host_to_dpu.length == 0) {
+        host_to_dpu.length = 256;
+        host_to_dpu.basic_seed = 0b1011100111010;
+        host_to_dpu.algo_index = 0;
+        rngs[me()] = seed_xs(host_to_dpu.basic_seed + me());
+        mram_range range = { 0, host_to_dpu.length };
+        generate_uniform_distribution_mram(input, cache, &range, 8);
+    }
 
     /* Reserve memory for custom call stack, which is needed by the iterative QuickSort. */
 #if (!RECURSIVE)
@@ -407,6 +430,12 @@ int main() {
     (void)start_of_call_stack;
 #endif
 
-    test_algos(name, algos, num_of_algos, lengths, num_of_lengths, &buffers, &DPU_INPUT_ARGUMENTS);
+    /* Perform test. */
+    pivot_rng_state[me()] = seed_xs_offset(host_to_dpu.basic_seed + me());
+    mram_read(input, cache, ROUND_UP_POW2(sizeof(T[host_to_dpu.length]), 8));
+    dpu_to_host = perfcounter_get();
+    algos[host_to_dpu.algo_index].data.fct(cache, &cache[host_to_dpu.length - 1]);
+    dpu_to_host = perfcounter_get() - dpu_to_host - CALL_OVERHEAD;
+
     return EXIT_SUCCESS;
 }
