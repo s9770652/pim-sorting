@@ -12,15 +12,15 @@ void generate_uniform_distribution_wram(T * const start, T * const end, T const 
     bool const is_power_of_two = (upper_bound & (upper_bound - 1)) == 0;
     if (upper_bound == 0) {
         for (T *t = start; t <= end; t++) {
-            *t = gen_xs(&rngs[me()]);
+            *t = gen_xs(&input_rngs[me()]);
         }
     } else if (is_power_of_two) {
         for (T *t = start; t <= end; t++) {
-            *t = gen_xs(&rngs[me()]) & (upper_bound - 1);
+            *t = gen_xs(&input_rngs[me()]) & (upper_bound - 1);
         }
     } else {
         for (T *t = start; t <= end; t++) {
-            *t = rr(upper_bound, &rngs[me()]);
+            *t = rr(upper_bound, &input_rngs[me()]);
         }
     }
 }
@@ -53,9 +53,9 @@ void generate_almost_sorted_distribution_wram(T * const start, T * const end, si
     size_t const n = end - start + 1;
     swaps = (swaps) ? : sqroot_on_dpu(n);
     for (size_t s = 0; s < swaps; s++) {
-        size_t const i = rr(n - 1, &rngs[me()]);
+        size_t const i = rr(n - 1, &input_rngs[me()]);
         size_t j;
-        do { j = rr(n - 1, &rngs[me()]); } while (i == j);
+        do { j = rr(n - 1, &input_rngs[me()]); } while (i == j);
         swap(&start[i], &start[j]);
     }
 }

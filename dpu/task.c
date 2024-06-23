@@ -24,7 +24,7 @@ __host struct dpu_arguments DPU_INPUT_ARGUMENTS;
 T __mram_noinit input[LOAD_INTO_MRAM];  // array of random numbers
 T __mram_noinit output[LOAD_INTO_MRAM];
 mram_range ranges[NR_TASKLETS];
-struct xorshift rngs[NR_TASKLETS];
+struct xorshift input_rngs[NR_TASKLETS];
 bool flipped;  // Whether `input` or `output` contains the final sorted sequence.
 bool dummy;  // Whether a dummy value was set at the end of the input sequence.
 
@@ -76,7 +76,7 @@ int main(void) {
     ranges[me()].end = part_end;
 
     /* Write random elements onto the MRAM. */
-    rngs[me()] = seed_xs(me() + 0b1011100111010);
+    input_rngs[me()] = seed_xs(me() + 0b1011100111010);
     triple_buffers buffers;
     allocate_triple_buffer(&buffers);
     T *cache = buffers.cache;

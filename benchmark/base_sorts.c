@@ -31,8 +31,9 @@ T __mram_noinit input[LOAD_INTO_MRAM];  // set by the host
 T __mram_noinit output[LOAD_INTO_MRAM];
 
 triple_buffers buffers[NR_TASKLETS];
-struct xorshift rngs[NR_TASKLETS];
-struct xorshift_offset pivot_rng_state[NR_TASKLETS];
+struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input (in debug mode)
+struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the pivot
+static T *call_stacks[NR_TASKLETS][40];  // call stack for iterative QuickSort
 
 #define BIG_STEP (-1)
 
@@ -309,13 +310,13 @@ int main() {
         host_to_dpu.length = 24;
         host_to_dpu.basic_seed = 0b1011100111010;
         host_to_dpu.algo_index = 0;
-        rngs[me()] = seed_xs(host_to_dpu.basic_seed + me());
+        input_rngs[me()] = seed_xs(host_to_dpu.basic_seed + me());
         mram_range range = { 0, host_to_dpu.length };
         generate_uniform_distribution_mram(input, cache, &range, 8);
     }
 
     /* Perform test. */
-    pivot_rng_state[me()] = seed_xs_offset(host_to_dpu.basic_seed + me());
+    pivot_rngs[me()] = seed_xs_offset(host_to_dpu.basic_seed + me());
     mram_read(input, cache, ROUND_UP_POW2(sizeof(T[host_to_dpu.length]), 8));
     dpu_to_host = perfcounter_get();
     algos[host_to_dpu.algo_index].data.fct(cache, &cache[host_to_dpu.length - 1]);

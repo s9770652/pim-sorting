@@ -11,7 +11,7 @@
 #include "random_generator.h"
 
 /// @brief Contains the seed for each tasklet.
-extern struct xorshift rngs[NR_TASKLETS];
+extern struct xorshift input_rngs[NR_TASKLETS];
 
 /**
  * @brief Uniformly draws numbers.

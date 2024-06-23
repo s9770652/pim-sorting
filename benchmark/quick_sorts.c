@@ -24,13 +24,15 @@ T __mram_noinit input[LOAD_INTO_MRAM];  // set by the host
 T __mram_noinit output[LOAD_INTO_MRAM];
 
 triple_buffers buffers[NR_TASKLETS];
-struct xorshift rngs[NR_TASKLETS];
-struct xorshift_offset pivot_rng_state[NR_TASKLETS];
+struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input (in debug mode)
+struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the pivot
+/// @brief The call stack for iterative QuickSort.
+/// @internal 20 pointers on the stack was the most I’ve seen for 1024 elements
+/// so the space reserved here should be enough.
+static T *call_stacks[NR_TASKLETS][40];
 
 // The input length at which QuickSort changes to InsertionSort.
 #define QUICK_TO_INSERTION (13)
-// The call stack for iterative QuickSort.
-static T **start_of_call_stack;
 
 /* Defining building blocks for QuickSort, which remain the same. */
 #define RECURSIVE (false)
@@ -108,11 +110,12 @@ swap(i, right)
 
 // A “call” stack for holding the values of `left` and `right` is maintained.
 // Its memory must be reserved beforehand.
-#define QUICK_HEAD()                                \
-T **call_stack = start_of_call_stack;               \
-*call_stack++ = start;                              \
-*call_stack++ = end;                                \
-do {                                                \
+#define QUICK_HEAD()                                    \
+T ** const start_of_call_stack = &call_stacks[me()][0]; \
+T **call_stack = start_of_call_stack;                   \
+*call_stack++ = start;                                  \
+*call_stack++ = end;                                    \
+do {                                                    \
     T *right = *--call_stack, *left = *--call_stack
 
 // Instead of recursive calls, the required variables are put on the stack.
@@ -415,23 +418,13 @@ int main() {
         host_to_dpu.length = 256;
         host_to_dpu.basic_seed = 0b1011100111010;
         host_to_dpu.algo_index = 0;
-        rngs[me()] = seed_xs(host_to_dpu.basic_seed + me());
+        input_rngs[me()] = seed_xs(host_to_dpu.basic_seed + me());
         mram_range range = { 0, host_to_dpu.length };
         generate_uniform_distribution_mram(input, cache, &range, 8);
     }
 
-    /* Reserve memory for custom call stack, which is needed by the iterative QuickSort. */
-#if (!RECURSIVE)
-    // 20 pointers on the stack was the most I’ve seen for 1024 elements
-    // so the space reserved here should be enough.
-    size_t const log = 31 - __builtin_clz(lengths[num_of_lengths - 1]);
-    start_of_call_stack = mem_alloc(4 * log * sizeof(T *));
-#else
-    (void)start_of_call_stack;
-#endif
-
     /* Perform test. */
-    pivot_rng_state[me()] = seed_xs_offset(host_to_dpu.basic_seed + me());
+    pivot_rngs[me()] = seed_xs_offset(host_to_dpu.basic_seed + me());
     mram_read(input, cache, ROUND_UP_POW2(sizeof(T[host_to_dpu.length]), 8));
     dpu_to_host = perfcounter_get();
     algos[host_to_dpu.algo_index].data.fct(cache, &cache[host_to_dpu.length - 1]);
