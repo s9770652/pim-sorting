@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <alloc.h>
 #include <defs.h>
@@ -20,7 +21,7 @@
 #include "random_generator.h"
 
 struct dpu_arguments __host host_to_dpu;
-time __host dpu_to_host;
+struct dpu_results __host dpu_to_host;
 T __mram_noinit input[LOAD_INTO_MRAM];  // set by the host
 T __mram_noinit output[LOAD_INTO_MRAM];
 
@@ -519,10 +520,9 @@ size_t __host num_of_lengths = sizeof lengths / sizeof lengths[0];
 
 int main() {
     if (me() != 0) return EXIT_SUCCESS;
-    perfcounter_config(COUNT_CYCLES, true);
 
     /* Set up buffers. */
-    if (buffers[me()].cache == 0) {  // Only allocate on the first launch.
+    if (buffers[me()].cache == NULL) {  // Only allocate on the first launch.
         allocate_triple_buffer(&buffers[me()]);
         /* Add additional sentinel values. */
         size_t num_of_sentinels = 8;  // 4 is the maximum step, 8 ensures alignment.
@@ -537,34 +537,49 @@ int main() {
     /* Set up dummy values if called via debugger. */
     if (host_to_dpu.length == 0) {
         host_to_dpu.length = 256;
+        host_to_dpu.reps = 1;
         host_to_dpu.basic_seed = 0b1011100111010;
         host_to_dpu.algo_index = 0;
         input_rngs[me()] = seed_xs(host_to_dpu.basic_seed + me());
-        mram_range range = { 0, host_to_dpu.length };
+        mram_range range = { 0, host_to_dpu.length * host_to_dpu.reps };
         generate_uniform_distribution_mram(input, cache, &range, 8);
     }
 
     /* Perform test. */
-    pivot_rngs[me()] = seed_xs_offset(host_to_dpu.basic_seed + me());
-    mram_read(input, cache, ROUND_UP_POW2(sizeof(T[host_to_dpu.length]), 8));
+    T __mram_ptr *read_from = input;
+    T * const start = cache, * const end = &cache[host_to_dpu.length - 1];
+    unsigned int const transfer_size = ROUND_UP_POW2(sizeof(T[host_to_dpu.length]), 8);
+    base_sort_algo * const algo = algos[host_to_dpu.algo_index].data.fct;
+    memset(&dpu_to_host, 0, sizeof dpu_to_host);
 
-    array_stats stats_before;
-    get_stats_unsorted_wram(cache, host_to_dpu.length, &stats_before);
+    for (uint32_t rep = 0; rep < host_to_dpu.reps; rep++) {
+        pivot_rngs[me()] = seed_xs_offset(host_to_dpu.basic_seed + me());
+        mram_read(read_from, cache, transfer_size);
 
-    dpu_to_host = perfcounter_get();
-    algos[host_to_dpu.algo_index].data.fct(cache, &cache[host_to_dpu.length - 1]);
-    dpu_to_host = perfcounter_get() - dpu_to_host - CALL_OVERHEAD;
+        array_stats stats_before;
+        get_stats_unsorted_wram(cache, host_to_dpu.length, &stats_before);
 
-    size_t offset = 0;  // Needed because of the MergeSort not writing back.
-    if (!flag) {
-        offset = host_to_dpu.length;
-        cache[host_to_dpu.length - 1] = T_MIN;  // `get_stats_sorted_wram` relies on sentinels.
-        flag = true;  // Following sorting algorithms may not reset this value.
-    }
-    array_stats stats_after;
-    get_stats_sorted_wram(cache + offset, host_to_dpu.length, &stats_after);
-    if (compare_stats(&stats_before, &stats_after, false) == EXIT_FAILURE) {
-        abort();
+        perfcounter_config(COUNT_CYCLES, true);
+        time new_time = perfcounter_get();
+        algo(start, end);
+        new_time = perfcounter_get() - new_time - CALL_OVERHEAD;
+        dpu_to_host.firsts += new_time;
+        dpu_to_host.seconds += new_time * new_time;
+
+        size_t offset = 0;  // Needed because of the MergeSort not writing back.
+        if (!flag) {
+            offset = host_to_dpu.length;
+            cache[host_to_dpu.length - 1] = T_MIN;  // `get_stats_sorted_wram` relies on sentinels.
+            flag = true;  // Following sorting algorithms may not reset this value.
+        }
+        array_stats stats_after;
+        get_stats_sorted_wram(cache + offset, host_to_dpu.length, &stats_after);
+        if (compare_stats(&stats_before, &stats_after, false) == EXIT_FAILURE) {
+            abort();
+        }
+
+        read_from += host_to_dpu.length;
+        host_to_dpu.basic_seed += NR_TASKLETS;
     }
 
     return EXIT_SUCCESS;

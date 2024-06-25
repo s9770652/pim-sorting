@@ -52,23 +52,20 @@ static void alloc_dpus(struct dpu_set_t *set, uint32_t *nr_dpus, unsigned const 
  * 
  * @param set The set with the DPU.
  * @param host_to_dpu The input data to send to the DPU.
- * @param firsts The sum of the first moments of the current sorting function.
- * @param seconds The sum of the second moments of the current sorting function.
- * @param input The data to be sorted by the DPU.
+ * @param dpu_to_host What the DPU has sent so far.
 **/
-static void test(struct dpu_set_t *set, struct dpu_arguments *host_to_dpu, time *firsts,
-        time *seconds, T input[]) {
+static void test(struct dpu_set_t *set, struct dpu_arguments *host_to_dpu,
+        struct dpu_results *dpu_to_host) {
     struct dpu_set_t dpu;
-    time new_result;
+    struct dpu_results new_result;
     DPU_FOREACH(*set, dpu) {
         DPU_ASSERT(dpu_copy_to(dpu, "host_to_dpu", 0, host_to_dpu, sizeof *host_to_dpu));
-        DPU_ASSERT(dpu_copy_to(dpu, "input", 0, input, ROUND_UP_POW2(sizeof(T[host_to_dpu->length]), 8)));
         DPU_ASSERT(dpu_launch(*set, DPU_SYNCHRONOUS));
         DPU_ASSERT(dpu_copy_from(dpu, "dpu_to_host", 0, &new_result, sizeof new_result));
         // DPU_ASSERT(dpu_log_read(dpu, stdout));
     }
-    *firsts += new_result;
-    *seconds += new_result * new_result;
+    dpu_to_host->firsts += new_result.firsts;
+    dpu_to_host->seconds += new_result.seconds;
 }
 
 /**
@@ -132,21 +129,19 @@ static void print_header(union algo_to_test const algos[], size_t const num_of_a
  * 
  * @param num_of_algos The number of sorting algorithms measured.
  * @param length The number of input elements which were sorted.
- * @param zeroth The zeroth moment (universal for all algorithms).
- * @param firsts The measured first moments of all algorithms.
- * @param seconds The measured second moments of all algorithms.
+ * @param reps How often each test was repeated.
+ * @param dpu_to_host The results as measured by the DPUs.
 **/
-static void print_measurements(size_t const num_of_algos, size_t const length, time const zeroth,
-        time const firsts[], time const seconds[]) {
+static void print_measurements(size_t const num_of_algos, size_t const length, time const reps,
+        struct dpu_results dpu_to_host[]) {
     printf("%zd\t", length);
     for (size_t id = 0; id < num_of_algos; id++) {
-        time mean = get_mean_of_time(zeroth, firsts[id]);
-        time std = get_std_of_time(zeroth, firsts[id], seconds[id]);
+        time mean = get_mean_of_time(reps, dpu_to_host[id].firsts);
+        time std = get_std_of_time(reps, dpu_to_host[id].firsts, dpu_to_host[id].seconds);
         printf("%6lu %5lu\t", mean, std);
     }
     printf("\n");
 }
-
 
 int main(int argc, char **argv) {
     struct Params p = input_params(argc, argv);
@@ -172,8 +167,7 @@ int main(int argc, char **argv) {
 
     /* Set up tests. */
     T *input = malloc(LOAD_INTO_MRAM * sizeof(T));
-    time *firsts = malloc(sizeof(time[num_of_algos]));  // sums of measured times
-    time *seconds = malloc(sizeof(time[num_of_algos]));  // sums of squares of measured times
+    struct dpu_results *dpu_to_host = malloc(sizeof(struct dpu_results[num_of_algos]));
     struct dpu_arguments host_to_dpu = {
         .basic_seed = 0b1011100111010,
     };
@@ -182,18 +176,27 @@ int main(int argc, char **argv) {
     /* Perform tests. */
     print_header(algos, num_of_algos, &p);
     for (uint32_t li = 0; li < num_of_lengths; li++) {
-        memset(firsts, 0, sizeof(time[num_of_algos]));
-        memset(seconds, 0, sizeof(time[num_of_algos]));
-        host_to_dpu.length = lengths[li];
-        for (uint32_t rep = 0; rep < p.n_reps; rep++) {
-            host_to_dpu.basic_seed += NR_TASKLETS;
-            generate_input_distribution(input, lengths[li], p.dist_type, p.dist_param);
+        uint32_t const len = lengths[li];
+        host_to_dpu.length = len;
+        uint32_t const reps_per_launch = LOAD_INTO_MRAM / len;
+
+        memset(dpu_to_host, 0, sizeof(struct dpu_results[num_of_algos]));
+        for (uint32_t rep = 0; rep < p.n_reps; rep += reps_per_launch) {
+            host_to_dpu.reps = (reps_per_launch > p.n_reps - rep) ? p.n_reps - rep : reps_per_launch;
+
+            for (uint32_t i = 0; i < host_to_dpu.reps; i++) {
+                generate_input_distribution(&input[i * len], len, p.dist_type, p.dist_param);
+            }
+            size_t const transferred = ROUND_UP_POW2(sizeof(T[len * host_to_dpu.reps]), 8);
+            DPU_ASSERT(dpu_copy_to(dpu, "input", 0, input, transferred));
+
             for (uint32_t id = 0; id < num_of_algos; id++) {
                 host_to_dpu.algo_index = id;
-                test(&set, &host_to_dpu, &firsts[id], &seconds[id], input);
+                test(&set, &host_to_dpu, &dpu_to_host[id]);
             }
+            host_to_dpu.basic_seed += host_to_dpu.reps * NR_TASKLETS;
         }
-        print_measurements(num_of_algos, lengths[li], p.n_reps, firsts, seconds);
+        print_measurements(num_of_algos, len, p.n_reps, dpu_to_host);
     }
 
     /* Clean up. */
@@ -201,8 +204,7 @@ int main(int argc, char **argv) {
     free(algos);
     free(lengths);
     free(input);
-    free(firsts);
-    free(seconds);
+    free(dpu_to_host);
 
     return EXIT_SUCCESS;
 }

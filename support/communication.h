@@ -20,6 +20,8 @@ typedef void base_sort_algo(T *, T *);
 struct dpu_arguments {
     /// @brief The number of elements to sort.
     uint32_t length;
+    /// @brief How many repetitions are performed.
+    uint32_t reps;
     /// @brief The seed used by all tasklets, which then offset with their own Id.
     uint32_t basic_seed;
     /// @brief The index of the sorting algorithm to run.
@@ -29,6 +31,15 @@ struct dpu_arguments {
 /// @brief The data type holding the performance counter count.
 /// This is needed since `perfcounter_t` is only available on a DPU.
 typedef uint64_t time;
+
+/// @brief Information sent from the DPU to the host.
+struct dpu_results {
+    /// @brief The sum of the measured times.
+    time firsts;
+    /// @brief The sum of the squares of the measured times.
+    time seconds;
+};
+
 
 /// @brief A sorting algorithm and its name.
 struct algo_data {
@@ -48,6 +59,6 @@ union algo_to_test {
 };
 
 /// @brief The experimentally determined overhead of calling a sorting function.
-#define CALL_OVERHEAD (223)
+#define CALL_OVERHEAD (128)
 
 #endif  // _COMMUNICATION_H_
