@@ -22,8 +22,8 @@
 
 struct dpu_arguments __host host_to_dpu;
 struct dpu_results __host dpu_to_host;
-T __mram_noinit input[LOAD_INTO_MRAM];  // set by the host
-T __mram_noinit output[LOAD_INTO_MRAM];
+T __mram_noinit_keep input[LOAD_INTO_MRAM];  // set by the host
+T __mram_noinit_keep output[LOAD_INTO_MRAM];
 
 triple_buffers buffers[NR_TASKLETS];
 struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input (in debug mode)
@@ -554,7 +554,7 @@ int main() {
 
     for (uint32_t rep = 0; rep < host_to_dpu.reps; rep++) {
         pivot_rngs[me()] = seed_xs_offset(host_to_dpu.basic_seed + me());
-        mram_read(read_from, cache, transfer_size);
+        mram_read_triple(read_from, cache, transfer_size);
 
         array_stats stats_before;
         get_stats_unsorted_wram(cache, host_to_dpu.length, &stats_before);

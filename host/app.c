@@ -166,7 +166,7 @@ int main(int argc, char **argv) {
     }
 
     /* Set up tests. */
-    T *input = malloc(LOAD_INTO_MRAM * sizeof(T));
+    T * const input = malloc(sizeof(T[LOAD_INTO_MRAM]));
     struct dpu_results *dpu_to_host = malloc(sizeof(struct dpu_results[num_of_algos]));
     struct dpu_arguments host_to_dpu = {
         .basic_seed = 0b1011100111010,

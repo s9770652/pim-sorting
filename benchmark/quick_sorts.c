@@ -22,8 +22,8 @@
 
 struct dpu_arguments __host host_to_dpu;
 struct dpu_results __host dpu_to_host;
-T __mram_noinit input[LOAD_INTO_MRAM];  // set by the host
-T __mram_noinit output[LOAD_INTO_MRAM];
+T __mram_noinit_keep input[LOAD_INTO_MRAM];  // set by the host
+T __mram_noinit_keep output[LOAD_INTO_MRAM];
 
 triple_buffers buffers[NR_TASKLETS];
 struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input (in debug mode)
@@ -389,13 +389,13 @@ optimised_label:
 
 union algo_to_test __host algos[] = {
     {{ "Normal", quick_sort }},
-    // {{ "TrivialBC", quick_sort_check_trivial_before_call }},
-    // {{ "NoTrivial", quick_sort_no_triviality }},
-    // {{ "OneInsertion", sort_with_one_insertion_sort }},
-    // {{ "ThreshBC", quick_sort_check_threshold_before_call }},
-    // {{ "ThreshTrivBC", quick_sort_check_triviality_and_threshold_before_call }},
-    // {{ "ThreshThenTriv", quick_sort_triviality_after_threshold }},
-    // {{ "TrivInThresh", quick_sort_triviality_within_threshold }},
+    {{ "TrivialBC", quick_sort_check_trivial_before_call }},
+    {{ "NoTrivial", quick_sort_no_triviality }},
+    {{ "OneInsertion", sort_with_one_insertion_sort }},
+    {{ "ThreshBC", quick_sort_check_threshold_before_call }},
+    {{ "ThreshTrivBC", quick_sort_check_triviality_and_threshold_before_call }},
+    {{ "ThreshThenTriv", quick_sort_triviality_after_threshold }},
+    {{ "TrivInThresh", quick_sort_triviality_within_threshold }},
 #if (!RECURSIVE)
     // {{ "Optimised", quick_sort_optimised_iterative }},
 #endif
@@ -434,7 +434,7 @@ int main() {
 
     for (uint32_t rep = 0; rep < host_to_dpu.reps; rep++) {
         pivot_rngs[me()] = seed_xs_offset(host_to_dpu.basic_seed + me());
-        mram_read(read_from, cache, transfer_size);
+        mram_read_triple(read_from, cache, transfer_size);
 
         array_stats stats_before;
         get_stats_unsorted_wram(cache, host_to_dpu.length, &stats_before);
