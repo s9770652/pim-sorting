@@ -29,11 +29,10 @@ static void usage(void) {
         "\nOptions:"
         "\n    -h          help"
         "\n    -n <uint>   input length [default: 512]"
-        "\n    -d <uint>   Id of the distribution to draw from (set to -1 to show list of all Ids) [default: 3]"
-        "\n    -p <uint>   parameter to pass to distribution (set to -1 to show list of all Ids)"
-        "\n    -w <uint>   # of untimed warm-up iterations [default: 1]"
-        "\n    -r <uint>   # of timed repetition iterations [default: 3]"
-        "\n    -b <int>    Id of benchmark to run (set to -1 to show list of all Ids) [default: 0]"
+        "\n    -t <uint>   type of the distribution to draw from (set to -1 to show list of all types) [default: uniform]"
+        "\n    -p <uint>   parameter to pass to distribution (set to -1 to show list of all meanings)"
+        "\n    -r <uint>   number of timed repetition iterations [default: 3]"
+        "\n    -b <int>    Id of the benchmark to run (set to -1 to show list of all Ids) [default: 0]"
         "\n"
     );
 }
@@ -45,6 +44,7 @@ static void show_distributions(void) {
         "\n     1   Reverse"
         "\n     2   AlmostSorted"
         "\n     3   Uniform"
+        "\n     4   Zipf"
         "\n"
     );
 }
@@ -56,6 +56,7 @@ static void show_param_meanings(void) {
         "\n     Reverse:        Value of the last element (i.e. the smallest) [default: 0]"
         "\n     AlmostSorted:   Number of swaps [default: √n]"
         "\n     Uniform:        Upper bound (exclusive) of range to draw from [default: maximum]"
+        "\n     Zipf:           /"
         "\n"
         "\nNon-zero default values internally equal zero as well."
         "\n"
