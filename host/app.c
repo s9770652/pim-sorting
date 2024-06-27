@@ -176,8 +176,9 @@ int main(int argc, char **argv) {
     /* Perform tests. */
     print_header(algos, num_of_algos, &p);
     for (uint32_t li = 0; li < num_of_lengths; li++) {
-        uint32_t const len = lengths[li];
+        uint32_t const len = lengths[li], offset = ROUND_UP_POW2(len << DIV, 8) >> DIV;
         host_to_dpu.length = len;
+        host_to_dpu.offset = offset;
         uint32_t const reps_per_launch = LOAD_INTO_MRAM / len;
 
         memset(dpu_to_host, 0, sizeof(struct dpu_results[num_of_algos]));
@@ -185,9 +186,9 @@ int main(int argc, char **argv) {
             host_to_dpu.reps = (reps_per_launch > p.n_reps - rep) ? p.n_reps - rep : reps_per_launch;
 
             for (uint32_t i = 0; i < host_to_dpu.reps; i++) {
-                generate_input_distribution(&input[i * len], len, p.dist_type, p.dist_param);
+                generate_input_distribution(&input[i * offset], len, p.dist_type, p.dist_param);
             }
-            size_t const transferred = ROUND_UP_POW2(sizeof(T[len * host_to_dpu.reps]), 8);
+            size_t const transferred = ROUND_UP_POW2(sizeof(T[offset * host_to_dpu.reps]), 8);
             DPU_ASSERT(dpu_copy_to(dpu, "input", 0, input, transferred));
 
             for (uint32_t id = 0; id < num_of_algos; id++) {

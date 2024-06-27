@@ -536,8 +536,9 @@ int main() {
 
     /* Set up dummy values if called via debugger. */
     if (host_to_dpu.length == 0) {
-        host_to_dpu.length = 256;
         host_to_dpu.reps = 1;
+        host_to_dpu.length = 256;
+        host_to_dpu.offset = ROUND_UP_POW2(host_to_dpu.length * sizeof(T), 8) / sizeof(T);
         host_to_dpu.basic_seed = 0b1011100111010;
         host_to_dpu.algo_index = 0;
         input_rngs[me()] = seed_xs(host_to_dpu.basic_seed + me());
@@ -578,7 +579,7 @@ int main() {
             abort();
         }
 
-        read_from += host_to_dpu.length;
+        read_from += host_to_dpu.offset;
         host_to_dpu.basic_seed += NR_TASKLETS;
     }
 

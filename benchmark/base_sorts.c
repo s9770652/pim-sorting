@@ -35,6 +35,7 @@ T __mram_noinit_keep output[LOAD_INTO_MRAM];
 triple_buffers buffers[NR_TASKLETS];
 struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input (in debug mode)
 struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the pivot
+static T *call_stacks[NR_TASKLETS][40];  // call stack for iterative QuickSort
 
 #define BIG_STEP (-1)
 
@@ -108,7 +109,7 @@ static void selection_sort(T * const start, T * const end) {
  * 2. Use a helper function.
 **/
 static void insertion_sort_nosentinel_helper(T * const start, T * const end) {
-    T *curr, *i = start, * const true_start = start - 1;;
+    T *curr, *i = start, * const true_start = start - 1;
     while ((curr = i++) <= end) {
         T const to_sort = *curr;
         while ((curr - 1) >= true_start && *(curr - 1) > to_sort) {
@@ -291,6 +292,7 @@ size_t __host num_of_lengths = sizeof lengths / sizeof lengths[0];
 
 int main() {
     if (me() != 0) return EXIT_SUCCESS;
+    (void)call_stacks;
 
     /* Set up buffers. */
     if (buffers[me()].cache == NULL) {  // Only allocate on the first launch.
@@ -307,8 +309,9 @@ int main() {
 
     /* Set up dummy values if called via debugger. */
     if (host_to_dpu.length == 0) {
-        host_to_dpu.length = 24;
         host_to_dpu.reps = 1;
+        host_to_dpu.length = 24;
+        host_to_dpu.offset = ROUND_UP_POW2(host_to_dpu.length * sizeof(T), 8) / sizeof(T);
         host_to_dpu.basic_seed = 0b1011100111010;
         host_to_dpu.algo_index = 0;
         input_rngs[me()] = seed_xs(host_to_dpu.basic_seed + me());
@@ -324,7 +327,7 @@ int main() {
     memset(&dpu_to_host, 0, sizeof dpu_to_host);
 
     for (uint32_t rep = 0; rep < host_to_dpu.reps; rep++) {
-        pivot_rngs[me()] = seed_xs_offset(host_to_dpu.basic_seed + me());
+        // pivot_rngs[me()] = seed_xs_offset(host_to_dpu.basic_seed + me());
         mram_read(read_from, cache, transfer_size);  // Change to `…_triple` for big lengths.
 
         array_stats stats_before;
@@ -343,7 +346,7 @@ int main() {
             abort();
         }
 
-        read_from += host_to_dpu.length;
+        read_from += host_to_dpu.offset;
         host_to_dpu.basic_seed += NR_TASKLETS;
     }
 

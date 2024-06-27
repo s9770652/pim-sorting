@@ -18,10 +18,12 @@ typedef void base_sort_algo(T *, T *);
 
 /// @brief Information sent from the host to the DPU.
 struct dpu_arguments {
-    /// @brief The number of elements to sort.
-    uint32_t length;
     /// @brief How many repetitions are performed.
     uint32_t reps;
+    /// @brief The number of elements to sort.
+    uint32_t length;
+    /// @brief The distance between the input data of the different tests.
+    uint32_t offset;
     /// @brief The seed used by all tasklets, which then offset with their own Id.
     uint32_t basic_seed;
     /// @brief The index of the sorting algorithm to run.
