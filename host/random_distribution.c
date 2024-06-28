@@ -129,15 +129,15 @@ static void generate_zipf_distribution(T array[], size_t const length) {
 
 /**
  * @brief Drawing normal distributed variables using the Marsaglia polar method.
- * The mean value is `T_MAX`/2, the standard deviation is `length`/8 if not specified.
+ * The mean value is 2³¹, the standard deviation is `length`/8 if not specified.
  * 
  * @param array Where the numbers are to be stored.
  * @param length How many numbers are to be generated.
  * @param std_dev The standard deviation. If zero, defaulting to `length`/8.
 **/
 static void generate_normal_distribution(T array[], size_t const length, T std_dev) {
-    T const mu = T_MAX / 2;
-    std_dev = (std_dev) ? : length / 8;
+    T const mu = 1U << 31;
+    std_dev = (std_dev) ? : ((length / 8) ? : 1);
     for (size_t i = 0; i < length; i += 2) {
         double u, v, p, q;
         do {
