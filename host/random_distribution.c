@@ -30,7 +30,7 @@ static inline int round_reject(int s) {
  * @param length How many numbers are to be generated.
  * @param smallest_value The value of the first element.
 **/
-void generate_sorted_distribution(T array[], size_t const length, T const smallest_value) {
+static void generate_sorted_distribution(T array[], size_t const length, T const smallest_value) {
     for (size_t i = 0; i < length; i++) {
         array[i] = i + smallest_value;
     }
@@ -43,7 +43,7 @@ void generate_sorted_distribution(T array[], size_t const length, T const smalle
  * @param length How many numbers are to be generated.
  * @param smallest_value The value of the last element.
 **/
-void generate_reversed_sorted_distribution(T array[], size_t const length, T const smallest_value) {
+static void generate_reversed_sorted_distribution(T array[], size_t const length, T const smallest_value) {
     T const base_value = smallest_value + length - 1;
     for (size_t i = 0; i < length; i++) {
         array[i] = base_value - i;
@@ -58,7 +58,7 @@ void generate_reversed_sorted_distribution(T array[], size_t const length, T con
  * @param length How many numbers are to be generated.
  * @param swaps How many pairs are to be swapped. If zero, √n swaps are made.
 **/
-void generate_almost_sorted_distribution(T array[], size_t const length, size_t swaps) {
+static void generate_almost_sorted_distribution(T array[], size_t const length, size_t swaps) {
     generate_sorted_distribution(array, length, 0);
     swaps = (swaps) ? : sqrt(length);
     for (size_t s = 0; s < swaps; s++) {
@@ -76,7 +76,7 @@ void generate_almost_sorted_distribution(T array[], size_t const length, size_t 
  * @param length How many numbers are to be generated.
  * @param upper_bound The (exclusive) upper limit of the range to draw from.
 **/
-void generate_uniform_distribution(T array[], size_t const length, T const upper_bound) {
+static void generate_uniform_distribution(T array[], size_t const length, T const upper_bound) {
     bool const is_power_of_two = (upper_bound & (upper_bound - 1)) == 0;
     if (upper_bound == 0) {
         for (size_t i = 0; i < length; i++)
@@ -98,7 +98,7 @@ void generate_uniform_distribution(T array[], size_t const length, T const upper
  * @param array Where the numbers are to be stored.
  * @param length How many numbers are to be generated.
 **/
-void generate_zipf_distribution(T array[], size_t const length) {
+static void generate_zipf_distribution(T array[], size_t const length) {
     /* Calculate CDF once. */
     static double cdf[100 + 1], total_density = 0;
     size_t const max = sizeof cdf / sizeof cdf[0] - 1;
@@ -127,6 +127,30 @@ void generate_zipf_distribution(T array[], size_t const length) {
     }
 }
 
+/**
+ * @brief Drawing normal distributed variables using the Marsaglia polar method.
+ * The mean value is `T_MAX`/2, the standard deviation is `length`/8 if not specified.
+ * 
+ * @param array Where the numbers are to be stored.
+ * @param length How many numbers are to be generated.
+ * @param std_dev The standard deviation. If zero, defaulting to `length`/8.
+**/
+static void generate_normal_distribution(T array[], size_t const length, T std_dev) {
+    T const mu = T_MAX / 2;
+    std_dev = (std_dev) ? : length / 8;
+    for (size_t i = 0; i < length; i += 2) {
+        double u, v, p, q;
+        do {
+            u = 2 * ((double)rand() / RAND_MAX) - 1;
+            v = 2 * ((double)rand() / RAND_MAX) - 1;
+            q = u * u + v * v;
+        } while (q >= 1 || q == 0);
+        p = sqrt(-2 * log(q) / q);
+        array[i] = mu + std_dev * u * p;
+        array[i + 1] = mu + std_dev * v * p;
+    }
+}
+
 void generate_input_distribution(T array[], size_t const length, enum dist const type,
         T const param) {
     switch (type) {
@@ -135,6 +159,7 @@ void generate_input_distribution(T array[], size_t const length, enum dist const
     case almost: generate_almost_sorted_distribution(array, length, param); break;
     case uniform: generate_uniform_distribution(array, length, param); break;
     case zipf: generate_zipf_distribution(array, length); break;
+    case normal: generate_normal_distribution(array, length, param); break;
     default: break;
     }
 }

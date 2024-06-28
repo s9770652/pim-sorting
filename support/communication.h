@@ -13,6 +13,10 @@
 /// @brief The maximum number of elements loaded into MRAM. Their size must be divisible by 8.
 #define LOAD_INTO_MRAM ((1024 * 1024 * 25) >> DIV)
 
+#if (LOAD_INTO_MRAM % 2)
+#error `LOAD_INTO_MRAM` must be an even number!
+#endif
+
 /// @brief Every WRAM sorting functions must adher to this pattern.
 typedef void base_sort_algo(T *, T *);
 
