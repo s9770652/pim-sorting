@@ -214,6 +214,38 @@ static void insertion_sort_implicit_sentinel(T * const start, T * const end) {
 }
 
 /**
+ * @brief An implementation of InsertionSort fully in inline assembler.
+ * It is the fastest version of all but also the most fragile.
+ * 
+ * @param start The first element of the WRAM array to sort.
+ * @param end The last element of said array.
+**/
+static __attribute__((unused)) void insertion_sort_assembly(T *const start, T * const end) {
+    __asm__(
+        "add r0, r0, 4\n"
+        "jleu r0, r1, .ZAW_1\n"
+    ".ZAW_5:\n"
+        "jump r23\n"
+    ".ZAW_4:\n"
+        "add r0, r0, 4\n"
+        "sw r3, 0, r2\n"
+        "jgtu r0, r1, .ZAW_5\n"
+    ".ZAW_1:\n"
+        "lw r2, r0, 0\n"
+        "lw r4, r0, -4\n"
+        "move r3, r0\n"
+        "jleu r4, r2, .ZAW_4\n"
+        // "move r3, r0\n"  // Present in the normal compilation. Why?
+    ".ZAW_3:\n"
+        "sw r3, 0, r4\n"
+        "lw r4, r3, -8\n"
+        "add r3, r3, -4\n"
+        "jgtu r4, r2, .ZAW_3\n"
+        "jump .ZAW_4"
+    );
+}
+
+/**
  * @brief An implementation of ShellSort using Ciura’s optimal sequence for 128 elements.
  * 
  * @param start The first element of the WRAM array to sort.
@@ -234,7 +266,7 @@ static __attribute__((unused)) void shell_sort_ciura(T * const start, T * const 
 
 /**
  * @brief Creates a ShellSort of the name `shell_sort_custom_step_x`
- * with x ∈ {2, …, 9} being the step size before the final InsertionSort.
+ * with `x` ∈ {2, …, 9} being the step size before the final InsertionSort.
  * If `BIG_STEP` is bigger than `x`, there will be three rounds
  * with `BIG_STEP` being the first step size.
  * 
@@ -279,6 +311,7 @@ union algo_to_test __host algos[] = {
     // {{ "Ciura", shell_sort_ciura }},
     {{ "1NoSentinel", insertion_sort_nosentinel }},
     {{ "1Implicit", insertion_sort_implicit_sentinel }},
+    // {{ "1Assembly", insertion_sort_assembly }},
     {{ "BubbleAdapt", bubble_sort_adaptive }},
     {{ "BubbleNonAdapt", bubble_sort_nonadaptive }},
     {{ "Selection", selection_sort }},
@@ -310,7 +343,7 @@ int main() {
     /* Set up dummy values if called via debugger. */
     if (host_to_dpu.length == 0) {
         host_to_dpu.reps = 1;
-        host_to_dpu.length = 24;
+        host_to_dpu.length = lengths[0];
         host_to_dpu.offset = ROUND_UP_POW2(host_to_dpu.length * sizeof(T), 8) / sizeof(T);
         host_to_dpu.basic_seed = 0b1011100111010;
         host_to_dpu.algo_index = 0;
