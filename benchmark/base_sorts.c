@@ -118,9 +118,6 @@ static void insertion_sort_nosentinel(T * const start, T * const end) {
  * i.e. being at least as small as any value in the array.
  * For this reason, `cache[-1]` is set to `T_MIN`.
  * For QuickSort, the last value of the previous partition takes on that role.
- * @internal Since `start` is not need later on, it is easy to inject assembler code
- * which manually increases the starting position.
- * This, however, might become a problem if this function is inlined by other functions.
  * 
  * @param start The first element of the WRAM array to sort.
  * @param end The last element of said array.

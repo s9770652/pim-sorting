@@ -37,7 +37,7 @@ static T *call_stacks[NR_TASKLETS][40];
 #define QUICK_TO_INSERTION (13)
 
 /* Defining building blocks for QuickSort, which remain the same. */
-#define RECURSIVE (true)
+#define RECURSIVE (false)
 
 // Wether the left or right partition is done first has an impact on the runtime.
 #define _SWITCH_SIDES_ (false)
@@ -167,19 +167,6 @@ do {                                                    \
 
 #endif
 
-/// @attention Never call this by yourself! Only ever call `insertion_sort_sentinel`!
-static void insertion_sort_sentinel_helper(T * const start, T * const end) {
-    T *curr, *i = start;
-    while ((curr = i++) <= end) {
-        T const to_sort = *curr;
-        while (*(curr - 1) > to_sort) {  // `-1` always valid due to the sentinel value
-            *curr = *(curr - 1);
-            curr--;
-        }
-        *curr = to_sort;
-    }
-}
-
 /**
  * @brief An implementation of standard InsertionSort.
  * @attention This algorithm relies on `start[-1]` being a sentinel value,
@@ -191,7 +178,15 @@ static void insertion_sort_sentinel_helper(T * const start, T * const end) {
  * @param end The last element of said array.
 **/
 static void insertion_sort_sentinel(T * const start, T * const end) {
-    insertion_sort_sentinel_helper(start + 1, end);
+    T *curr, *i = start + 1;
+    while ((curr = i++) <= end) {
+        T const to_sort = *curr;
+        while (*(curr - 1) > to_sort) {  // `-1` always valid due to the sentinel value
+            *curr = *(curr - 1);
+            curr--;
+        }
+        *curr = to_sort;
+    }
 }
 
 /**
@@ -400,8 +395,7 @@ union algo_to_test __host algos[] = {
     // {{ "Optimised", quick_sort_optimised_iterative }},
 #endif
 };
-// size_t __host lengths[] = { 20, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };
-size_t __host lengths[] = { 768 };
+size_t __host lengths[] = { 20, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };
 size_t __host num_of_algos = sizeof algos / sizeof algos[0];
 size_t __host num_of_lengths = sizeof lengths / sizeof lengths[0];
 
@@ -418,7 +412,7 @@ int main() {
     /* Set up dummy values if called via debugger. */
     if (host_to_dpu.length == 0) {
         host_to_dpu.reps = 100;
-        host_to_dpu.length = 768;
+        host_to_dpu.length = lengths[0];
         host_to_dpu.offset = ROUND_UP_POW2(host_to_dpu.length * sizeof(T), 8) / sizeof(T);
         host_to_dpu.basic_seed = 0b1011100111010;
         host_to_dpu.algo_index = 0;
