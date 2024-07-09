@@ -117,9 +117,9 @@ static void print_header(union algo_to_test const algos[], size_t const num_of_a
         NR_TASKLETS,
         CALL_OVERHEAD
     );
-    printf("n\t");
+    printf("n");
     for (size_t i = 0; i < num_of_algos; i++)
-        printf("µ_%s σ_%s\t", algos[i].data.name, algos[i].data.name);
+        printf("\tµ_%s σ_%s", algos[i].data.name, algos[i].data.name);
     printf("\n");
 }
 
@@ -134,11 +134,11 @@ static void print_header(union algo_to_test const algos[], size_t const num_of_a
 **/
 static void print_measurements(size_t const num_of_algos, size_t const length, time const reps,
         struct dpu_results dpu_to_host[]) {
-    printf("%zd\t", length);
+    printf("%-4zd", length);
     for (size_t id = 0; id < num_of_algos; id++) {
         time mean = get_mean_of_time(reps, dpu_to_host[id].firsts);
         time std = get_std_of_time(reps, dpu_to_host[id].firsts, dpu_to_host[id].seconds);
-        printf("%6lu %5lu\t", mean, std);
+        printf("\t%7lu %5lu", mean, std);
     }
     printf("\n");
 }

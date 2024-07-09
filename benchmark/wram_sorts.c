@@ -36,8 +36,14 @@ static T *call_stacks[NR_TASKLETS][40];  // call stack for iterative QuickSort
 #define STABLE_QUICK_TO_INSERTION (40)
 // The input length at which HeapSort changes to InsertionSort.
 #define HEAP_TO_INSERTION (12)
-// The length of the first runs sorted by InsertionSort/ShellSort.
-#define MERGE_TO_INSERTION (8)
+
+#if (MERGE_TO_SHELL > 48)
+#define FIRST_STEP (12)
+#elif (MERGE_TO_SHELL > 16)
+#define FIRST_STEP (6)
+#else
+#define FIRST_STEP (1)
+#endif
 
 /**
  * @brief An implementation of standard InsertionSort.
@@ -66,7 +72,7 @@ static void insertion_sort_sentinel(T * const start, T * const end) {
  * Needed by ShellSort.
  * @attention This algorithm relies on `start[-step .. -1]` being a sentinel value,
  * i.e. being at least as small as any value in the array.
- * 
+ *
  * @param start The first element of the WRAM array to sort.
  * @param end The last element of said array.
  * @param step The distance between any two elements compared.
@@ -74,26 +80,31 @@ static void insertion_sort_sentinel(T * const start, T * const end) {
 static void insertion_sort_with_steps_sentinel(T * const start, T * const end, size_t const step) {
     T *curr, *i = start;
     while ((curr = (i += step)) <= end) {
-        T *prev = curr - step;
         T const to_sort = *curr;
-        while (*prev > to_sort) {
-            *curr = *prev;
-            curr = prev;
-            prev -= step;  // always valid due to the sentinel value
+        while (*(curr - step) > to_sort) {  // `-step` always valid due to the sentinel value
+            *curr = *(curr - step);
+            curr -= step;
         }
         *curr = to_sort;
     }
 }
 
 /**
- * @brief A two-round ShellSort with step sizes 3 and 1.
+ * @brief A ShellSort with one, two, or three passes of InsertionSort.
  * 
  * @param start The first element of the WRAM array to sort.
  * @param end The last element of said array.
 **/
 static __attribute__((unused)) void shell_sort(T * const start, T * const end) {
-    for (size_t j = 0; j < 4; j++)
-        insertion_sort_with_steps_sentinel(&start[j], end, 4);
+#if (MERGE_TO_SHELL > 48)
+    for (size_t j = 0; j < 12; j++)
+        insertion_sort_with_steps_sentinel(&start[j], end, 12);
+    for (size_t j = 0; j < 5; j++)
+        insertion_sort_with_steps_sentinel(&start[j], end, 5);
+#elif (MERGE_TO_SHELL > 16)
+    for (size_t j = 0; j < 6; j++)
+        insertion_sort_with_steps_sentinel(&start[j], end, 6);
+#endif  // MERGE_TO_SHELL > 16
     insertion_sort_sentinel(start, end);
 }
 
@@ -296,46 +307,37 @@ static void heap_sort(T * const start, T * const end) {
     insertion_sort_sentinel(start, &start[i]);
 }
 
-// Creating the starting runs for MergeSort …
-#if (MERGE_TO_INSERTION <= 20)
-// … using InsertionSort.
-#define CREATE_STARTING_RUNS()                                                                 \
-if (end - start + 1 <= MERGE_TO_INSERTION) {                                                   \
-    insertion_sort_sentinel(start, end);                                                       \
-    flag = true;                                                                               \
-    return;                                                                                    \
-}                                                                                              \
-insertion_sort_sentinel(start, start + MERGE_TO_INSERTION - 1);                                \
-for (T *t = start + MERGE_TO_INSERTION; t < end; t += MERGE_TO_INSERTION) {                    \
-    T const before_sentinel = *(t - 1);                                                        \
-    *(t - 1) = T_MIN;  /* Set sentinel value. */                                               \
-    T * const run_end = (t + MERGE_TO_INSERTION - 1 > end) ? end : t + MERGE_TO_INSERTION - 1; \
-    insertion_sort_sentinel(t, run_end);                                                       \
-    *(t - 1) = before_sentinel;  /* Restore old value. */                                      \
+// Creating the starting runs for MergeSort.
+#define CREATE_STARTING_RUNS()                                                         \
+if (end - start + 1 <= MERGE_TO_SHELL) {                                               \
+    if (end - start + 1 > 48) {                                                        \
+        for (size_t j = 0; j < 12; j++)                                                \
+            insertion_sort_with_steps_sentinel(&start[j], end, 12);                    \
+        for (size_t j = 0; j < 5; j++)                                                 \
+            insertion_sort_with_steps_sentinel(&start[j], end, 5);                     \
+    } else if (end - start + 1 > 16) {                                                 \
+        for (size_t j = 0; j < 6; j++)                                                 \
+            insertion_sort_with_steps_sentinel(&start[j], end, 6);                     \
+    }                                                                                  \
+    insertion_sort_sentinel(start, end);                                               \
+    flag = true;                                                                       \
+    return;                                                                            \
+}                                                                                      \
+shell_sort(start, start + MERGE_TO_SHELL - 1);                                         \
+for (T *t = start + MERGE_TO_SHELL; t < end; t += MERGE_TO_SHELL) {                    \
+    T before_sentinel[FIRST_STEP];                                                     \
+    _Pragma("unroll")  /* Set sentinel values. */                                      \
+    for (size_t i = 0; i < FIRST_STEP; i++) {                                          \
+        before_sentinel[i] = *(t - i - 1);                                             \
+        *(t - i - 1) = T_MIN;                                                          \
+    }                                                                                  \
+    T * const run_end = (t + MERGE_TO_SHELL - 1 > end) ? end : t + MERGE_TO_SHELL - 1; \
+    shell_sort(t, run_end);                                                            \
+    _Pragma("unroll")  /* Restore old values. */                                       \
+    for (size_t i = 0; i < FIRST_STEP; i++) {                                          \
+        *(t - i - 1) = before_sentinel[i];                                             \
+    }                                                                                  \
 }
-#else
-// … using ShellSort.
-#define CREATE_STARTING_RUNS()                                                                 \
-if (end - start + 1 <= MERGE_TO_INSERTION) {                                                   \
-    shell_sort(start, end);                                                                    \
-    flag = true;                                                                               \
-    return;                                                                                    \
-}                                                                                              \
-shell_sort(start, start + MERGE_TO_INSERTION - 1);                                             \
-for (T *t = start + MERGE_TO_INSERTION; t < end; t += MERGE_TO_INSERTION) {                    \
-    T const before_sentinel[4] = { *(t - 1), *(t - 2), *(t - 3), *(t - 4) };                   \
-    *(t - 1) = T_MIN;  /* Set sentinel values. */                                              \
-    *(t - 2) = T_MIN;                                                                          \
-    *(t - 3) = T_MIN;                                                                          \
-    *(t - 4) = T_MIN;                                                                          \
-    T * const run_end = (t + MERGE_TO_INSERTION - 1 > end) ? end : t + MERGE_TO_INSERTION - 1; \
-    shell_sort(t, run_end);                                                                    \
-    *(t - 1) = before_sentinel[0];  /* Restore old values. */                                  \
-    *(t - 2) = before_sentinel[1];                                                             \
-    *(t - 3) = before_sentinel[2];                                                             \
-    *(t - 4) = before_sentinel[3];                                                             \
-}
-#endif
 
 /**
  * @brief Merges two runs ranging from [`start_1`, `start_2`[ and [`start_2`, `end_2`].
@@ -390,7 +392,7 @@ static inline void merge_sort_no_write_back(T * const start, T * const end) {
     T *in, *until, *out;  // Runs from `in` to `until` are merged and stored in `out`.
     flag = true;  // Used to determine the initial positions of `in`, `out`, and `until`.
     size_t const n = end - start + 1;
-    for (size_t run_length = MERGE_TO_INSERTION; run_length < n; run_length *= 2) {
+    for (size_t run_length = MERGE_TO_SHELL; run_length < n; run_length *= 2) {
         // Set the positions to read from and write to.
         if ((flag = !flag)) {
             in = end + 1;
@@ -481,7 +483,7 @@ static void merge_sort_half_space(T * const start, T * const end) {
     CREATE_STARTING_RUNS();
     /* Merging. */
     size_t const n = end - start + 1;
-    for (size_t run_length = MERGE_TO_INSERTION; run_length < n; run_length *= 2) {
+    for (size_t run_length = MERGE_TO_SHELL; run_length < n; run_length *= 2) {
         // Merge pairs of adjacent runs.
         for (T *i = start; i <= end; i += 2 * run_length) {
             // Only one run left?
@@ -501,15 +503,15 @@ static void merge_sort_half_space(T * const start, T * const end) {
 }
 
 union algo_to_test __host algos[] = {
-    {{ "Quick", quick_sort }},
+    // {{ "Quick", quick_sort }},
     // {{ "QuickStable", quick_sort_stable_with_arrays }},
     // {{ "QuickStableIds", quick_sort_stable_with_ids }},
-    {{ "Heap", heap_sort }},
+    // {{ "Heap", heap_sort }},
     {{ "Merge", merge_sort_no_write_back}},
     {{ "MergeWriteBack", merge_sort_write_back }},
     {{ "MergeHalfSpace", merge_sort_half_space }},
 };
-size_t __host lengths[] = { 20, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768 };//, 1024 };
+size_t __host lengths[] = { 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };
 size_t __host num_of_algos = sizeof algos / sizeof algos[0];
 size_t __host num_of_lengths = sizeof lengths / sizeof lengths[0];
 
@@ -520,11 +522,11 @@ int main() {
     if (buffers[me()].cache == NULL) {  // Only allocate on the first launch.
         allocate_triple_buffer(&buffers[me()]);
         /* Add additional sentinel values. */
-        size_t num_of_sentinels = 8;  // 4 is the maximum step, 8 ensures alignment.
+        size_t const num_of_sentinels = ROUND_UP_POW2(FIRST_STEP * sizeof(T), 8) / sizeof(T);
         for (size_t i = 0; i < num_of_sentinels; i++)
             buffers[me()].cache[i] = T_MIN;
         buffers[me()].cache += num_of_sentinels;
-        assert(lengths[num_of_lengths - 1] + num_of_sentinels <= (TRIPLE_BUFFER_SIZE >> DIV));
+        assert(2*lengths[num_of_lengths - 1] + num_of_sentinels <= (TRIPLE_BUFFER_SIZE >> DIV));
         assert(!((uintptr_t)buffers[me()].cache & 7) && "Cache address not aligned on 8 bytes!");
     }
     T * const cache = buffers[me()].cache;
