@@ -37,7 +37,7 @@ struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input 
 struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the pivot
 static T *call_stacks[NR_TASKLETS][40];  // call stack for iterative QuickSort
 
-#define BIG_STEP (-1)
+#define BIG_STEP (0)
 
 /**
  * @brief An implementation of standard BubbleSort.
@@ -192,26 +192,28 @@ static void insertion_sort_implicit_sentinel(T * const start, T * const end) {
 static __attribute__((unused)) void insertion_sort_assembly(T *const start, T * const end) {
     (void)start, (void)end;
     __asm__(
-        "add r0, r0, 4\n"
-        "jleu r0, r1, .ZAW_1\n"
-    ".ZAW_5:\n"
-        "jump r23\n"
-    ".ZAW_4:\n"
-        "add r0, r0, 4\n"
-        "sw r3, 0, r2\n"
-        "jgtu r0, r1, .ZAW_5\n"
-    ".ZAW_1:\n"
-        "lw r2, r0, 0\n"
-        "lw r4, r0, -4\n"
-        "move r3, r0\n"
-        "jleu r4, r2, .ZAW_4\n"
-        // "move r3, r0\n"  // Present in the normal compilation. Why?
-    ".ZAW_3:\n"
-        "sw r3, 0, r4\n"
-        "lw r4, r3, -8\n"
-        "add r3, r3, -4\n"
-        "jgtu r4, r2, .ZAW_3\n"
-        "jump .ZAW_4"
+        "\tadd %[i], %[i], 4\n"
+        "\tjleu %[i], %[end], 1f\n"
+    "5:\n"
+        "\tjump r23\n"
+    "4:\n"
+        "\tadd %[i], %[i], 4\n"
+        "\tsw r3, 0, r2\n"
+        "\tjgtu %[i], %[end], 5b\n"
+    "1:\n"
+        "\tlw r2, %[i], 0\n"
+        "\tlw r4, %[i], -4\n"
+        "\tmove r3, %[i]\n"
+        "\tjleu r4, r2, 4b\n"
+        // "\tmove r3, %[i]\n"  // Present in the normal compilation. Why?
+    "3:\n"
+        "\tsw r3, 0, r4\n"
+        "\tlw r4, r3, -8\n"
+        "\tadd r3, r3, -4\n"
+        "\tjgtu r4, r2, 3b\n"
+        "\tjump 4b"
+        :
+        : [i] "r"(start), [end] "r"(end)
     );
 }
 
@@ -290,6 +292,7 @@ size_t __host lengths[] = {
     3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
     15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
 };
+// size_t __host lengths[] = { 16, 24, 32, 48, 64, 96, 128 };
 size_t __host num_of_algos = sizeof algos / sizeof algos[0];
 size_t __host num_of_lengths = sizeof lengths / sizeof lengths[0];
 
