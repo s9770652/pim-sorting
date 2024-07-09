@@ -23,7 +23,7 @@ do
         rm obj/benchmark/wram_sorts.o bin/wram_sorts
         NR_TASKLETS=${NR_TASKLETS} BLOCK_SIZE=${BLOCK_SIZE} SEQREAD_CACHE_SIZE=${SEQREAD_CACHE_SIZE} TYPE=UINT${type} MERGE_TO_SHELL=${fallback} make all
 
-        dists=("sorted" "reversed" "almost" "uniform" "zipf" "normal")
+        dists=("sorted" "reverse" "almost" "uniform" "zipf" "normal")
         for dist in "${!dists[@]}";
         do
             bin/host -b ${b} -r ${r} -t ${dist} | tee ${folder}/${dists[${dist}]}.txt
