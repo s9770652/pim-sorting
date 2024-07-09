@@ -45,6 +45,16 @@ void generate_uniform_distribution_mram(T __mram_ptr *array, T *cache, mram_rang
 void generate_sorted_distribution_wram(T *start, T *end);
 
 /**
+ * @brief Generates a range of ascending numbers, starting from `T_MIN`.
+ * Stores them in a MRAM array.
+ * 
+ * @param array The MRAM array where to store the random data.
+ * @param cache A cache in WRAM.
+ * @param range For which indices of the array the numbers are drawn.
+**/
+void generate_sorted_distribution_mram(T __mram_ptr *array, T *cache, mram_range const *range);
+
+/**
  * @brief Generates a range of descending numbers, ending at `T_MIN`.
  * Stores them in a WRAM array.
  * 
@@ -52,6 +62,17 @@ void generate_sorted_distribution_wram(T *start, T *end);
  * @param end The last element of said array.
 **/
 void generate_reverse_sorted_distribution_wram(T *start, T *end);
+
+/**
+ * @brief Generates a range of descending numbers, ending at `T_MIN`.
+ * Stores them in a MRAM array.
+ * 
+ * @param array The MRAM array where to store the random data.
+ * @param cache A cache in WRAM.
+ * @param range For which indices of the array the numbers are drawn.
+**/
+void generate_reverse_sorted_distribution_mram(T __mram_ptr *array, T *cache,
+                mram_range const *range);
 
 /**
  * @brief Generates a range of ascending numbers, then swaps some pairs of numbers.

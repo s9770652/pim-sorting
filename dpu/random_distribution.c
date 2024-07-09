@@ -41,10 +41,28 @@ void generate_sorted_distribution_wram(T * const start, T * const end) {
     }
 }
 
+void generate_sorted_distribution_mram(T __mram_ptr *array, T * const cache,
+        mram_range const * const range) {
+    size_t i, curr_length, curr_size;
+    LOOP_ON_MRAM(i, curr_length, curr_size, (*range)) {
+        generate_sorted_distribution_wram(cache, &cache[curr_length-1]);
+        mram_write(cache, &array[i], curr_size);
+    }
+}
+
 void generate_reverse_sorted_distribution_wram(T * const start, T * const end) {
     T counter = T_MIN;
     for (T *t = end; t >= start; t--) {
         *t = counter++;
+    }
+}
+
+void generate_reverse_sorted_distribution_mram(T __mram_ptr *array, T * const cache,
+        mram_range const * const range) {
+    size_t i, curr_length, curr_size;
+    LOOP_ON_MRAM(i, curr_length, curr_size, (*range)) {
+        generate_reverse_sorted_distribution_wram(cache, &cache[curr_length-1]);
+        mram_write(cache, &array[i], curr_size);
     }
 }
 
