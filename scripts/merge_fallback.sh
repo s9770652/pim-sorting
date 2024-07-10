@@ -6,7 +6,6 @@ SEQREAD_CACHE_SIZE=1024
 
 b=3
 r=1000
-cmd="NR_TASKLETS=1 BLOCK_SIZE=16512 SEQREAD_CACHE_SIZE=1024 make all"
 
 main_folder=scripts/merge
 mkdir -p ${main_folder}
