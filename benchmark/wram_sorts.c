@@ -29,7 +29,7 @@ triple_buffers buffers[NR_TASKLETS];
 struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input (in debug mode)
 struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the pivot
 static T *call_stacks[NR_TASKLETS][40];  // call stack for iterative QuickSort
-static bool flags[NR_TASKLETS];  // Whether a write-back from the auxiliary array is needed.
+static bool flags[NR_TASKLETS];  // Whether a write-back from the auxiliary array is (not) needed.
 
 // The input length at which QuickSort changes to InsertionSort.
 #define QUICK_TO_INSERTION (13)
@@ -321,7 +321,7 @@ if (end - start + 1 <= MERGE_TO_SHELL) {                                        
             insertion_sort_with_steps_sentinel(&start[j], end, 6);                     \
     }                                                                                  \
     insertion_sort_sentinel(start, end);                                               \
-    flags[me()] = true;                                                                \
+    flags[me()] = false;                                                                \
     return;                                                                            \
 }                                                                                      \
 shell_sort(start, start + MERGE_TO_SHELL - 1);                                         \
@@ -388,18 +388,18 @@ static inline void merge_sort_no_write_back(T * const start, T * const end) {
     CREATE_STARTING_RUNS();
     /* Merging. */
     T *in, *until, *out;  // Runs from `in` to `until` are merged and stored in `out`.
-    bool flag = true;  // Used to determine the initial positions of `in`, `out`, and `until`.
+    bool flag = false;  // Used to determine the initial positions of `in`, `out`, and `until`.
     size_t const n = end - start + 1;
     for (size_t run_length = MERGE_TO_SHELL; run_length < n; run_length *= 2) {
         // Set the positions to read from and write to.
         if ((flag = !flag)) {
-            in = end + 1;
-            until = end + n;
-            out = start;
-        } else {
             in = start;
             until = end;
             out = end + 1;
+        } else {
+            in = end + 1;
+            until = end + n;
+            out = start;
         }
         // Merge pairs of adjacent runs.
         for (; in <= until; in += 2 * run_length, out += 2 * run_length) {
@@ -429,7 +429,7 @@ static inline void merge_sort_no_write_back(T * const start, T * const end) {
 static void merge_sort_write_back(T * const start, T * const end) {
     merge_sort_no_write_back(start, end);
     /* Writing back. */
-    if (flags[me()])
+    if (!flags[me()])
         return;
     T *in = end + 1, *until = end + (end - start) + 1, *out = start;
     do {
@@ -564,10 +564,10 @@ int main() {
         dpu_to_host.seconds += new_time * new_time;
 
         size_t offset = 0;  // Needed because of the MergeSort not writing back.
-        if (!flags[me()]) {
+        if (flags[me()]) {
             offset = host_to_dpu.length;
             cache[host_to_dpu.length - 1] = T_MIN;  // `get_stats_sorted_wram` relies on sentinels.
-            flags[me()] = true;  // Following sorting algorithms may not reset this value.
+            flags[me()] = false;  // Following sorting algorithms may not reset this value.
         }
         array_stats stats_after;
         get_stats_sorted_wram(cache + offset, host_to_dpu.length, &stats_after);
