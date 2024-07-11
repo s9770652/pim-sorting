@@ -311,17 +311,8 @@ static void heap_sort(T * const start, T * const end) {
 // Creating the starting runs for MergeSort.
 #define CREATE_STARTING_RUNS()                                                         \
 if (end - start + 1 <= MERGE_TO_SHELL) {                                               \
-    if (end - start + 1 > 48) {                                                        \
-        for (size_t j = 0; j < 12; j++)                                                \
-            insertion_sort_with_steps_sentinel(&start[j], end, 12);                    \
-        for (size_t j = 0; j < 5; j++)                                                 \
-            insertion_sort_with_steps_sentinel(&start[j], end, 5);                     \
-    } else if (end - start + 1 > 16) {                                                 \
-        for (size_t j = 0; j < 6; j++)                                                 \
-            insertion_sort_with_steps_sentinel(&start[j], end, 6);                     \
-    }                                                                                  \
-    insertion_sort_sentinel(start, end);                                               \
-    flags[me()] = false;                                                                \
+    shell_sort(start, end);                                                            \
+    flags[me()] = false;                                                               \
     return;                                                                            \
 }                                                                                      \
 shell_sort(start, start + MERGE_TO_SHELL - 1);                                         \
