@@ -37,6 +37,8 @@ static bool flags[NR_TASKLETS];  // Whether a write-back from the auxiliary arra
 #define STABLE_QUICK_TO_INSERTION (40)
 // The input length at which HeapSort changes to InsertionSort.
 #define HEAP_TO_INSERTION (12)
+// The number of elements flushed at once if possible.
+#define FLUSH_BATCH_LENGTH (24)
 
 #if (MERGE_TO_SHELL > 48)
 #define FIRST_STEP (12)
@@ -332,6 +334,29 @@ for (T *t = start + MERGE_TO_SHELL; t < end; t += MERGE_TO_SHELL) {             
 }
 
 /**
+ * @brief Copies a given range of values to some sepcified buffer.
+ * The copying is done using batches of length `FLUSH_BATCH_LENGTH`:
+ * If there are at least `FLUSH_BATCH_LENGTH` many elements to copy, they are copied at once.
+ * This way, the loop overhead is cut by about a `FLUSH_BATCH_LENGTH`th in good cases.
+ * 
+ * @param in The first element to copy.
+ * @param until The last element to copy.
+ * @param out Whither to place the first element to copy.
+**/
+static inline void flush(T *in, T *until, T *out) {
+    while (in + FLUSH_BATCH_LENGTH <= until) {
+        #pragma unroll
+        for (size_t k = 0; k < FLUSH_BATCH_LENGTH; k++)
+            *(out + k) = *(in + k);
+        out += FLUSH_BATCH_LENGTH;
+        in += FLUSH_BATCH_LENGTH;
+    }
+    while (in <= until) {
+        *out++ = *in++;
+    }
+}
+
+/**
  * @brief Merges two runs ranging from [`start_1`, `start_2`[ and [`start_2`, `end_2`].
  * @internal Using `end_1 = start_2 - 1` worsens the runtime
  * but making `end_2` exclusive also worsens the runtime, hence the asymmetry.
@@ -347,17 +372,13 @@ static inline void merge(T * const start_1, T * const start_2, T * const end_2, 
         if (*i <= *j) {
             *out++ = *i++;
             if (i >= start_2) {  // Pulling these if-statements out of the loop …
-                do {
-                    *out++ = *j++;
-                } while (j <= end_2);
+                flush(j, end_2, out);
                 return;
             }
         } else {
             *out++ = *j++;
             if (j > end_2) {  // … worsens the runtime.
-                do {
-                    *out++ = *i++;
-                } while (i < start_2);
+                flush(i, start_2, out);
                 return;
             }
         }
@@ -396,9 +417,7 @@ static inline void merge_sort_no_write_back(T * const start, T * const end) {
         for (; in <= until; in += 2 * run_length, out += 2 * run_length) {
             // Only one run left?
             if (in + run_length - 1 >= until) {
-                do {
-                    *out++ = *in++;
-                } while (in <= until);
+                flush(in, until, out);
                 break;
             }
             // If not, merge the next two runs.
@@ -423,9 +442,7 @@ static void merge_sort_write_back(T * const start, T * const end) {
     if (!flags[me()])
         return;
     T *in = end + 1, *until = end + (end - start) + 1, *out = start;
-    do {
-        *out++ = *in++;
-    } while (in <= until);
+    flush(in, until, out);
 }
 
 /**
@@ -451,7 +468,7 @@ static inline void merge_left_flush_only(T * const start_1, T * const end_1, T *
         } else {
             *out++ = *j++;
             if (j > end_2) {
-                do {
+                do {  // Yes, this is faster than `flush`ing…
                     *out++ = *i++;
                 } while (i <= end_1);
                 return;
@@ -483,7 +500,11 @@ static void merge_sort_half_space(T * const start, T * const end) {
             // If not, copy the current run …
             T *out = end + 1, *j = i;
             do {
-                *out++ = *j++;
+                #pragma unroll
+                for (size_t k = 0; k < MERGE_TO_SHELL; k++)
+                    *(out + k) = *(j + k);
+                out += MERGE_TO_SHELL;
+                j += MERGE_TO_SHELL;
             } while (j < i + run_length);
             // … and merge the copy with the next run.
             T * const run_2_end = (i + 2 * run_length - 1 > end) ? end : i + 2 * run_length - 1;
@@ -501,7 +522,8 @@ union algo_to_test __host algos[] = {
     {{ "MergeWriteBack", merge_sort_write_back }},
     {{ "MergeHalfSpace", merge_sort_half_space }},
 };
-size_t __host lengths[] = { 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };
+size_t __host lengths[] = { 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024, 1536, 2048, 3072 };
+// size_t __host lengths[] = { 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };
 size_t __host num_of_algos = sizeof algos / sizeof algos[0];
 size_t __host num_of_lengths = sizeof lengths / sizeof lengths[0];
 
