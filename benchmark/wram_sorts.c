@@ -343,13 +343,36 @@ for (T *t = start + MERGE_TO_SHELL; t < end; t += MERGE_TO_SHELL) {             
  * @param until The last element to copy.
  * @param out Whither to place the first element to copy.
 **/
-static inline void flush(T *in, T *until, T *out) {
-    while (in + FLUSH_BATCH_LENGTH <= until) {
+static inline void flush_batch(T *in, T *until, T *out) {
+    while (in + FLUSH_BATCH_LENGTH - 1 <= until) {
         #pragma unroll
         for (size_t k = 0; k < FLUSH_BATCH_LENGTH; k++)
             *(out + k) = *(in + k);
         out += FLUSH_BATCH_LENGTH;
         in += FLUSH_BATCH_LENGTH;
+    }
+    while (in <= until) {
+        *out++ = *in++;
+    }
+}
+
+/**
+ * @brief Copies a given range of values to some sepcified buffer.
+ * The copying is done using batches of length `MERGE_TO_SHELL`:
+ * If there are at least `MERGE_TO_SHELL` many elements to copy, they are copied at once.
+ * This way, the loop overhead is cut by about a `MERGE_TO_SHELL`th in good cases.
+ * 
+ * @param in The first element to copy.
+ * @param until The last element to copy.
+ * @param out Whither to place the first element to copy.
+**/
+static inline void flush_starting_run(T *in, T *until, T *out) {
+    while (in + MERGE_TO_SHELL - 1 <= until) {
+        #pragma unroll
+        for (size_t k = 0; k < MERGE_TO_SHELL; k++)
+            *(out + k) = *(in + k);
+        out += MERGE_TO_SHELL;
+        in += MERGE_TO_SHELL;
     }
     while (in <= until) {
         *out++ = *in++;
@@ -371,14 +394,14 @@ static inline void merge(T * const start_1, T * const start_2, T * const end_2, 
     while (true) {
         if (*i <= *j) {
             *out++ = *i++;
-            if (i >= start_2) {  // Pulling these if-statements out of the loop …
-                flush(j, end_2, out);
+            if (i == start_2) {  // Pulling these if-statements out of the loop …
+                flush_batch(j, end_2, out);
                 return;
             }
         } else {
             *out++ = *j++;
             if (j > end_2) {  // … worsens the runtime.
-                flush(i, start_2, out);
+                flush_batch(i, start_2 - 1, out);
                 return;
             }
         }
@@ -416,8 +439,8 @@ static inline void merge_sort_no_write_back(T * const start, T * const end) {
         // Merge pairs of adjacent runs.
         for (; in <= until; in += 2 * run_length, out += 2 * run_length) {
             // Only one run left?
-            if (in + run_length - 1 >= until) {
-                flush(in, until, out);
+            if (in + run_length > until) {
+                flush_starting_run(in, until, out);
                 break;
             }
             // If not, merge the next two runs.
@@ -442,35 +465,33 @@ static void merge_sort_write_back(T * const start, T * const end) {
     if (!flags[me()])
         return;
     T *in = end + 1, *until = end + (end - start) + 1, *out = start;
-    flush(in, until, out);
+    flush_starting_run(in, until, out);
 }
 
 /**
  * @brief Merges two runs ranging from [`start_1`, `end_1`] and [`start_2`, `end_2`].
- * If the first run is depleted, the second one will not be flushed.
+ * If the second run is depleted, the first one will not be flushed.
  * 
  * @param start_1 The first element of the first run.
  * @param end_1 The last element of the first run.
  * @param start_2 The first element of the second run.
  * @param end_2 The last element of the second run.
  * @param out Whither the merged runs are written.
- * Must be equal to `start_2` - (`end_1` - `start_1` + 1).
+ * Must be equal to `start_1` - (`end_2` - `start_2` + 1).
 **/
-static inline void merge_left_flush_only(T * const start_1, T * const end_1, T * const start_2,
+static inline void merge_right_flush_only(T * const start_1, T * const end_1, T * const start_2,
         T * const end_2, T *out) {
     T *i = start_1, *j = start_2;
     while (true) {
-        if (*i <= *j) {
+        if (*i < *j) {
             *out++ = *i++;
             if (i > end_1) {
+                flush_batch(j, end_2, out);
                 return;
             }
         } else {
             *out++ = *j++;
             if (j > end_2) {
-                do {  // Yes, this is faster than `flush`ing…
-                    *out++ = *i++;
-                } while (i <= end_1);
                 return;
             }
         }
@@ -507,11 +528,64 @@ static void merge_sort_half_space(T * const start, T * const end) {
                 j += MERGE_TO_SHELL;
             } while (j < i + run_length);
             // … and merge the copy with the next run.
-            T * const run_2_end = (i + 2 * run_length - 1 > end) ? end : i + 2 * run_length - 1;
-            merge_left_flush_only(end + 1, end + run_length, i + run_length, run_2_end, i);
+            T * const run_1_end = (i + 2 * run_length - 1 > end) ? end : i + 2 * run_length - 1;
+            merge_right_flush_only(i + run_length, run_1_end, end + 1, end + run_length, i);
         }
     }
 }
+
+// /// @brief The copying of the first run happens only if merging is needed.
+// static inline void merge_left_flush_only(T * const start_1, T * const start_2,
+//         T * const end_2, T * aux, size_t const run_length) {
+//     T *i = start_1, *j = start_2;
+//     while (true) {
+//         if (*i <= *j) {
+//             i++;
+//             if (i == start_2)
+//                 return;  // Everything in the first run was smaller than in the second one.
+//         } else {
+//             flush_starting_run(i, start_2 - 1, aux);
+//             *i = *j++;
+//             break;
+//         }
+//     }
+//     T *aux_end = aux + run_length - (i - start_1) - 1, *out = i + 1;
+//     i = aux;
+//     while (true) {
+//         if (*i <= *j) {
+//             *out++ = *i++;
+//             if (i > aux_end) {
+//                 return;
+//             }
+//         } else {
+//             *out++ = *j++;
+//             if (j > end_2) {
+//                 flush_batch(i, aux_end, out);
+//                 return;
+//             }
+//         }
+//     }
+// }
+
+// static void merge_sort_half_space(T * const start, T * const end) {
+//     /* Natural runs. */
+//     CREATE_STARTING_RUNS();
+//     /* Merging. */
+//     size_t const n = end - start + 1;
+//     for (size_t run_length = MERGE_TO_SHELL; run_length < n; run_length *= 2) {
+//         // Merge pairs of adjacent runs.
+//         for (T *i = start; i <= end; i += 2 * run_length) {
+//             // Only one run left?
+//             if (i + run_length - 1 >= end) {
+//                 break;
+//             }
+//             // … and merge the copy with the next run.
+//             T * const end_2 = (i + 2 * run_length - 1 > end) ? end : i + 2 * run_length - 1;
+//             merge_left_flush_only(i, i + run_length, end_2, end + 1, run_length);
+//             // merge_left_flush_only(i + run_length, end_2, i, end + 1, run_length);
+//         }
+//     }
+// }
 
 union algo_to_test __host algos[] = {
     // {{ "Quick", quick_sort }},
