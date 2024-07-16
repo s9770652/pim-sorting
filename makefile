@@ -17,7 +17,7 @@ PERF ?= 1
 CHECK_SANITY ?= 1
 PIVOT ?= MEDIAN
 
-MERGE_TO_SHELL ?= 64
+MERGE_TO_SHELL ?= 32
 
 # A file whose name reflects the set constants.
 define conf_filename
