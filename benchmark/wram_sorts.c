@@ -36,7 +36,8 @@ static bool flags[NR_TASKLETS];  // Whether a write-back from the auxiliary arra
 // The input length at which stable QuickSort changes to InsertionSort.
 #define STABLE_QUICK_TO_INSERTION (40)
 // The input length at which HeapSort changes to InsertionSort.
-#define HEAP_TO_INSERTION (12)
+#define HEAP_TO_INSERTION (16)
+static_assert(HEAP_TO_INSERTION >= 2, "HeapSort breaks if HEAP_TO_INSERTION is too low!");
 // The number of elements flushed at once if possible.
 #define FLUSH_BATCH_LENGTH (24)
 
@@ -250,16 +251,16 @@ static void quick_sort_stable_with_ids(T * const start, T * const end) {
 }
 
 /**
- * @brief Sifts a value down in a binary max-heap.
+ * @brief Sifts the root of a binary max-heap down.
  * 
- * @param array A binary tree whose left and right subtrees are heapified.
+ * @param heap A 1-indexed array that contains the root to sift and its subtrees.
  * @param n The size of the binary tree.
- * @param root The index of the value to sift down.
+ * @param root The index of the value to sift down. Its left and right subtrees must be heapified.
 **/
-static void heapify(T heap[], size_t const n, size_t const root) {
+static void repair_down(T heap[], size_t const n, size_t const root) {
     T const root_value = heap[root];
     size_t father = root, son;
-    while ((son = father * 2 + 1) < n) {  // left son
+    while ((son = father * 2) <= n) {  // left son
         if (heap[son + 1] > heap[son]) {  // Check if right son is bigger.
             if (heap[son + 1] <= root_value) break;
             heap[father] = heap[son + 1];  // Shift right son up.
@@ -274,26 +275,80 @@ static void heapify(T heap[], size_t const n, size_t const root) {
 }
 
 /**
+ * @brief This restores the heap order, given that it is violated at at most one position.
+ * @note Funfact: The parameter name `wo` is German and means `where`.
+ * For some reason, the name bugged me (Z.A. Weil) back in the summer of 2019
+ * as student of the class ‘Datenstrukturen’ (Data Structures), where it was used
+ * in pseudo code on HeapSort, and it bugged me again as tutor of the class
+ * ‘Algorithmen und Datenstrukturen 1’ (need I translate?) in the summer of 2024.
+ * I hereby immortalised it, even if `wo` should perish from the courses’ script
+ * when its long overdue rewrite happens.
+ * 
+ * @param heap The 1-indexed heap where the order may be violated.
+ * @param wo The index of the vertex where the heap order may be violated.
+**/
+static void repair_up(T heap[], size_t wo) {
+    T p = heap[wo];
+    while (heap[wo/2] < p) {
+        heap[wo] = heap[wo/2];
+        wo /= 2;
+    }
+    heap[wo] = p;
+}
+
+/**
+ * @brief Removes and returns the root of a heap.
+ * 
+ * @param heap The 1-indexed heap whose root is to be returned.
+ * @param n The length of the heap.
+ * 
+ * @return The original root value.
+ */
+static T extract_root(T heap[], size_t const n) {
+    T const root_value = heap[1];
+    /* Move hole down. */
+    // Do a repair-down that moves the ‘hole’ at the root down to the last or erelast layer.
+    size_t father = 1, son;
+    while ((son = father * 2) <= n) {  // left son
+        if (heap[son + 1] > heap[son]) {  // Check if right son is bigger.
+            heap[father] = heap[son + 1];  // Shift right son up.
+            father = son + 1;
+        } else {
+            heap[father] = heap[son];  // Shift left son up.
+            father = son;
+        }
+    }
+    /* Move right-most leaf in bottom layer into hole. */
+    heap[father] = heap[n];
+    /* Repair the heap structure. */
+    repair_up(heap, father);
+    return root_value;
+}
+
+/**
  * @brief An implementation of standard HeapSort.
+ * It only uses `repair_down`.
  * 
  * @param start The first element of the WRAM array to sort.
  * @param end The last element of said array.
 **/
-static void heap_sort(T * const start, T * const end) {
+static void heap_sort_only_down(T * const start, T * const end) {
     size_t n = end - start + 1;
+    T *heap = start - 1;
     /* Build a heap using Floyd’s method. */
-    start[n] = T_MIN;
+    // if (!(n & 1))  // For some reason, this if-statement worsens the runtime drastically.
+        heap[n + 1] = T_MIN;  // If `n' is even, the last leaf is a left one.
     for (size_t r = n / 2; r > 0; r--) {
-        heapify(start, n, r - 1);
+        repair_down(heap, n, r);
     }
     /* Sort by repeatedly putting the root at the end of the heap. */
     if (!(n & 1)) {  // If `n' is even, the last leaf is a left one. (cf. loop below)
-        swap(&start[0], &start[--n]);
-        heapify(start, n, 0);
+        swap(&heap[1], &heap[n--]);
+        repair_down(heap, n, 1);
     }
     // `i` is always odd. When there is an odd number of elements, the last leaf is a right one.
     // Pulling it to the front raises the need for a sentinel value,
-    // since the leaf with which one ends up at the end of `heapify` may be the last one,
+    // since the leaf with which one ends up at the end of `repair_down` may be the last leaf,
     // which is now a left one. Since the right brothers of nodes are checked,
     // a sentinel value erases the need for an additional bounds check.
     size_t i;
@@ -301,12 +356,54 @@ static void heap_sort(T * const start, T * const end) {
         T const biggest_element = start[0];
         start[0] = start[i];
         start[i] = T_MIN;
-        heapify(start, i, 0);
+        repair_down(heap, i, 1);
         start[i] = biggest_element;
 
         swap(&start[0], &start[i - 1]);
-        heapify(start, i - 1, 0);
+        repair_down(heap, i - 1, 1);
     }
+    insertion_sort_sentinel(start, &start[i]);
+}
+
+/**
+ * @brief An implementation of standard HeapSort.
+ * It uses both `repair_down` and `repair_up`.
+ * 
+ * @param start The first element of the WRAM array to sort.
+ * @param end The last element of said array.
+**/
+static void heap_sort_both_up_and_down(T * const start, T * const end) {
+    size_t n = end - start + 1;
+    T *heap = start - 1;
+    T const prev_value = heap[0];
+    heap[0] = T_MAX;  // sentinel value for `repair_up`
+    /* Build a heap using Floyd’s method. */
+    // if (!(n & 1))  // For some reason, this if-statement worsens the runtime drastically.
+        heap[n + 1] = T_MIN;  // If `n' is even, the last leaf is a left one.
+    for (size_t r = n / 2; r > 0; r--) {
+        repair_down(heap, n, r);
+    }
+    /* Sort by repeatedly putting the root at the end of the heap. */
+    if (!(n & 1)) {  // If `n' is even, the last leaf is a left one. (cf. loop below)
+        T const biggest_element = extract_root(heap, n);
+        heap[n--] = biggest_element;
+    }
+    // `i` is always odd. When there is an odd number of elements, the last leaf is a right one.
+    // Placing it in the hole raises the need for a sentinel value,
+    // since the leaf with which one ends up at the end of `extract_root` may be the last leaf,
+    // which is now a left one. Since the right brothers of nodes are checked,
+    // a sentinel value erases the need for an additional bounds check.
+    size_t i;
+    for (i = n; i >= HEAP_TO_INSERTION; i -= 2) {
+        T const biggest_element =  extract_root(heap, i);
+
+        heap[i] = T_MIN;  // The last leaf is now a left one, so a sentinel value is needed.
+        T const second_biggest_element = extract_root(heap, i - 1);
+
+        heap[i] = biggest_element;
+        heap[i - 1] = second_biggest_element;
+    }
+    heap[0] = prev_value;
     insertion_sort_sentinel(start, &start[i]);
 }
 
@@ -591,13 +688,14 @@ union algo_to_test __host algos[] = {
     // {{ "Quick", quick_sort }},
     // {{ "QuickStable", quick_sort_stable_with_arrays }},
     // {{ "QuickStableIds", quick_sort_stable_with_ids }},
-    // {{ "Heap", heap_sort }},
-    {{ "Merge", merge_sort_no_write_back}},
-    {{ "MergeWriteBack", merge_sort_write_back }},
-    {{ "MergeHalfSpace", merge_sort_half_space }},
+    {{ "HeapOnlyDown", heap_sort_only_down }},
+    {{ "HeapUpDown", heap_sort_both_up_and_down }},
+    // {{ "Merge", merge_sort_no_write_back}},
+    // {{ "MergeWriteBack", merge_sort_write_back }},
+    // {{ "MergeHalfSpace", merge_sort_half_space }},
 };
-size_t __host lengths[] = { 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024, 1536, 2048, 3072 };
-// size_t __host lengths[] = { 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };
+// size_t __host lengths[] = { 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024, 1536, 2048, 3072 };
+size_t __host lengths[] = { 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };
 size_t __host num_of_algos = sizeof algos / sizeof algos[0];
 size_t __host num_of_lengths = sizeof lengths / sizeof lengths[0];
 
