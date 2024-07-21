@@ -36,8 +36,8 @@ static bool flags[NR_TASKLETS];  // Whether a write-back from the auxiliary arra
 // The input length at which stable QuickSort changes to InsertionSort.
 #define STABLE_QUICK_TO_INSERTION (40)
 // The input length at which HeapSort changes to InsertionSort.
-#define HEAP_TO_INSERTION (16)
-static_assert(HEAP_TO_INSERTION >= 2, "HeapSort breaks if HEAP_TO_INSERTION is too low!");
+#define HEAP_TO_INSERTION (1)
+static_assert(HEAP_TO_INSERTION & 1, "Applying to right sons, HEAP_TO_INSERTION should be odd!");
 // The number of elements flushed at once if possible.
 #define FLUSH_BATCH_LENGTH (24)
 
@@ -288,7 +288,7 @@ static void repair_down(T heap[], size_t const n, size_t const root) {
  * @param wo The index of the vertex where the heap order may be violated.
 **/
 static void repair_up(T heap[], size_t wo) {
-    T p = heap[wo];
+    T const p = heap[wo];
     while (heap[wo/2] < p) {
         heap[wo] = heap[wo/2];
         wo /= 2;
@@ -303,12 +303,12 @@ static void repair_up(T heap[], size_t wo) {
  * @param n The length of the heap.
  * 
  * @return The original root value.
- */
+**/
 static T extract_root(T heap[], size_t const n) {
     T const root_value = heap[1];
+    size_t father = 1, son;
     /* Move hole down. */
     // Do a repair-down that moves the ‘hole’ at the root down to the last or erelast layer.
-    size_t father = 1, son;
     while ((son = father * 2) <= n) {  // left son
         if (heap[son + 1] > heap[son]) {  // Check if right son is bigger.
             heap[father] = heap[son + 1];  // Shift right son up.
@@ -326,15 +326,61 @@ static T extract_root(T heap[], size_t const n) {
 }
 
 /**
+ * @brief Removes and returns the root of a heap.
+ * Does the same number of swaps as the regular `repair_down`.
+ * 
+ * @param heap The 1-indexed heap whose root is to be returned.
+ * @param n The length of the heap.
+ * @return 
+**/
+static T extract_root_swap_parity(T heap[], size_t const n) {
+    T const root_value = heap[1];
+    size_t father = 1, son;
+    /* Trace downwards motion of hole. */
+    while ((son = father * 2) <= n) {  // left son
+        if (heap[son + 1] > heap[son]) {  // Check if right son is bigger.
+            father = son + 1;
+        } else {
+            father = son;
+        }
+    }
+    /* Go whither `repair_up` would put the hole. */
+    while (heap[father] < heap[n])
+        father /= 2;
+    /* Move rightmost leaf in bottom layer. */
+    T to_sift_up = heap[father];
+    heap[father] = heap[n];
+    /* Move the leaf's predecessors upwards. */
+    for (size_t wo = father / 2; wo >= 1; wo /= 2) {
+        T const tmp = heap[wo];
+        heap[wo] = to_sift_up;
+        to_sift_up = tmp;
+    }
+    // /* Move the leaf's predecessors upwards. (unrolled) */
+    // size_t wo = father;
+    // while (wo / 4 >= 1) {
+    //     T const tmp = heap[wo / 4];
+    //     heap[wo / 4] = heap[wo / 2];
+    //     heap[wo / 2] = to_sift_up;
+    //     to_sift_up = tmp;
+    //     wo /= 4;
+    // }
+    // if (wo == 2 || wo == 3) {
+    //     heap[1] = to_sift_up;
+    // }
+    return root_value;
+}
+
+/**
  * @brief An implementation of standard HeapSort.
- * It only uses `repair_down`.
+ * It only sifts down.
  * 
  * @param start The first element of the WRAM array to sort.
  * @param end The last element of said array.
 **/
 static void heap_sort_only_down(T * const start, T * const end) {
     size_t n = end - start + 1;
-    T *heap = start - 1;
+    T * const heap = start - 1;
     /* Build a heap using Floyd’s method. */
     // if (!(n & 1))  // For some reason, this if-statement worsens the runtime drastically.
         heap[n + 1] = T_MIN;  // If `n' is even, the last leaf is a left one.
@@ -352,29 +398,31 @@ static void heap_sort_only_down(T * const start, T * const end) {
     // which is now a left one. Since the right brothers of nodes are checked,
     // a sentinel value erases the need for an additional bounds check.
     size_t i;
-    for (i = n - 1; i > HEAP_TO_INSERTION; i -= 2) {
-        T const biggest_element = start[0];
-        start[0] = start[i];
-        start[i] = T_MIN;
-        repair_down(heap, i, 1);
-        start[i] = biggest_element;
-
-        swap(&start[0], &start[i - 1]);
+    for (i = n; i > HEAP_TO_INSERTION; i -= 2) {
+        T const biggest_element = heap[1];
+        heap[1] = heap[i];
+        heap[i] = T_MIN;
         repair_down(heap, i - 1, 1);
+        heap[i] = biggest_element;
+
+        swap(&heap[1], &heap[i - 1]);
+        repair_down(heap, i - 2, 1);
     }
-    insertion_sort_sentinel(start, &start[i]);
+#if (HEAP_TO_INSERTION > 1)
+    insertion_sort_sentinel(&heap[1], &heap[i]);
+#endif  // HEAP_TO_INSERTION > 2
 }
 
 /**
  * @brief An implementation of standard HeapSort.
- * It uses both `repair_down` and `repair_up`.
+ * It sifts both up and down.
  * 
  * @param start The first element of the WRAM array to sort.
  * @param end The last element of said array.
 **/
 static void heap_sort_both_up_and_down(T * const start, T * const end) {
     size_t n = end - start + 1;
-    T *heap = start - 1;
+    T * const heap = start - 1;
     T const prev_value = heap[0];
     heap[0] = T_MAX;  // sentinel value for `repair_up`
     /* Build a heap using Floyd’s method. */
@@ -394,8 +442,8 @@ static void heap_sort_both_up_and_down(T * const start, T * const end) {
     // which is now a left one. Since the right brothers of nodes are checked,
     // a sentinel value erases the need for an additional bounds check.
     size_t i;
-    for (i = n; i >= HEAP_TO_INSERTION; i -= 2) {
-        T const biggest_element =  extract_root(heap, i);
+    for (i = n; i > HEAP_TO_INSERTION; i -= 2) {
+        T const biggest_element = extract_root(heap, i);
 
         heap[i] = T_MIN;  // The last leaf is now a left one, so a sentinel value is needed.
         T const second_biggest_element = extract_root(heap, i - 1);
@@ -404,7 +452,53 @@ static void heap_sort_both_up_and_down(T * const start, T * const end) {
         heap[i - 1] = second_biggest_element;
     }
     heap[0] = prev_value;
-    insertion_sort_sentinel(start, &start[i]);
+#if (HEAP_TO_INSERTION > 1)
+    insertion_sort_sentinel(&heap[1], &heap[i]);
+#endif  // HEAP_TO_INSERTION > 2
+}
+
+/**
+ * @brief An implementation of standard HeapSort.
+ * It sifts both up and down while doing the same number of swaps as `heap_sort_only_down`.
+ * 
+ * @param start The first element of the WRAM array to sort.
+ * @param end The last element of said array.
+**/
+static void heap_sort_both_up_and_down_swap_parity(T * const start, T * const end) {
+    size_t n = end - start + 1;
+    T * const heap = start - 1;
+    T const prev_value = heap[0];
+    heap[0] = T_MAX;  // sentinel value for `repair_up`
+    /* Build a heap using Floyd’s method. */
+    // if (!(n & 1))  // For some reason, this if-statement worsens the runtime drastically.
+        heap[n + 1] = T_MIN;  // If `n' is even, the last leaf is a left one.
+    for (size_t r = n / 2; r > 0; r--) {
+        repair_down(heap, n, r);
+    }
+    /* Sort by repeatedly putting the root at the end of the heap. */
+    if (!(n & 1)) {  // If `n' is even, the last leaf is a left one. (cf. loop below)
+        T const biggest_element = extract_root_swap_parity(heap, n);
+        heap[n--] = biggest_element;
+    }
+    // `i` is always odd. When there is an odd number of elements, the last leaf is a right one.
+    // Placing it in the hole raises the need for a sentinel value,
+    // since the leaf with which one ends up at the end of `extract_root` may be the last leaf,
+    // which is now a left one. Since the right brothers of nodes are checked,
+    // a sentinel value erases the need for an additional bounds check.
+    size_t i;
+    for (i = n; i > HEAP_TO_INSERTION; i -= 2) {
+        T const biggest_element = extract_root_swap_parity(heap, i);
+
+        heap[i] = T_MIN;  // The last leaf is now a left one, so a sentinel value is needed.
+        T const second_biggest_element = extract_root_swap_parity(heap, i - 1);
+
+        heap[i] = biggest_element;
+        heap[i - 1] = second_biggest_element;
+    }
+    heap[0] = prev_value;
+#if (HEAP_TO_INSERTION > 1)
+    insertion_sort_sentinel(&heap[1], &heap[i]);
+#endif  // HEAP_TO_INSERTION > 2
 }
 
 // Creating the starting runs for MergeSort.
@@ -690,6 +784,7 @@ union algo_to_test __host algos[] = {
     // {{ "QuickStableIds", quick_sort_stable_with_ids }},
     {{ "HeapOnlyDown", heap_sort_only_down }},
     {{ "HeapUpDown", heap_sort_both_up_and_down }},
+    {{ "HeapSwapParity", heap_sort_both_up_and_down_swap_parity }},
     // {{ "Merge", merge_sort_no_write_back}},
     // {{ "MergeWriteBack", merge_sort_write_back }},
     // {{ "MergeHalfSpace", merge_sort_half_space }},
