@@ -28,20 +28,14 @@ T __mram_noinit_keep output[LOAD_INTO_MRAM];
 triple_buffers buffers[NR_TASKLETS];
 struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input (in debug mode)
 struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the pivot
+#if (!RECURSIVE)
 /// @brief The call stack for iterative QuickSort.
 /// @internal 20 pointers on the stack was the most I’ve seen for 1024 elements
 /// so the space reserved here should be enough.
 static T *call_stacks[NR_TASKLETS][40];
-
-// The input length at which QuickSort changes to InsertionSort.
-#define QUICK_TO_INSERTION (13)
+#endif
 
 /* Defining building blocks for QuickSort, which remain the same. */
-#define RECURSIVE (false)
-
-// Wether the left or right partition is done first has an impact on the runtime.
-#define _SWITCH_SIDES_ (false)
-
 // The main body of QuickSort remains the same no matter the implementation variant.
 #define QUICK_BODY()                                         \
 T * const pivot = get_pivot(left, right);                    \
@@ -55,6 +49,32 @@ while (true) {                                               \
 }                                                            \
 swap(i, right)
 
+// Wether the left-hand or right-hand partition is done first has an impact on the runtime.
+// 1: The longer one is done first.
+// 2: The left-hand one is done first.
+// 3: the right-hand one is done first.
+#if (PARTITION_PRIO == 1)
+
+#if (RECURSIVE)
+// Returns the smaller of the two partitions.
+#define QUICK_GET_SHORTER_PARTITION() (i - left <= right - i)
+#else  // RECURSIVE
+// Returns the smaller of the two partitions.
+#define QUICK_GET_SHORTER_PARTITION() (i - left >= right - i)
+#endif  // RECURSIVE
+
+#elif (PARTITION_PRIO == 2)
+
+// Returns the left-hand partition.
+#define QUICK_GET_SHORTER_PARTITION() (RECURSIVE)
+
+#elif (PARTITION_PRIO == 3)
+
+// Returns the right-hand partition.
+#define QUICK_GET_SHORTER_PARTITION() (!RECURSIVE)
+
+#endif  // PARTITION_PRIO == 1
+
 // Whether the partition has a length below the threshold.
 #define QUICK_IS_THRESHOLD_UNDERCUT() (right - left + 1 <= QUICK_TO_INSERTION)
 
@@ -63,9 +83,7 @@ swap(i, right)
 
 #define QUICK_FALLBACK() insertion_sort_sentinel(left, right)
 
-#if RECURSIVE  // recursive variant
-
-#define SWITCH_SIDES (_SWITCH_SIDES_)
+#if (RECURSIVE)  // recursive variant
 
 // Sets up `left` and `right` as synonyms for `start` and `end`.
 // They are distinct only in the iterative variant.
@@ -80,8 +98,6 @@ swap(i, right)
 // Obviously, ending the current QuickSort is done via `return`.
 #define QUICK_STOP() return
 
-#if (!SWITCH_SIDES)
-
 #define QUICK_IS_TRIVIAL_LEFT() (i - 1 <= left)
 #define QUICK_IS_TRIVIAL_RIGHT() (right <= i + 1)
 
@@ -89,26 +105,9 @@ swap(i, right)
 #define QUICK_IS_THRESHOLD_UNDERCUT_RIGHT() (right - (i + 1) + 1 <= QUICK_TO_INSERTION)
 
 #define QUICK_CALL_LEFT(name) name(left, i - 1)
-#define QUICK_CALL_RIGHT(name) name(i+ 1, right)
-
-#else  // !SWITCH_SIDES
-
-#define QUICK_IS_TRIVIAL_RIGHT() (i - 1 <= left)
-#define QUICK_IS_TRIVIAL_LEFT() (right <= i + 1)
-
-#define QUICK_IS_THRESHOLD_UNDERCUT_RIGHT() ((i - 1) - left + 1 <= QUICK_TO_INSERTION)
-#define QUICK_IS_THRESHOLD_UNDERCUT_LEFT() (right - (i + 1) + 1 <= QUICK_TO_INSERTION)
-
-#define QUICK_CALL_RIGHT(name) name(left, i - 1)
-#define QUICK_CALL_LEFT(name) name(i+ 1, right)
-
-#endif  // !SWITCH_SIDES
+#define QUICK_CALL_RIGHT(name) name(i + 1, right)
 
 #else  // RECURSIVE
-
-// Switching the sides for iterative implementations
-// makes them traverse their ‘recursion’ tree in the same way as their recursive counterparts.
-#define SWITCH_SIDES (!_SWITCH_SIDES_)
 
 // A “call” stack for holding the values of `left` and `right` is maintained.
 // Its memory must be reserved beforehand.
@@ -129,8 +128,6 @@ do {                                                    \
 // Obviously, ending the current QuickSort is done via `continue`.
 #define QUICK_STOP() continue
 
-#if (!SWITCH_SIDES)
-
 #define QUICK_IS_TRIVIAL_LEFT() (i - 1 <= left)
 #define QUICK_IS_TRIVIAL_RIGHT() (right <= i + 1)
 
@@ -140,32 +137,10 @@ do {                                                    \
 #define QUICK_CALL_LEFT(name) do { *call_stack++ = left; *call_stack++ = i - 1; } while (false)
 #define QUICK_CALL_RIGHT(name) do { *call_stack++ = i + 1; *call_stack++ = right; } while (false)
 
-#else  // !SWITCH_SIDES
-
-#define QUICK_IS_TRIVIAL_RIGHT() (i - 1 <= left)
-#define QUICK_IS_TRIVIAL_LEFT() (right <= i + 1)
-
-#define QUICK_IS_THRESHOLD_UNDERCUT_RIGHT() ((i - 1) - left + 1 <= QUICK_TO_INSERTION)
-#define QUICK_IS_THRESHOLD_UNDERCUT_LEFT() (right - (i + 1) + 1 <= QUICK_TO_INSERTION)
-
-#define QUICK_CALL_RIGHT(name) do { *call_stack++ = left; *call_stack++ = i - 1; } while (false)
-#define QUICK_CALL_LEFT(name) do { *call_stack++ = i + 1; *call_stack++ = right; } while (false)
-
-#endif  // !SWITCH_SIDES
-
 #endif  // RECURSIVE
-
-#if (!SWITCH_SIDES)
 
 #define QUICK_FALLBACK_LEFT() insertion_sort_sentinel(left, i - 1)
 #define QUICK_FALLBACK_RIGHT() insertion_sort_sentinel(i + 1, right)
-
-#else
-
-#define QUICK_FALLBACK_RIGHT() insertion_sort_sentinel(left, i - 1)
-#define QUICK_FALLBACK_LEFT() insertion_sort_sentinel(i + 1, right)
-
-#endif
 
 /**
  * @brief An implementation of standard InsertionSort.
@@ -203,10 +178,46 @@ static void quick_sort(T * const start, T * const end) {
         QUICK_STOP();
     }
     QUICK_BODY();
-    QUICK_CALL_LEFT(quick_sort);
-    QUICK_CALL_RIGHT(quick_sort);
+    if (QUICK_GET_SHORTER_PARTITION()) {
+        QUICK_CALL_LEFT(quick_sort);
+        QUICK_CALL_RIGHT(quick_sort);
+    } else {
+        QUICK_CALL_RIGHT(quick_sort);
+        QUICK_CALL_LEFT(quick_sort);
+    }
     QUICK_TAIL();
 }
+
+// static void quick_sort(T * const start, T * const end) {
+//     QUICK_HEAD();
+//     if (QUICK_IS_TRIVIAL()) QUICK_STOP();
+//     if (QUICK_IS_THRESHOLD_UNDERCUT()) {
+//         QUICK_FALLBACK();
+//         QUICK_STOP();
+//     }
+//     QUICK_BODY();
+//     if (QUICK_GET_SHORTER_PARTITION()) {
+//         // QUICK_CALL_LEFT(quick_sort);
+//         // QUICK_CALL_RIGHT(quick_sort);
+//         __asm__(
+//             "sw %[cs], -8, %[left]\n"
+//             "add %[i], %[i], -4\n"
+//             "sw %[cs], -4, %[i]\n"
+
+//             "add %[i], %[i], 8\n"
+//             "sw %[cs], 0, %[i]\n"
+//             "sw %[cs], 4, %[right]\n"
+
+//             "add %[cs], %[cs], 8"
+//             :
+//             : [cs] "r"(call_stack), [i] "r"(i), [left] "r"(left), [right] "r"(right)
+//         );
+//     } else {
+//         QUICK_CALL_RIGHT(quick_sort);
+//         QUICK_CALL_LEFT(quick_sort);
+//     }
+//     QUICK_TAIL();
+// }
 
 /**
  * @brief An implementation of QuickSort where the trivial case is not checked.
@@ -221,8 +232,13 @@ static void quick_sort_no_triviality(T * const start, T * const end) {
         QUICK_STOP();
     }
     QUICK_BODY();
-    QUICK_CALL_LEFT(quick_sort_no_triviality);
-    QUICK_CALL_RIGHT(quick_sort_no_triviality);
+    if (QUICK_GET_SHORTER_PARTITION()) {
+        QUICK_CALL_LEFT(quick_sort_no_triviality);
+        QUICK_CALL_RIGHT(quick_sort_no_triviality);
+    } else {
+        QUICK_CALL_RIGHT(quick_sort_no_triviality);
+        QUICK_CALL_LEFT(quick_sort_no_triviality);
+    }
     QUICK_TAIL();
 }
 
@@ -240,8 +256,13 @@ static void quick_sort_triviality_after_threshold(T * const start, T * const end
     }
     if (QUICK_IS_TRIVIAL()) QUICK_STOP();
     QUICK_BODY();
-    QUICK_CALL_LEFT(quick_sort_triviality_after_threshold);
-    QUICK_CALL_RIGHT(quick_sort_triviality_after_threshold);
+    if (QUICK_GET_SHORTER_PARTITION()) {
+        QUICK_CALL_LEFT(quick_sort_triviality_after_threshold);
+        QUICK_CALL_RIGHT(quick_sort_triviality_after_threshold);
+    } else {
+        QUICK_CALL_RIGHT(quick_sort_triviality_after_threshold);
+        QUICK_CALL_LEFT(quick_sort_triviality_after_threshold);
+    }
     QUICK_TAIL();
 }
 
@@ -259,10 +280,17 @@ static void quick_sort_check_trivial_before_call(T * const start, T * const end)
         QUICK_STOP();
     }
     QUICK_BODY();
-    if (!QUICK_IS_TRIVIAL_LEFT())
-        QUICK_CALL_LEFT(quick_sort_check_trivial_before_call);
-    if (!QUICK_IS_TRIVIAL_RIGHT())
-        QUICK_CALL_RIGHT(quick_sort_check_trivial_before_call);
+    if (QUICK_GET_SHORTER_PARTITION()) {
+        if (!QUICK_IS_TRIVIAL_LEFT())
+            QUICK_CALL_LEFT(quick_sort_check_trivial_before_call);
+        if (!QUICK_IS_TRIVIAL_RIGHT())
+            QUICK_CALL_RIGHT(quick_sort_check_trivial_before_call);
+    } else {
+        if (!QUICK_IS_TRIVIAL_RIGHT())
+            QUICK_CALL_RIGHT(quick_sort_check_trivial_before_call);
+        if (!QUICK_IS_TRIVIAL_LEFT())
+            QUICK_CALL_LEFT(quick_sort_check_trivial_before_call);
+    }
     QUICK_TAIL();
 }
 
@@ -278,8 +306,13 @@ static void quick_sort_no_insertion_sort(T * const start, T * const end) {
     if (QUICK_IS_THRESHOLD_UNDERCUT())
         QUICK_STOP();
     QUICK_BODY();
-    QUICK_CALL_LEFT(quick_sort_no_insertion_sort);
-    QUICK_CALL_RIGHT(quick_sort_no_insertion_sort);
+    if (QUICK_GET_SHORTER_PARTITION()) {
+        QUICK_CALL_LEFT(quick_sort_no_insertion_sort);
+        QUICK_CALL_RIGHT(quick_sort_no_insertion_sort);
+    } else {
+        QUICK_CALL_RIGHT(quick_sort_no_insertion_sort);
+        QUICK_CALL_LEFT(quick_sort_no_insertion_sort);
+    }
     QUICK_TAIL();
 }
 
@@ -305,14 +338,25 @@ static void sort_with_one_insertion_sort(T * const start, T * const end) {
 static void quick_sort_check_threshold_before_call(T * const start, T * const end) {
     QUICK_HEAD();
     QUICK_BODY();
-    if (QUICK_IS_THRESHOLD_UNDERCUT_LEFT())
-        QUICK_FALLBACK_LEFT();
-    else
-        QUICK_CALL_LEFT(quick_sort_check_threshold_before_call);
-    if (QUICK_IS_THRESHOLD_UNDERCUT_RIGHT())
-        QUICK_FALLBACK_RIGHT();
-    else
-        QUICK_CALL_RIGHT(quick_sort_check_threshold_before_call);
+    if (QUICK_GET_SHORTER_PARTITION()) {
+        if (QUICK_IS_THRESHOLD_UNDERCUT_LEFT())
+            QUICK_FALLBACK_LEFT();
+        else
+            QUICK_CALL_LEFT(quick_sort_check_threshold_before_call);
+        if (QUICK_IS_THRESHOLD_UNDERCUT_RIGHT())
+            QUICK_FALLBACK_RIGHT();
+        else
+            QUICK_CALL_RIGHT(quick_sort_check_threshold_before_call);
+    } else {
+        if (QUICK_IS_THRESHOLD_UNDERCUT_RIGHT())
+            QUICK_FALLBACK_RIGHT();
+        else
+            QUICK_CALL_RIGHT(quick_sort_check_threshold_before_call);
+        if (QUICK_IS_THRESHOLD_UNDERCUT_LEFT())
+            QUICK_FALLBACK_LEFT();
+        else
+            QUICK_CALL_LEFT(quick_sort_check_threshold_before_call);
+    }
     QUICK_TAIL();
 }
 
@@ -326,16 +370,29 @@ static void quick_sort_check_threshold_before_call(T * const start, T * const en
 static void quick_sort_check_triviality_and_threshold_before_call(T * const start, T * const end) {
     QUICK_HEAD();
     QUICK_BODY();
-    if (QUICK_IS_THRESHOLD_UNDERCUT_LEFT()) {
-        if (!QUICK_IS_TRIVIAL_LEFT())
-            QUICK_FALLBACK_LEFT();
-    } else
-        QUICK_CALL_LEFT(quick_sort_check_triviality_and_threshold_before_call);
-    if (QUICK_IS_THRESHOLD_UNDERCUT_RIGHT()) {
-        if (!QUICK_IS_TRIVIAL_RIGHT())
-            QUICK_FALLBACK_RIGHT();
-    } else
-        QUICK_CALL_RIGHT(quick_sort_check_triviality_and_threshold_before_call);
+    if (QUICK_GET_SHORTER_PARTITION()) {
+        if (QUICK_IS_THRESHOLD_UNDERCUT_LEFT()) {
+            if (!QUICK_IS_TRIVIAL_LEFT())
+                QUICK_FALLBACK_LEFT();
+        } else
+            QUICK_CALL_LEFT(quick_sort_check_triviality_and_threshold_before_call);
+        if (QUICK_IS_THRESHOLD_UNDERCUT_RIGHT()) {
+            if (!QUICK_IS_TRIVIAL_RIGHT())
+                QUICK_FALLBACK_RIGHT();
+        } else
+            QUICK_CALL_RIGHT(quick_sort_check_triviality_and_threshold_before_call);
+    } else {
+        if (QUICK_IS_THRESHOLD_UNDERCUT_RIGHT()) {
+            if (!QUICK_IS_TRIVIAL_RIGHT())
+                QUICK_FALLBACK_RIGHT();
+        } else
+            QUICK_CALL_RIGHT(quick_sort_check_triviality_and_threshold_before_call);
+        if (QUICK_IS_THRESHOLD_UNDERCUT_LEFT()) {
+            if (!QUICK_IS_TRIVIAL_LEFT())
+                QUICK_FALLBACK_LEFT();
+        } else
+            QUICK_CALL_LEFT(quick_sort_check_triviality_and_threshold_before_call);
+    }
     QUICK_TAIL();
 }
 
@@ -354,33 +411,15 @@ static void quick_sort_triviality_within_threshold(T * const start, T * const en
         QUICK_STOP();
     }
     QUICK_BODY();
-    QUICK_CALL_LEFT(quick_sort_triviality_within_threshold);
-    QUICK_CALL_RIGHT(quick_sort_triviality_within_threshold);
-    QUICK_TAIL();
-}
-
-#if (!RECURSIVE)
-/**
- * @brief An implementation of the fastest variant of the iterative QuickSort
- * where the last push to the call stack is replaced by a simple jump.
- * 
- * @param start The first element of the WRAM array to sort.
- * @param end The last element of said array.
-**/
-static __attribute__((unused)) void quick_sort_optimised_iterative(T * const start, T * const end) {
-    QUICK_HEAD();
-optimised_label:
-    if (right - left + 1 <= QUICK_TO_INSERTION) {
-        insertion_sort_sentinel(left, right);
-        QUICK_STOP();
+    if (QUICK_GET_SHORTER_PARTITION()) {
+        QUICK_CALL_LEFT(quick_sort_triviality_within_threshold);
+        QUICK_CALL_RIGHT(quick_sort_triviality_within_threshold);
+    } else {
+        QUICK_CALL_RIGHT(quick_sort_triviality_within_threshold);
+        QUICK_CALL_LEFT(quick_sort_triviality_within_threshold);
     }
-    QUICK_BODY();
-    QUICK_CALL(quick_sort_triviality_within_threshold, left, i - 1);
-    left = i + 1;
-    goto optimised_label;
     QUICK_TAIL();
 }
-#endif
 
 union algo_to_test __host algos[] = {
     {{ "Normal", quick_sort }},
@@ -391,11 +430,9 @@ union algo_to_test __host algos[] = {
     {{ "ThreshTrivBC", quick_sort_check_triviality_and_threshold_before_call }},
     {{ "ThreshThenTriv", quick_sort_triviality_after_threshold }},
     {{ "TrivInThresh", quick_sort_triviality_within_threshold }},
-#if (!RECURSIVE)
-    // {{ "Optimised", quick_sort_optimised_iterative }},
-#endif
 };
-size_t __host lengths[] = { 20, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };
+// size_t __host lengths[] = { 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };
+size_t __host lengths[] = { 16, 32, 64, 128, 256, 512, 1024 };
 size_t __host num_of_algos = sizeof algos / sizeof algos[0];
 size_t __host num_of_lengths = sizeof lengths / sizeof lengths[0];
 

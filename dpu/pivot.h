@@ -11,7 +11,7 @@
 #include "common.h"
 #include "random_generator.h"
 
-#if (!(defined(END) || defined(MIDDLE) || defined(MEDIAN) || defined(RANDOM)))
+#if (!(defined(LAST) || defined(MIDDLE) || defined(MEDIAN) || defined(RANDOM) || defined(MEDIAN_OF_RANDOM)))
 #error Unknown pivot choice!
 #endif
 
@@ -26,6 +26,7 @@ extern struct xorshift_offset pivot_rngs[NR_TASKLETS];
  * - always the rightmost element
  * - the median of the leftmost, middle and rightmost element
  * - a random element
+ * - the median of three random elements
  * 
  * @param start The first element of the WRAM array to sort.
  * @param end The last element of said array.
@@ -35,7 +36,7 @@ extern struct xorshift_offset pivot_rngs[NR_TASKLETS];
 static inline T *get_pivot(T const * const start, T const * const end) {
     (void)start;  // Gets optimised away …
     (void)end;  // … but suppresses potential warnings about unused functions.
-#if defined(END)
+#if defined(LAST)
     /* Always the rightmost element. */
     return (T *)end;
 #elif defined(MIDDLE)
@@ -55,6 +56,20 @@ static inline T *get_pivot(T const * const start, T const * const end) {
     size_t const n = end - start;
     size_t const offset = rr_offset(n, &pivot_rngs[me()]);
     return (T *)(start + offset);
+#elif defined(MEDIAN_OF_RANDOM)
+    /* Pick a random element. */
+    size_t const n = end - start;
+    T const * const r[3] = {
+        start + rr_offset(n, &pivot_rngs[me()]),
+        start + rr_offset(n, &pivot_rngs[me()]),
+        start + rr_offset(n, &pivot_rngs[me()]),
+    };
+    if ((*r[0] > *r[1]) ^ (*r[0] > *r[2]))
+        return (T *)r[0];
+    else if ((*r[0] > *r[1]) ^ (*r[2] > *r[1]))
+        return (T *)r[1];
+    else
+        return (T *)r[2];
 #endif
 }
 
