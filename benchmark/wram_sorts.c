@@ -31,19 +31,17 @@ struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the p
 static T *call_stacks[NR_TASKLETS][40];  // call stack for iterative QuickSort
 static bool flags[NR_TASKLETS];  // Whether a write-back from the auxiliary array is (not) needed.
 
-// The input length at which QuickSort changes to InsertionSort.
-#define QUICK_TO_INSERTION (13)
 // The input length at which stable QuickSort changes to InsertionSort.
-#define STABLE_QUICK_TO_INSERTION (40)
+#define STABLE_QUICK_THRESHOLD (40)
 // The input length at which HeapSort changes to InsertionSort.
 #define HEAP_TO_INSERTION (1)
 static_assert(HEAP_TO_INSERTION & 1, "Applying to right sons, HEAP_TO_INSERTION should be odd!");
 // The number of elements flushed at once if possible.
 #define FLUSH_BATCH_LENGTH (24)
 
-#if (MERGE_TO_SHELL > 48)
+#if (MERGE_THRESHOLD > 48)
 #define FIRST_STEP (12)
-#elif (MERGE_TO_SHELL > 16)
+#elif (MERGE_THRESHOLD > 16)
 #define FIRST_STEP (6)
 #else
 #define FIRST_STEP (1)
@@ -100,15 +98,15 @@ static void insertion_sort_with_steps_sentinel(T * const start, T * const end, s
  * @param end The last element of said array.
 **/
 static __attribute__((unused)) void shell_sort(T * const start, T * const end) {
-#if (MERGE_TO_SHELL > 48)
+#if (MERGE_THRESHOLD > 48)
     for (size_t j = 0; j < 12; j++)
         insertion_sort_with_steps_sentinel(&start[j], end, 12);
     for (size_t j = 0; j < 5; j++)
         insertion_sort_with_steps_sentinel(&start[j], end, 5);
-#elif (MERGE_TO_SHELL > 16)
+#elif (MERGE_THRESHOLD > 16)
     for (size_t j = 0; j < 6; j++)
         insertion_sort_with_steps_sentinel(&start[j], end, 6);
-#endif  // MERGE_TO_SHELL > 16
+#endif  // MERGE_THRESHOLD > 16
     insertion_sort_sentinel(start, end);
 }
 
@@ -130,7 +128,7 @@ static void quick_sort(T * const start, T * const end) {
         T *right = *--call_stack;
         T *left = *--call_stack;
         /* Detect base cases. */
-        if (right - left + 1 <= QUICK_TO_INSERTION) {
+        if (right - left + 1 <= QUICK_THRESHOLD) {
             if (right > left)
                 insertion_sort_sentinel(left, right);
             continue;
@@ -167,7 +165,7 @@ static void quick_sort_stable_with_arrays(T * const start, T * const end) {
         T *right = *--call_stack;
         T *left = *--call_stack;
         /* Detect base cases. */
-        if (right - left + 1 <= STABLE_QUICK_TO_INSERTION) {
+        if (right - left + 1 <= STABLE_QUICK_THRESHOLD) {
             if (right > left)
                 insertion_sort_sentinel(left, right);
             continue;
@@ -222,7 +220,7 @@ static void quick_sort_stable_with_ids(T * const start, T * const end) {
         T *right = *--call_stack;
         T *left = *--call_stack;
         /* Detect base cases. */
-        if (right - left + 1 <= QUICK_TO_INSERTION) {
+        if (right - left + 1 <= QUICK_THRESHOLD) {
             if (right > left)
                 insertion_sort_sentinel(left, right);
             continue;
@@ -502,26 +500,26 @@ static void heap_sort_both_up_and_down_swap_parity(T * const start, T * const en
 }
 
 // Creating the starting runs for MergeSort.
-#define CREATE_STARTING_RUNS()                                                         \
-if (end - start + 1 <= MERGE_TO_SHELL) {                                               \
-    shell_sort(start, end);                                                            \
-    flags[me()] = false;                                                               \
-    return;                                                                            \
-}                                                                                      \
-shell_sort(start, start + MERGE_TO_SHELL - 1);                                         \
-for (T *t = start + MERGE_TO_SHELL; t < end; t += MERGE_TO_SHELL) {                    \
-    T before_sentinel[FIRST_STEP];                                                     \
-    _Pragma("unroll")  /* Set sentinel values. */                                      \
-    for (size_t i = 0; i < FIRST_STEP; i++) {                                          \
-        before_sentinel[i] = *(t - i - 1);                                             \
-        *(t - i - 1) = T_MIN;                                                          \
-    }                                                                                  \
-    T * const run_end = (t + MERGE_TO_SHELL - 1 > end) ? end : t + MERGE_TO_SHELL - 1; \
-    shell_sort(t, run_end);                                                            \
-    _Pragma("unroll")  /* Restore old values. */                                       \
-    for (size_t i = 0; i < FIRST_STEP; i++) {                                          \
-        *(t - i - 1) = before_sentinel[i];                                             \
-    }                                                                                  \
+#define CREATE_STARTING_RUNS()                                                           \
+if (end - start + 1 <= MERGE_THRESHOLD) {                                                \
+    shell_sort(start, end);                                                              \
+    flags[me()] = false;                                                                 \
+    return;                                                                              \
+}                                                                                        \
+shell_sort(start, start + MERGE_THRESHOLD - 1);                                          \
+for (T *t = start + MERGE_THRESHOLD; t < end; t += MERGE_THRESHOLD) {                    \
+    T before_sentinel[FIRST_STEP];                                                       \
+    _Pragma("unroll")  /* Set sentinel values. */                                        \
+    for (size_t i = 0; i < FIRST_STEP; i++) {                                            \
+        before_sentinel[i] = *(t - i - 1);                                               \
+        *(t - i - 1) = T_MIN;                                                            \
+    }                                                                                    \
+    T * const run_end = (t + MERGE_THRESHOLD - 1 > end) ? end : t + MERGE_THRESHOLD - 1; \
+    shell_sort(t, run_end);                                                              \
+    _Pragma("unroll")  /* Restore old values. */                                         \
+    for (size_t i = 0; i < FIRST_STEP; i++) {                                            \
+        *(t - i - 1) = before_sentinel[i];                                               \
+    }                                                                                    \
 }
 
 /**
@@ -549,21 +547,21 @@ static inline void flush_batch(T *in, T *until, T *out) {
 
 /**
  * @brief Copies a given range of values to some sepcified buffer.
- * The copying is done using batches of length `MERGE_TO_SHELL`:
- * If there are at least `MERGE_TO_SHELL` many elements to copy, they are copied at once.
- * This way, the loop overhead is cut by about a `MERGE_TO_SHELL`th in good cases.
+ * The copying is done using batches of length `MERGE_THRESHOLD`:
+ * If there are at least `MERGE_THRESHOLD` many elements to copy, they are copied at once.
+ * This way, the loop overhead is cut by about a `MERGE_THRESHOLD`th in good cases.
  * 
  * @param in The first element to copy.
  * @param until The last element to copy.
  * @param out Whither to place the first element to copy.
 **/
 static inline void flush_starting_run(T *in, T *until, T *out) {
-    while (in + MERGE_TO_SHELL - 1 <= until) {
+    while (in + MERGE_THRESHOLD - 1 <= until) {
         #pragma unroll
-        for (size_t k = 0; k < MERGE_TO_SHELL; k++)
+        for (size_t k = 0; k < MERGE_THRESHOLD; k++)
             *(out + k) = *(in + k);
-        out += MERGE_TO_SHELL;
-        in += MERGE_TO_SHELL;
+        out += MERGE_THRESHOLD;
+        in += MERGE_THRESHOLD;
     }
     while (in <= until) {
         *out++ = *in++;
@@ -616,7 +614,7 @@ static inline void merge_sort_no_write_back(T * const start, T * const end) {
     T *in, *until, *out;  // Runs from `in` to `until` are merged and stored in `out`.
     bool flag = false;  // Used to determine the initial positions of `in`, `out`, and `until`.
     size_t const n = end - start + 1;
-    for (size_t run_length = MERGE_TO_SHELL; run_length < n; run_length *= 2) {
+    for (size_t run_length = MERGE_THRESHOLD; run_length < n; run_length *= 2) {
         // Set the positions to read from and write to.
         if ((flag = !flag)) {
             in = start;
@@ -702,7 +700,7 @@ static void merge_sort_half_space(T * const start, T * const end) {
     CREATE_STARTING_RUNS();
     /* Merging. */
     size_t const n = end - start + 1;
-    for (size_t run_length = MERGE_TO_SHELL; run_length < n; run_length *= 2) {
+    for (size_t run_length = MERGE_THRESHOLD; run_length < n; run_length *= 2) {
         // Merge pairs of adjacent runs.
         for (T *i = start; i <= end; i += 2 * run_length) {
             // Only one run left?
@@ -713,10 +711,10 @@ static void merge_sort_half_space(T * const start, T * const end) {
             T *out = end + 1, *j = i;
             do {
                 #pragma unroll
-                for (size_t k = 0; k < MERGE_TO_SHELL; k++)
+                for (size_t k = 0; k < MERGE_THRESHOLD; k++)
                     *(out + k) = *(j + k);
-                out += MERGE_TO_SHELL;
-                j += MERGE_TO_SHELL;
+                out += MERGE_THRESHOLD;
+                j += MERGE_THRESHOLD;
             } while (j < i + run_length);
             // … and merge the copy with the next run.
             T * const run_1_end = (i + 2 * run_length - 1 > end) ? end : i + 2 * run_length - 1;
@@ -763,7 +761,7 @@ static void merge_sort_half_space(T * const start, T * const end) {
 //     CREATE_STARTING_RUNS();
 //     /* Merging. */
 //     size_t const n = end - start + 1;
-//     for (size_t run_length = MERGE_TO_SHELL; run_length < n; run_length *= 2) {
+//     for (size_t run_length = MERGE_THRESHOLD; run_length < n; run_length *= 2) {
 //         // Merge pairs of adjacent runs.
 //         for (T *i = start; i <= end; i += 2 * run_length) {
 //             // Only one run left?

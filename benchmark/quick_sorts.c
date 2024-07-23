@@ -76,7 +76,7 @@ swap(i, right)
 #endif  // PARTITION_PRIO == 1
 
 // Whether the partition has a length below the threshold.
-#define QUICK_IS_THRESHOLD_UNDERCUT() (right - left + 1 <= QUICK_TO_INSERTION)
+#define QUICK_IS_THRESHOLD_UNDERCUT() (right - left + 1 <= QUICK_THRESHOLD)
 
 // Whether the partition has a length in { 1, 0, -1 }.
 #define QUICK_IS_TRIVIAL() (right <= left)
@@ -101,8 +101,8 @@ swap(i, right)
 #define QUICK_IS_TRIVIAL_LEFT() (i - 1 <= left)
 #define QUICK_IS_TRIVIAL_RIGHT() (right <= i + 1)
 
-#define QUICK_IS_THRESHOLD_UNDERCUT_LEFT() ((i - 1) - left + 1 <= QUICK_TO_INSERTION)
-#define QUICK_IS_THRESHOLD_UNDERCUT_RIGHT() (right - (i + 1) + 1 <= QUICK_TO_INSERTION)
+#define QUICK_IS_THRESHOLD_UNDERCUT_LEFT() ((i - 1) - left + 1 <= QUICK_THRESHOLD)
+#define QUICK_IS_THRESHOLD_UNDERCUT_RIGHT() (right - (i + 1) + 1 <= QUICK_THRESHOLD)
 
 #define QUICK_CALL_LEFT(name) name(left, i - 1)
 #define QUICK_CALL_RIGHT(name) name(i + 1, right)
@@ -131,8 +131,8 @@ do {                                                    \
 #define QUICK_IS_TRIVIAL_LEFT() (i - 1 <= left)
 #define QUICK_IS_TRIVIAL_RIGHT() (right <= i + 1)
 
-#define QUICK_IS_THRESHOLD_UNDERCUT_LEFT() ((i - 1) - left + 1 <= QUICK_TO_INSERTION)
-#define QUICK_IS_THRESHOLD_UNDERCUT_RIGHT() (right - (i + 1) + 1 <= QUICK_TO_INSERTION)
+#define QUICK_IS_THRESHOLD_UNDERCUT_LEFT() ((i - 1) - left + 1 <= QUICK_THRESHOLD)
+#define QUICK_IS_THRESHOLD_UNDERCUT_RIGHT() (right - (i + 1) + 1 <= QUICK_THRESHOLD)
 
 #define QUICK_CALL_LEFT(name) do { *call_stack++ = left; *call_stack++ = i - 1; } while (false)
 #define QUICK_CALL_RIGHT(name) do { *call_stack++ = i + 1; *call_stack++ = right; } while (false)
@@ -431,8 +431,8 @@ union algo_to_test __host algos[] = {
     {{ "ThreshThenTriv", quick_sort_triviality_after_threshold }},
     {{ "TrivInThresh", quick_sort_triviality_within_threshold }},
 };
-// size_t __host lengths[] = { 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };
-size_t __host lengths[] = { 16, 32, 64, 128, 256, 512, 1024 };
+size_t __host lengths[] = { 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };
+// size_t __host lengths[] = { 16, 32, 64, 128, 256, 512, 1024 };
 size_t __host num_of_algos = sizeof algos / sizeof algos[0];
 size_t __host num_of_lengths = sizeof lengths / sizeof lengths[0];
 

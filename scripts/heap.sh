@@ -15,7 +15,7 @@ do
     make clean
     NR_TASKLETS=${NR_TASKLETS} BLOCK_SIZE=${BLOCK_SIZE} SEQREAD_CACHE_SIZE=${SEQREAD_CACHE_SIZE} TYPE=UINT${type} make all
 
-    folder=${main_folder}//uint${type}
+    folder=${main_folder}/uint${type}
     mkdir -p ${folder}
 
     dists=("sorted" "reverse" "almost" "uniform" "zipf" "normal")

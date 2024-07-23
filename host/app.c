@@ -105,17 +105,17 @@ static time get_std_of_time(time const zeroth, time const first, time second) {
 static void print_header(union algo_to_test const algos[], size_t const num_of_algos,
         struct Params *params) {
     printf(
-        "# reps=%u, dist name=%s, dist param=%"T_QUALIFIER", PIVOT=%s, TYPE=%s, BLOCK_SIZE=%d, "
-        "SEQREAD_CACHE_SIZE=%d, NR_TASKLETS=%d, CALL_OVERHEAD=%u\n",
+        "# reps=%u, dist name=%s, dist param=%"T_QUALIFIER", TYPE=%s, BLOCK_SIZE=%d, "
+        "SEQREAD_CACHE_SIZE=%d, NR_TASKLETS=%d, CALL_OVERHEAD=%u\n%s\n",
         params->n_reps,
         get_dist_name(params->dist_type),
         params->dist_param,
-        PIVOT_NAME,
         TYPE_NAME,
         BLOCK_SIZE,
         SEQREAD_CACHE_SIZE,
         NR_TASKLETS,
-        CALL_OVERHEAD
+        CALL_OVERHEAD,
+        TABLE_HEADER
     );
     printf("n");
     for (size_t i = 0; i < num_of_algos; i++)
