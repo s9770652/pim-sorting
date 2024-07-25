@@ -106,7 +106,7 @@ static void print_header(union algo_to_test const algos[], size_t const num_of_a
         struct Params *params) {
     printf(
         "# reps=%u, dist name=%s, dist param=%"T_QUALIFIER", TYPE=%s, BLOCK_SIZE=%d, "
-        "SEQREAD_CACHE_SIZE=%d, NR_TASKLETS=%d, CALL_OVERHEAD=%u\n%s\n",
+        "SEQREAD_CACHE_SIZE=%d, NR_TASKLETS=%d, CALL_OVERHEAD=%u\n# %s\n",
         params->n_reps,
         get_dist_name(params->dist_type),
         params->dist_param,
