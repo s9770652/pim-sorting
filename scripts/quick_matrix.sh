@@ -34,7 +34,11 @@ do
                 rm obj/benchmark/quick_sorts.o bin/quick_sorts obj/host/app.o
                 eval "RECURSIVE=${way} PIVOT=${pivot} PARTITION_PRIO=${prio} TYPE=UINT${type} ${cmd}"
 
-                bin/host -b ${b} -r ${r} -t 3 | tee ${prio_folder}/uniform.txt
+                dists=("sorted" "reverse" "almost" "uniform" "zipf" "normal")
+                for dist in "${!dists[@]}";
+                do
+                    bin/host -b ${b} -r ${r} -t ${dist} | tee ${prio_folder}/${dists[${dist}]}.txt
+                done
             done
         done
     done
