@@ -16,19 +16,23 @@ for type in 32 64
 do
     make clean
     eval "TYPE=UINT${type} ${cmd}"
-    for way in 0 1
+    for way in false true
     do
-        way_name=("iterative" "recursive")
-        way_folder=${main_folder}/${way_name[${way}]}
+        way_name="iterative"
+        if [ ${way} = true ];
+        then
+            way_name="recursive"
+        fi
+        way_folder=${main_folder}/${way_name}
         mkdir -p ${way_folder}
-        for pivot in "LAST" "MIDDLE" "MEDIAN" "RANDOM" "MEDIAN_OF_RANDOM"
+
+        for pivot in "LAST" "MEDIAN" "RANDOM" "MEDIAN_OF_RANDOM"
         do
-            pivot_folder=${way_folder}/${pivot}
+            pivot_folder=${way_folder}/${pivot,,}
             mkdir -p ${pivot_folder}
-            for prio in 1 2 3
+            for prio in "SHORTER" "LEFT" "RIGHT"
             do
-                prio_name=("shorter" "left" "right")
-                prio_folder=${pivot_folder}/${prio_name[${prio}-1]}/uint${type}
+                prio_folder=${pivot_folder}/${prio,,}/uint${type}
                 mkdir -p ${prio_folder}
 
                 rm obj/benchmark/quick_sorts.o bin/quick_sorts obj/host/app.o
@@ -37,6 +41,10 @@ do
                 dists=("sorted" "reverse" "almost" "uniform" "zipf" "normal")
                 for dist in "${!dists[@]}";
                 do
+                    if [ "$pivot" = "LAST" ] && [ ${dist} -lt 3 ];
+                    then
+                        continue
+                    fi
                     bin/host -b ${b} -r ${r} -t ${dist} | tee ${prio_folder}/${dists[${dist}]}.txt
                 done
             done
