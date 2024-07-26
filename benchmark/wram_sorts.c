@@ -792,7 +792,7 @@ size_t __host lengths[] = { 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768
 size_t __host num_of_algos = sizeof algos / sizeof algos[0];
 size_t __host num_of_lengths = sizeof lengths / sizeof lengths[0];
 
-int main() {
+int main(void) {
     if (me() != 0) return EXIT_SUCCESS;
 
     /* Set up buffers. */

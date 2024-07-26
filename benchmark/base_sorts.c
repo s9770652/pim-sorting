@@ -296,7 +296,7 @@ size_t __host lengths[] = {
 size_t __host num_of_algos = sizeof algos / sizeof algos[0];
 size_t __host num_of_lengths = sizeof lengths / sizeof lengths[0];
 
-int main() {
+int main(void) {
     if (me() != 0) return EXIT_SUCCESS;
     (void)call_stacks;
 
