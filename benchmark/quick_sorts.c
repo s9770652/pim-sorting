@@ -50,10 +50,10 @@ while (true) {                                               \
 swap(i, right)
 
 // Wether the left-hand or right-hand partition is done first has an impact on the runtime.
-// 1: The longer one is done first.
-// 2: The left-hand one is done first.
-// 3: the right-hand one is done first.
-#if (PARTITION_PRIO == 1)
+#define SHORTER 1
+#define LEFT 2
+#define RIGHT 3
+#if (PARTITION_PRIO == SHORTER)
 
 #if (RECURSIVE)
 // Returns the smaller of the two partitions.
@@ -63,12 +63,12 @@ swap(i, right)
 #define QUICK_GET_SHORTER_PARTITION() (i - left >= right - i)
 #endif  // RECURSIVE
 
-#elif (PARTITION_PRIO == 2)
+#elif (PARTITION_PRIO == LEFT)
 
 // Returns the left-hand partition.
 #define QUICK_GET_SHORTER_PARTITION() (RECURSIVE)
 
-#elif (PARTITION_PRIO == 3)
+#elif (PARTITION_PRIO == RIGHT)
 
 // Returns the right-hand partition.
 #define QUICK_GET_SHORTER_PARTITION() (!RECURSIVE)
@@ -432,7 +432,6 @@ union algo_to_test __host algos[] = {
     {{ "TrivInThresh", quick_sort_triviality_within_threshold }},
 };
 size_t __host lengths[] = { 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };
-// size_t __host lengths[] = { 16, 32, 64, 128, 256, 512, 1024 };
 size_t __host num_of_algos = sizeof algos / sizeof algos[0];
 size_t __host num_of_lengths = sizeof lengths / sizeof lengths[0];
 
