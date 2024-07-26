@@ -39,11 +39,12 @@ static T *call_stacks[NR_TASKLETS][40];
 // The main body of QuickSort remains the same no matter the implementation variant.
 #define QUICK_BODY()                                         \
 T * const pivot = get_pivot(left, right);                    \
+T const pivot_value = *pivot;                                \
 swap(pivot, right);  /* The pivot acts as sentinel value. */ \
 T *i = left - 1, *j = right;                                 \
 while (true) {                                               \
-    while (*++i < *right);                                   \
-    while (*--j > *right);                                   \
+    while (*++i < pivot_value);                              \
+    while (*--j > pivot_value);                              \
     if (i >= j) break;                                       \
     swap(i, j);                                              \
 }                                                            \
