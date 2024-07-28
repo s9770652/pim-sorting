@@ -18,8 +18,8 @@ CHECK_SANITY ?= 1
 
 QUICK_THRESHOLD ?= 18
 PIVOT ?= MEDIAN_OF_RANDOM
-PARTITION_PRIO ?= LEFT
-RECURSIVE ?= true
+PARTITION_PRIO ?= RIGHT
+RECURSIVE ?= false
 MERGE_THRESHOLD ?= 32
 
 # A file whose name reflects the set constants.
