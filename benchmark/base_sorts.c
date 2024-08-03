@@ -69,7 +69,7 @@ static void bubble_sort_adaptive(T * const start, T * const end) {
         for (T *i = start; i < until; i++) {
             if (*i > *(i+1)) {
                 swap(i, i+1);
-                swapped = true;
+                swapped = true;  // Changing to a second loop worsens the runtime.
             }
         }
         until--;
@@ -293,6 +293,7 @@ size_t __host lengths[] = {
     15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
 };
 // size_t __host lengths[] = { 16, 24, 32, 48, 64, 96, 128 };
+// size_t __host lengths[] = { 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };
 size_t __host num_of_algos = sizeof algos / sizeof algos[0];
 size_t __host num_of_lengths = sizeof lengths / sizeof lengths[0];
 
@@ -304,7 +305,7 @@ int main(void) {
     if (buffers[me()].cache == NULL) {  // Only allocate on the first launch.
         allocate_triple_buffer(&buffers[me()]);
         /* Add additional sentinel values. */
-        size_t num_of_sentinels = 16;  // 9 is the maximum step, 16 ensures alignment.
+        size_t num_of_sentinels = 16;  // 17 is the maximum step, 1 is already present.
         for (size_t i = 0; i < num_of_sentinels; i++)
             buffers[me()].cache[i] = T_MIN;
         buffers[me()].cache += num_of_sentinels;
@@ -333,8 +334,8 @@ int main(void) {
     memset(&dpu_to_host, 0, sizeof dpu_to_host);
 
     for (uint32_t rep = 0; rep < host_to_dpu.reps; rep++) {
-        // pivot_rngs[me()] = seed_xs_offset(host_to_dpu.basic_seed + me());
-        mram_read(read_from, cache, transfer_size);  // Change to `…_triple` for big lengths.
+        pivot_rngs[me()] = seed_xs_offset(host_to_dpu.basic_seed + me());
+        mram_read_triple(read_from, cache, transfer_size);
 
         array_stats stats_before;
         get_stats_unsorted_wram(cache, host_to_dpu.length, &stats_before);
