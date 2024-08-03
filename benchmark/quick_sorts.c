@@ -28,12 +28,7 @@ T __mram_noinit_keep output[LOAD_INTO_MRAM];
 triple_buffers buffers[NR_TASKLETS];
 struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input (in debug mode)
 struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the pivot
-#if (!RECURSIVE)
-/// @brief The call stack for iterative QuickSort.
-/// @internal 20 pointers on the stack was the most I’ve seen for 1024 elements
-/// so the space reserved here should be enough.
-static T *call_stacks[NR_TASKLETS][40];
-#endif
+static T *call_stacks[NR_TASKLETS][40];  // call stack for iterative QuickSort
 
 /* Defining building blocks for QuickSort, which remain the same. */
 // The main body of QuickSort remains the same no matter the implementation variant.
@@ -74,7 +69,7 @@ swap(i, right)
 // Returns the right-hand partition.
 #define QUICK_GET_SHORTER_PARTITION() (!RECURSIVE)
 
-#endif  // PARTITION_PRIO == 1
+#endif  // PARTITION_PRIO == RIGHT
 
 // Whether the partition has a length below the threshold.
 #define QUICK_IS_THRESHOLD_UNDERCUT() (right - left + 1 <= QUICK_THRESHOLD)
@@ -83,6 +78,15 @@ swap(i, right)
 #define QUICK_IS_TRIVIAL() (right <= left)
 
 #define QUICK_FALLBACK() insertion_sort_sentinel(left, right)
+
+#define QUICK_IS_TRIVIAL_LEFT() (i - 1 <= left)
+#define QUICK_IS_TRIVIAL_RIGHT() (right <= i + 1)
+
+#define QUICK_IS_THRESHOLD_UNDERCUT_LEFT() ((i - 1) - left + 1 <= QUICK_THRESHOLD)
+#define QUICK_IS_THRESHOLD_UNDERCUT_RIGHT() (right - (i + 1) + 1 <= QUICK_THRESHOLD)
+
+#define QUICK_FALLBACK_LEFT() insertion_sort_sentinel(left, i - 1)
+#define QUICK_FALLBACK_RIGHT() insertion_sort_sentinel(i + 1, right)
 
 #if (RECURSIVE)  // recursive variant
 
@@ -98,12 +102,6 @@ swap(i, right)
 
 // Obviously, ending the current QuickSort is done via `return`.
 #define QUICK_STOP() return
-
-#define QUICK_IS_TRIVIAL_LEFT() (i - 1 <= left)
-#define QUICK_IS_TRIVIAL_RIGHT() (right <= i + 1)
-
-#define QUICK_IS_THRESHOLD_UNDERCUT_LEFT() ((i - 1) - left + 1 <= QUICK_THRESHOLD)
-#define QUICK_IS_THRESHOLD_UNDERCUT_RIGHT() (right - (i + 1) + 1 <= QUICK_THRESHOLD)
 
 #define QUICK_CALL_LEFT(name) name(left, i - 1)
 #define QUICK_CALL_RIGHT(name) name(i + 1, right)
@@ -129,19 +127,10 @@ do {                                                    \
 // Obviously, ending the current QuickSort is done via `continue`.
 #define QUICK_STOP() continue
 
-#define QUICK_IS_TRIVIAL_LEFT() (i - 1 <= left)
-#define QUICK_IS_TRIVIAL_RIGHT() (right <= i + 1)
-
-#define QUICK_IS_THRESHOLD_UNDERCUT_LEFT() ((i - 1) - left + 1 <= QUICK_THRESHOLD)
-#define QUICK_IS_THRESHOLD_UNDERCUT_RIGHT() (right - (i + 1) + 1 <= QUICK_THRESHOLD)
-
 #define QUICK_CALL_LEFT(name) do { *call_stack++ = left; *call_stack++ = i - 1; } while (false)
 #define QUICK_CALL_RIGHT(name) do { *call_stack++ = i + 1; *call_stack++ = right; } while (false)
 
 #endif  // RECURSIVE
-
-#define QUICK_FALLBACK_LEFT() insertion_sort_sentinel(left, i - 1)
-#define QUICK_FALLBACK_RIGHT() insertion_sort_sentinel(i + 1, right)
 
 /**
  * @brief An implementation of standard InsertionSort.
@@ -188,37 +177,6 @@ static void quick_sort(T * const start, T * const end) {
     }
     QUICK_TAIL();
 }
-
-// static void quick_sort(T * const start, T * const end) {
-//     QUICK_HEAD();
-//     if (QUICK_IS_TRIVIAL()) QUICK_STOP();
-//     if (QUICK_IS_THRESHOLD_UNDERCUT()) {
-//         QUICK_FALLBACK();
-//         QUICK_STOP();
-//     }
-//     QUICK_BODY();
-//     if (QUICK_GET_SHORTER_PARTITION()) {
-//         // QUICK_CALL_LEFT(quick_sort);
-//         // QUICK_CALL_RIGHT(quick_sort);
-//         __asm__(
-//             "sw %[cs], -8, %[left]\n"
-//             "add %[i], %[i], -4\n"
-//             "sw %[cs], -4, %[i]\n"
-
-//             "add %[i], %[i], 8\n"
-//             "sw %[cs], 0, %[i]\n"
-//             "sw %[cs], 4, %[right]\n"
-
-//             "add %[cs], %[cs], 8"
-//             :
-//             : [cs] "r"(call_stack), [i] "r"(i), [left] "r"(left), [right] "r"(right)
-//         );
-//     } else {
-//         QUICK_CALL_RIGHT(quick_sort);
-//         QUICK_CALL_LEFT(quick_sort);
-//     }
-//     QUICK_TAIL();
-// }
 
 /**
  * @brief An implementation of QuickSort where the trivial case is not checked.
@@ -438,6 +396,7 @@ size_t __host num_of_lengths = sizeof lengths / sizeof lengths[0];
 
 int main(void) {
     if (me() != 0) return EXIT_SUCCESS;
+    (void)call_stacks;
 
     /* Set up buffers. */
     if (buffers[me()].cache == NULL) {  // Only allocate on the first launch.
