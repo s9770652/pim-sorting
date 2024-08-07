@@ -41,7 +41,7 @@ do
                 dists=("sorted" "reverse" "almost" "uniform" "zipf" "normal")
                 for dist in "${!dists[@]}";
                 do
-                    if [ "$pivot" = "LAST" ] && [ ${dist} -lt 3 ];
+                    if [ ${pivot} = "LAST" ] && [ ${dist} -lt 3 ];
                     then
                         continue
                     fi
