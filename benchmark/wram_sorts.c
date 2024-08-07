@@ -103,10 +103,10 @@ static __attribute__((unused)) void shell_sort(T * const start, T * const end) {
         insertion_sort_with_steps_sentinel(&start[j], end, 12);
     for (size_t j = 0; j < 5; j++)
         insertion_sort_with_steps_sentinel(&start[j], end, 5);
-#elif (MERGE_THRESHOLD > 16)
+#elif (MERGE_THRESHOLD > 18)
     for (size_t j = 0; j < 6; j++)
         insertion_sort_with_steps_sentinel(&start[j], end, 6);
-#endif  // MERGE_THRESHOLD > 16
+#endif  // MERGE_THRESHOLD > 18
     insertion_sort_sentinel(start, end);
 }
 
@@ -580,18 +580,28 @@ static inline void flush_starting_run(T *in, T *until, T *out) {
 **/
 static inline void merge(T * const start_1, T * const start_2, T * const end_2, T *out) {
     T *i = start_1, *j = start_2;
-    while (true) {
-        if (*i <= *j) {
-            *out++ = *i++;
-            if (i == start_2) {  // Pulling these if-statements out of the loop …
-                flush_batch(j, end_2, out);
-                return;
+    if (*(start_2 - 1) <= *(end_2)) {
+        while (true) {
+            if (*i <= *j) {
+                *out++ = *i++;
+                if (i == start_2) {  // Pulling these if-statements out of the loop …
+                    flush_batch(j, end_2, out);
+                    return;
+                }
+            } else {
+                *out++ = *j++;
             }
-        } else {
-            *out++ = *j++;
-            if (j > end_2) {  // … worsens the runtime.
-                flush_batch(i, start_2 - 1, out);
-                return;
+        }
+    } else {
+        while (true) {
+            if (*i <= *j) {
+                *out++ = *i++;
+            } else {
+                *out++ = *j++;
+                if (j > end_2) {  // … worsens the runtime.
+                    flush_batch(i, start_2 - 1, out);
+                    return;
+                }
             }
         }
     }
@@ -671,17 +681,27 @@ static void merge_sort_write_back(T * const start, T * const end) {
 static inline void merge_right_flush_only(T * const start_1, T * const end_1, T * const start_2,
         T * const end_2, T *out) {
     T *i = start_1, *j = start_2;
-    while (true) {
-        if (*i < *j) {
-            *out++ = *i++;
-            if (i > end_1) {
-                flush_batch(j, end_2, out);
-                return;
+    if (*end_1 < *end_2) {
+        while (true) {
+            if (*i < *j) {
+                *out++ = *i++;
+                if (i > end_1) {
+                    flush_batch(j, end_2, out);
+                    return;
+                }
+            } else {
+                *out++ = *j++;
             }
-        } else {
-            *out++ = *j++;
-            if (j > end_2) {
-                return;
+        }
+    } else {
+        while (true) {
+            if (*i < *j) {
+                *out++ = *i++;
+            } else {
+                *out++ = *j++;
+                if (j > end_2) {
+                    return;
+                }
             }
         }
     }
@@ -777,18 +797,35 @@ static void merge_sort_half_space(T * const start, T * const end) {
 // }
 
 union algo_to_test __host algos[] = {
-    // {{ "Quick", quick_sort }},
+    {{ "Quick", quick_sort }},
     // {{ "QuickStable", quick_sort_stable_with_arrays }},
     // {{ "QuickStableIds", quick_sort_stable_with_ids }},
     {{ "HeapOnlyDown", heap_sort_only_down }},
     {{ "HeapUpDown", heap_sort_both_up_and_down }},
     {{ "HeapSwapParity", heap_sort_both_up_and_down_swap_parity }},
-    // {{ "Merge", merge_sort_no_write_back}},
-    // {{ "MergeWriteBack", merge_sort_write_back }},
-    // {{ "MergeHalfSpace", merge_sort_half_space }},
+    {{ "Merge", merge_sort_no_write_back}},
+    {{ "MergeWriteBack", merge_sort_write_back }},
+    {{ "MergeHalfSpace", merge_sort_half_space }},
 };
 // size_t __host lengths[] = { 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024, 1536, 2048, 3072 };
 size_t __host lengths[] = { 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };
+// size_t __host lengths[] = {  // for `MERGE_THRESHOLD` <= 15
+//     MERGE_THRESHOLD, MERGE_THRESHOLD + 1, 4*MERGE_THRESHOLD + 1, 16*MERGE_THRESHOLD + 1,
+//     64*MERGE_THRESHOLD + 1, 128*MERGE_THRESHOLD + 1,
+// };
+// size_t __host lengths[] = {  // for `MERGE_THRESHOLD` < 64
+//     MERGE_THRESHOLD, MERGE_THRESHOLD + 1, 4*MERGE_THRESHOLD + 1, 16*MERGE_THRESHOLD + 1,
+//     64*MERGE_THRESHOLD + 1,
+// };
+// size_t __host lengths[] = {  // for `MERGE_THRESHOLD` > 64
+//     MERGE_THRESHOLD, MERGE_THRESHOLD + 1, 4*MERGE_THRESHOLD + 1, 16*MERGE_THRESHOLD + 1,
+// };
+// size_t __host lengths[] = {  // for `MERGE_THRESHOLD` == 16 with both worst-case and best-caseg
+//      1*MERGE_THRESHOLD,  1*MERGE_THRESHOLD + 1,  2*MERGE_THRESHOLD,  2*MERGE_THRESHOLD + 1,
+//      4*MERGE_THRESHOLD,  4*MERGE_THRESHOLD + 1,  8*MERGE_THRESHOLD,  8*MERGE_THRESHOLD + 1,
+//     16*MERGE_THRESHOLD, 16*MERGE_THRESHOLD + 1, 32*MERGE_THRESHOLD, 32*MERGE_THRESHOLD + 1,
+//     64*MERGE_THRESHOLD, 64*MERGE_THRESHOLD + 1,
+// };
 size_t __host num_of_algos = sizeof algos / sizeof algos[0];
 size_t __host num_of_lengths = sizeof lengths / sizeof lengths[0];
 
