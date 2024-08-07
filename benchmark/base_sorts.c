@@ -57,22 +57,22 @@ static void bubble_sort_nonadaptive(T * const start, T * const end) {
 
 /**
  * @brief An implementation of BubbleSort which terminates early if the array is sorted.
+ * It also does not sort already sorted tails.
  * 
  * @param start The first element of the WRAM array to sort.
  * @param end The last element of said array.
 **/
 static void bubble_sort_adaptive(T * const start, T * const end) {
-    bool swapped;
-    T *until = end;
+    T *until = end, *swapped;
     do {
-        swapped = false;
+        swapped = NULL;
         for (T *i = start; i < until; i++) {
-            if (*i > *(i+1)) {
-                swap(i, i+1);
-                swapped = true;  // Changing to a second loop worsens the runtime.
+            if (*i > *(i + 1)) {
+                swap(i, i + 1);
+                swapped = i;
             }
         }
-        until--;
+        until = swapped;
     } while (swapped);
 }
 
@@ -288,12 +288,16 @@ union algo_to_test __host algos[] = {
     {{ "BubbleNonAdapt", bubble_sort_nonadaptive }},
     {{ "Selection", selection_sort }},
 };
-size_t __host lengths[] = {
+size_t __host lengths[] = {  // for all small sorts
     3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
     15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
 };
-// size_t __host lengths[] = { 16, 24, 32, 48, 64, 96, 128 };
-// size_t __host lengths[] = { 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };
+// size_t __host lengths[] = {  // for two-tier vs. three-tier ShellSort
+//     16, 24, 32, 48, 64, 96, 128
+// };
+// size_t __host lengths[] = {  // for Ciura’s ShellSort
+//     16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024
+// };
 size_t __host num_of_algos = sizeof algos / sizeof algos[0];
 size_t __host num_of_lengths = sizeof lengths / sizeof lengths[0];
 
