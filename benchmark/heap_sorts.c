@@ -28,8 +28,6 @@ T __mram_noinit_keep output[LOAD_INTO_MRAM];
 triple_buffers buffers[NR_TASKLETS];
 struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input (in debug mode)
 struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the pivot
-static T *call_stacks[NR_TASKLETS][40];  // call stack for iterative QuickSort
-static bool flags[NR_TASKLETS];  // Whether a write-back from the auxiliary array is (not) needed.
 
 // The input length at which HeapSort changes to InsertionSort.
 #define HEAP_TO_INSERTION (15)
@@ -319,8 +317,6 @@ size_t __host num_of_lengths = sizeof lengths / sizeof lengths[0];
 
 int main(void) {
     if (me() != 0) return EXIT_SUCCESS;
-    (void)call_stacks;
-    (void)flags;
 
     /* Set up buffers. */
     if (buffers[me()].cache == NULL) {  // Only allocate on the first launch.

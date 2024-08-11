@@ -1,14 +1,6 @@
 /**
  * @file
- * @brief Measures runtimes of sorting algorithms intended for small input arrays.
- * 
- * The tested algorithms are:
- * - InsertionSort
- * - ShellSort
- * - BubbleSort
- * - SelectionSort
- * Whether the ShellSorts have two rounds or three, depends on the value of `BIG_STEP`.
- * See their respective documentation for more information.
+ * @brief Measures runtimes of InsertionSort, ShellSort, BubbleSort, and SelectionSort.
 **/
 
 #include <assert.h>
@@ -16,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <alloc.h>
 #include <defs.h>
 #include <perfcounter.h>
 
@@ -35,9 +28,8 @@ T __mram_noinit_keep output[LOAD_INTO_MRAM];
 triple_buffers buffers[NR_TASKLETS];
 struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input (in debug mode)
 struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the pivot
-static T *call_stacks[NR_TASKLETS][40];  // call stack for iterative QuickSort
 
-#define BIG_STEP (0)
+#define BIG_STEP (0)  // first step size of three-tier ShellSort
 
 /**
  * @brief An implementation of standard BubbleSort.
@@ -303,7 +295,6 @@ size_t __host num_of_lengths = sizeof lengths / sizeof lengths[0];
 
 int main(void) {
     if (me() != 0) return EXIT_SUCCESS;
-    (void)call_stacks;
 
     /* Set up buffers. */
     if (buffers[me()].cache == NULL) {  // Only allocate on the first launch.

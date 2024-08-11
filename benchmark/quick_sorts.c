@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Measures runtimes of some implementations of QuickSort.
+ * @brief Measures runtimes of QuickSorts.
 **/
 
 #include <assert.h>
@@ -28,7 +28,8 @@ T __mram_noinit_keep output[LOAD_INTO_MRAM];
 triple_buffers buffers[NR_TASKLETS];
 struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input (in debug mode)
 struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the pivot
-static T *call_stacks[NR_TASKLETS][40];  // call stack for iterative QuickSort
+
+static __attribute__((unused)) T *call_stacks[NR_TASKLETS][40];  // call stack for iter. QuickSort
 
 /* Defining building blocks for QuickSort, which remain the same. */
 // The main body of QuickSort remains the same no matter the implementation variant.
@@ -396,7 +397,6 @@ size_t __host num_of_lengths = sizeof lengths / sizeof lengths[0];
 
 int main(void) {
     if (me() != 0) return EXIT_SUCCESS;
-    (void)call_stacks;
 
     /* Set up buffers. */
     if (buffers[me()].cache == NULL) {  // Only allocate on the first launch.

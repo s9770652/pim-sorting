@@ -28,11 +28,10 @@ T __mram_noinit_keep output[LOAD_INTO_MRAM];
 triple_buffers buffers[NR_TASKLETS];
 struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input (in debug mode)
 struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the pivot
-static T *call_stacks[NR_TASKLETS][40];  // call stack for iterative QuickSort
+
 static bool flags[NR_TASKLETS];  // Whether a write-back from the auxiliary array is (not) needed.
 
-// The number of elements flushed at once if possible.
-#define FLUSH_BATCH_LENGTH (24)
+#define FLUSH_BATCH_LENGTH (24)  // The number of elements flushed at once if possible.
 
 #if (MERGE_THRESHOLD > 48)
 #define FIRST_STEP (12)
