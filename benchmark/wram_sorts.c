@@ -34,7 +34,7 @@ static bool flags[NR_TASKLETS];  // Whether a write-back from the auxiliary arra
 // The input length at which stable QuickSort changes to InsertionSort.
 #define STABLE_QUICK_THRESHOLD (40)
 // The input length at which HeapSort changes to InsertionSort.
-#define HEAP_TO_INSERTION (1)
+#define HEAP_TO_INSERTION (15)
 static_assert(HEAP_TO_INSERTION & 1, "Applying to right sons, HEAP_TO_INSERTION should be odd!");
 // The number of elements flushed at once if possible.
 #define FLUSH_BATCH_LENGTH (24)
@@ -108,144 +108,6 @@ static __attribute__((unused)) void shell_sort(T * const start, T * const end) {
         insertion_sort_with_steps_sentinel(&start[j], end, 6);
 #endif  // MERGE_THRESHOLD > 18
     insertion_sort_sentinel(start, end);
-}
-
-/**
- * @brief The fastest implementation of QuickSort, which uses a manual call stack.
- * To this end, enough memory should be reserved
- * and saved in the file-wide variable `start_of_call_stack`.
- * 
- * @param start The first element of the WRAM array to sort.
- * @param end The last element of said array.
-**/
-static void quick_sort(T * const start, T * const end) {
-    T ** const start_of_call_stack = &call_stacks[me()][0];
-    T **call_stack = start_of_call_stack;
-    *call_stack++ = start;
-    *call_stack++ = end;
-    do {
-        /* Pop from call stack. */
-        T *right = *--call_stack;
-        T *left = *--call_stack;
-        /* Detect base cases. */
-        if (right - left + 1 <= QUICK_THRESHOLD) {
-            if (right > left)
-                insertion_sort_sentinel(left, right);
-            continue;
-        }
-        /* Put elements into respective partitions. */
-        T * const pivot = get_pivot(left, right);  // The pivot acts as sentinel value.
-        swap(pivot, right);
-        T *i = left - 1, *j = right;
-        while (true) {
-            while (*++i < *right);
-            while (*--j > *right);
-            if (i >= j) break;
-            swap(i, j);
-        }
-        swap(i, right);
-        /* Push left partition to call stack. */
-        *call_stack++ = left;
-        *call_stack++ = i - 1;
-        /* Push right partition to call stack. */
-        *call_stack++ = i + 1;
-        *call_stack++ = right;
-    } while (call_stack != start_of_call_stack);
-}
-
-// @todo Work in progress
-static void quick_sort_stable_with_arrays(T * const start, T * const end) {
-    T * const smaller = end + 1, * const greater = end + 257;
-    T ** const start_of_call_stack = &call_stacks[me()][0];
-    T **call_stack = start_of_call_stack;
-    *call_stack++ = start;
-    *call_stack++ = end;
-    do {
-        /* Pop from call stack. */
-        T *right = *--call_stack;
-        T *left = *--call_stack;
-        /* Detect base cases. */
-        if (right - left + 1 <= STABLE_QUICK_THRESHOLD) {
-            if (right > left)
-                insertion_sort_sentinel(left, right);
-            continue;
-        }
-        /* Put elements into respective partitions. */
-        T * const pivot = get_pivot(left, right);
-        T *s = smaller - 1, *g = greater - 1; 
-        for (T *i = left; i <= right; i++) {
-            if (*i < *pivot) {
-                *++s = *i;
-            } else if (*i > *pivot) {
-                *++g = *i;
-            } else if (i < pivot) {
-                *++s = *i;
-            } else if (i > pivot) {
-                *++g = *i;
-            }
-        }
-        /* Move elements back into the array. */
-        T const pivot_value = *pivot;
-        T *orig_array = left;
-        for (T *i = smaller; i <= s; i++) {
-            *orig_array++ = *i;
-        }
-        *orig_array++ = pivot_value;
-        for (T *i = greater; i <= g; i++) {
-            *orig_array++ = *i;
-        }
-        /* Push left partition to call stack. */
-        *call_stack++ = left;
-        *call_stack++ = left + (s - smaller);
-        /* Push right partition to call stack. */
-        *call_stack++ = left + (s - smaller) + 2;
-        *call_stack++ = right;
-    } while (call_stack != start_of_call_stack);
-}
-
-// @todo Work in progress
-static void quick_sort_stable_with_ids(T * const start, T * const end) {
-    /* Create array of indices used for distinguishing equivalent elements. */
-    for (T *t = end + 1; t <= end + (end - start + 1); t++) {
-        *t = (T)t;
-    }
-    uintptr_t offset = end - start + 1;
-    /* Start of actual QuickSort. */
-    T ** const start_of_call_stack = &call_stacks[me()][0];
-    T **call_stack = start_of_call_stack;
-    *call_stack++ = start;
-    *call_stack++ = end;
-    do {
-        /* Pop from call stack. */
-        T *right = *--call_stack;
-        T *left = *--call_stack;
-        /* Detect base cases. */
-        if (right - left + 1 <= QUICK_THRESHOLD) {
-            if (right > left)
-                insertion_sort_sentinel(left, right);
-            continue;
-        }
-        /* Put elements into respective partitions. */
-        T * const pivot = get_pivot(left, right);  // The pivot acts as sentinel value.
-        swap(pivot, right);
-        swap(pivot + offset, right + offset);
-        T *i = left - 1, *j = right;
-        while (true) {
-            while (*++i < *right);
-            while (*--j > *right);
-            if (i >= j) break;
-            swap(i, j);
-            swap(i + offset, j + offset);
-        }
-        swap(i, right);
-        swap(i + offset, right + offset);
-        /* Push left partition to call stack. */
-        *call_stack++ = left;
-        *call_stack++ = i - 1;
-        /* Push right partition to call stack. */
-        *call_stack++ = i + 1;
-        *call_stack++ = right;
-    } while (call_stack != start_of_call_stack);
 }
 
 /**
@@ -406,7 +268,7 @@ static void heap_sort_only_down(T * const start, T * const end) {
         swap(&heap[1], &heap[i - 1]);
         repair_down(heap, i - 2, 1);
     }
-#if (HEAP_TO_INSERTION > 1)
+#if (HEAP_TO_INSERTION > 2)
     insertion_sort_sentinel(&heap[1], &heap[i]);
 #endif  // HEAP_TO_INSERTION > 2
 }
@@ -450,7 +312,7 @@ static void heap_sort_both_up_and_down(T * const start, T * const end) {
         heap[i - 1] = second_biggest_element;
     }
     heap[0] = prev_value;
-#if (HEAP_TO_INSERTION > 1)
+#if (HEAP_TO_INSERTION > 2)
     insertion_sort_sentinel(&heap[1], &heap[i]);
 #endif  // HEAP_TO_INSERTION > 2
 }
@@ -494,7 +356,7 @@ static void heap_sort_both_up_and_down_swap_parity(T * const start, T * const en
         heap[i - 1] = second_biggest_element;
     }
     heap[0] = prev_value;
-#if (HEAP_TO_INSERTION > 1)
+#if (HEAP_TO_INSERTION > 2)
     insertion_sort_sentinel(&heap[1], &heap[i]);
 #endif  // HEAP_TO_INSERTION > 2
 }
@@ -797,9 +659,6 @@ static void merge_sort_half_space(T * const start, T * const end) {
 // }
 
 union algo_to_test __host algos[] = {
-    {{ "Quick", quick_sort }},
-    // {{ "QuickStable", quick_sort_stable_with_arrays }},
-    // {{ "QuickStableIds", quick_sort_stable_with_ids }},
     {{ "HeapOnlyDown", heap_sort_only_down }},
     {{ "HeapUpDown", heap_sort_both_up_and_down }},
     {{ "HeapSwapParity", heap_sort_both_up_and_down_swap_parity }},
