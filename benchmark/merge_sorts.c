@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Measures runtimes of sorting algorithms used on full WRAM.
+ * @brief Measures runtimes of MergeSorts.
 **/
 
 #include <assert.h>
@@ -31,11 +31,6 @@ struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the p
 static T *call_stacks[NR_TASKLETS][40];  // call stack for iterative QuickSort
 static bool flags[NR_TASKLETS];  // Whether a write-back from the auxiliary array is (not) needed.
 
-// The input length at which stable QuickSort changes to InsertionSort.
-#define STABLE_QUICK_THRESHOLD (40)
-// The input length at which HeapSort changes to InsertionSort.
-#define HEAP_TO_INSERTION (15)
-static_assert(HEAP_TO_INSERTION & 1, "Applying to right sons, HEAP_TO_INSERTION should be odd!");
 // The number of elements flushed at once if possible.
 #define FLUSH_BATCH_LENGTH (24)
 
@@ -79,7 +74,7 @@ static void insertion_sort_sentinel(T * const start, T * const end) {
  * @param end The last element of said array.
  * @param step The distance between any two elements compared.
 **/
-static void insertion_sort_with_steps_sentinel(T * const start, T * const end, size_t const step) {
+static __attribute__((unused)) void insertion_sort_with_steps_sentinel(T * const start, T * const end, size_t const step) {
     T *curr, *i = start;
     while ((curr = (i += step)) <= end) {
         T const to_sort = *curr;
@@ -108,257 +103,6 @@ static __attribute__((unused)) void shell_sort(T * const start, T * const end) {
         insertion_sort_with_steps_sentinel(&start[j], end, 6);
 #endif  // MERGE_THRESHOLD > 18
     insertion_sort_sentinel(start, end);
-}
-
-/**
- * @brief Sifts the root of a binary max-heap down.
- * 
- * @param heap A 1-indexed array that contains the root to sift and its subtrees.
- * @param n The size of the binary tree.
- * @param root The index of the value to sift down. Its left and right subtrees must be heapified.
-**/
-static void repair_down(T heap[], size_t const n, size_t const root) {
-    T const root_value = heap[root];
-    size_t father = root, son;
-    while ((son = father * 2) <= n) {  // left son
-        if (heap[son + 1] > heap[son]) {  // Check if right son is bigger.
-            if (heap[son + 1] <= root_value) break;
-            heap[father] = heap[son + 1];  // Shift right son up.
-            father = son + 1;
-        } else {
-            if (heap[son] <= root_value) break;
-            heap[father] = heap[son];  // Shift left son up.
-            father = son;
-        }
-    }
-    heap[father] = root_value;
-}
-
-/**
- * @brief This restores the heap order, given that it is violated at at most one position.
- * @note Funfact: The parameter name `wo` is German and means `where`.
- * For some reason, the name bugged me (Z.A. Weil) back in the summer of 2019
- * as student of the class ‘Datenstrukturen’ (Data Structures), where it was used
- * in pseudo code on HeapSort, and it bugged me again as tutor of the class
- * ‘Algorithmen und Datenstrukturen 1’ (need I translate?) in the summer of 2024.
- * I hereby immortalised it, even if `wo` should perish from the courses’ script
- * when its long overdue rewrite happens.
- * 
- * @param heap The 1-indexed heap where the order may be violated.
- * @param wo The index of the vertex where the heap order may be violated.
-**/
-static void repair_up(T heap[], size_t wo) {
-    T const p = heap[wo];
-    while (heap[wo/2] < p) {
-        heap[wo] = heap[wo/2];
-        wo /= 2;
-    }
-    heap[wo] = p;
-}
-
-/**
- * @brief Removes and returns the root of a heap.
- * 
- * @param heap The 1-indexed heap whose root is to be returned.
- * @param n The length of the heap.
- * 
- * @return The original root value.
-**/
-static T extract_root(T heap[], size_t const n) {
-    T const root_value = heap[1];
-    size_t father = 1, son;
-    /* Move hole down. */
-    // Do a repair-down that moves the ‘hole’ at the root down to the last or erelast layer.
-    while ((son = father * 2) <= n) {  // left son
-        if (heap[son + 1] > heap[son]) {  // Check if right son is bigger.
-            heap[father] = heap[son + 1];  // Shift right son up.
-            father = son + 1;
-        } else {
-            heap[father] = heap[son];  // Shift left son up.
-            father = son;
-        }
-    }
-    /* Move right-most leaf in bottom layer into hole. */
-    heap[father] = heap[n];
-    /* Repair the heap structure. */
-    repair_up(heap, father);
-    return root_value;
-}
-
-/**
- * @brief Removes and returns the root of a heap.
- * Does the same number of swaps as the regular `repair_down`.
- * 
- * @param heap The 1-indexed heap whose root is to be returned.
- * @param n The length of the heap.
- * @return 
-**/
-static T extract_root_swap_parity(T heap[], size_t const n) {
-    T const root_value = heap[1];
-    size_t father = 1, son;
-    /* Trace downwards motion of hole. */
-    while ((son = father * 2) <= n) {  // left son
-        if (heap[son + 1] > heap[son]) {  // Check if right son is bigger.
-            father = son + 1;
-        } else {
-            father = son;
-        }
-    }
-    /* Go whither `repair_up` would put the hole. */
-    while (heap[father] < heap[n])
-        father /= 2;
-    /* Move rightmost leaf in bottom layer. */
-    T to_sift_up = heap[father];
-    heap[father] = heap[n];
-    /* Move the leaf's predecessors upwards. */
-    for (size_t wo = father / 2; wo >= 1; wo /= 2) {
-        T const tmp = heap[wo];
-        heap[wo] = to_sift_up;
-        to_sift_up = tmp;
-    }
-    // /* Move the leaf's predecessors upwards. (unrolled) */
-    // size_t wo = father;
-    // while (wo / 4 >= 1) {
-    //     T const tmp = heap[wo / 4];
-    //     heap[wo / 4] = heap[wo / 2];
-    //     heap[wo / 2] = to_sift_up;
-    //     to_sift_up = tmp;
-    //     wo /= 4;
-    // }
-    // if (wo == 2 || wo == 3) {
-    //     heap[1] = to_sift_up;
-    // }
-    return root_value;
-}
-
-/**
- * @brief An implementation of standard HeapSort.
- * It only sifts down.
- * 
- * @param start The first element of the WRAM array to sort.
- * @param end The last element of said array.
-**/
-static void heap_sort_only_down(T * const start, T * const end) {
-    size_t n = end - start + 1;
-    T * const heap = start - 1;
-    /* Build a heap using Floyd’s method. */
-    // if (!(n & 1))  // For some reason, this if-statement worsens the runtime drastically.
-        heap[n + 1] = T_MIN;  // If `n' is even, the last leaf is a left one.
-    for (size_t r = n / 2; r > 0; r--) {
-        repair_down(heap, n, r);
-    }
-    /* Sort by repeatedly putting the root at the end of the heap. */
-    if (!(n & 1)) {  // If `n' is even, the last leaf is a left one. (cf. loop below)
-        swap(&heap[1], &heap[n--]);
-        repair_down(heap, n, 1);
-    }
-    // `i` is always odd. When there is an odd number of elements, the last leaf is a right one.
-    // Pulling it to the front raises the need for a sentinel value,
-    // since the leaf with which one ends up at the end of `repair_down` may be the last leaf,
-    // which is now a left one. Since the right brothers of nodes are checked,
-    // a sentinel value erases the need for an additional bounds check.
-    size_t i;
-    for (i = n; i > HEAP_TO_INSERTION; i -= 2) {
-        T const biggest_element = heap[1];
-        heap[1] = heap[i];
-        heap[i] = T_MIN;
-        repair_down(heap, i - 1, 1);
-        heap[i] = biggest_element;
-
-        swap(&heap[1], &heap[i - 1]);
-        repair_down(heap, i - 2, 1);
-    }
-#if (HEAP_TO_INSERTION > 2)
-    insertion_sort_sentinel(&heap[1], &heap[i]);
-#endif  // HEAP_TO_INSERTION > 2
-}
-
-/**
- * @brief An implementation of standard HeapSort.
- * It sifts both up and down.
- * 
- * @param start The first element of the WRAM array to sort.
- * @param end The last element of said array.
-**/
-static void heap_sort_both_up_and_down(T * const start, T * const end) {
-    size_t n = end - start + 1;
-    T * const heap = start - 1;
-    T const prev_value = heap[0];
-    heap[0] = T_MAX;  // sentinel value for `repair_up`
-    /* Build a heap using Floyd’s method. */
-    // if (!(n & 1))  // For some reason, this if-statement worsens the runtime drastically.
-        heap[n + 1] = T_MIN;  // If `n' is even, the last leaf is a left one.
-    for (size_t r = n / 2; r > 0; r--) {
-        repair_down(heap, n, r);
-    }
-    /* Sort by repeatedly putting the root at the end of the heap. */
-    if (!(n & 1)) {  // If `n' is even, the last leaf is a left one. (cf. loop below)
-        T const biggest_element = extract_root(heap, n);
-        heap[n--] = biggest_element;
-    }
-    // `i` is always odd. When there is an odd number of elements, the last leaf is a right one.
-    // Placing it in the hole raises the need for a sentinel value,
-    // since the leaf with which one ends up at the end of `extract_root` may be the last leaf,
-    // which is now a left one. Since the right brothers of nodes are checked,
-    // a sentinel value erases the need for an additional bounds check.
-    size_t i;
-    for (i = n; i > HEAP_TO_INSERTION; i -= 2) {
-        T const biggest_element = extract_root(heap, i);
-
-        heap[i] = T_MIN;  // The last leaf is now a left one, so a sentinel value is needed.
-        T const second_biggest_element = extract_root(heap, i - 1);
-
-        heap[i] = biggest_element;
-        heap[i - 1] = second_biggest_element;
-    }
-    heap[0] = prev_value;
-#if (HEAP_TO_INSERTION > 2)
-    insertion_sort_sentinel(&heap[1], &heap[i]);
-#endif  // HEAP_TO_INSERTION > 2
-}
-
-/**
- * @brief An implementation of standard HeapSort.
- * It sifts both up and down while doing the same number of swaps as `heap_sort_only_down`.
- * 
- * @param start The first element of the WRAM array to sort.
- * @param end The last element of said array.
-**/
-static void heap_sort_both_up_and_down_swap_parity(T * const start, T * const end) {
-    size_t n = end - start + 1;
-    T * const heap = start - 1;
-    T const prev_value = heap[0];
-    heap[0] = T_MAX;  // sentinel value for `repair_up`
-    /* Build a heap using Floyd’s method. */
-    // if (!(n & 1))  // For some reason, this if-statement worsens the runtime drastically.
-        heap[n + 1] = T_MIN;  // If `n' is even, the last leaf is a left one.
-    for (size_t r = n / 2; r > 0; r--) {
-        repair_down(heap, n, r);
-    }
-    /* Sort by repeatedly putting the root at the end of the heap. */
-    if (!(n & 1)) {  // If `n' is even, the last leaf is a left one. (cf. loop below)
-        T const biggest_element = extract_root_swap_parity(heap, n);
-        heap[n--] = biggest_element;
-    }
-    // `i` is always odd. When there is an odd number of elements, the last leaf is a right one.
-    // Placing it in the hole raises the need for a sentinel value,
-    // since the leaf with which one ends up at the end of `extract_root` may be the last leaf,
-    // which is now a left one. Since the right brothers of nodes are checked,
-    // a sentinel value erases the need for an additional bounds check.
-    size_t i;
-    for (i = n; i > HEAP_TO_INSERTION; i -= 2) {
-        T const biggest_element = extract_root_swap_parity(heap, i);
-
-        heap[i] = T_MIN;  // The last leaf is now a left one, so a sentinel value is needed.
-        T const second_biggest_element = extract_root_swap_parity(heap, i - 1);
-
-        heap[i] = biggest_element;
-        heap[i - 1] = second_biggest_element;
-    }
-    heap[0] = prev_value;
-#if (HEAP_TO_INSERTION > 2)
-    insertion_sort_sentinel(&heap[1], &heap[i]);
-#endif  // HEAP_TO_INSERTION > 2
 }
 
 // Creating the starting runs for MergeSort.
@@ -605,68 +349,11 @@ static void merge_sort_half_space(T * const start, T * const end) {
     }
 }
 
-// /// @brief The copying of the first run happens only if merging is needed.
-// static inline void merge_left_flush_only(T * const start_1, T * const start_2,
-//         T * const end_2, T * aux, size_t const run_length) {
-//     T *i = start_1, *j = start_2;
-//     while (true) {
-//         if (*i <= *j) {
-//             i++;
-//             if (i == start_2)
-//                 return;  // Everything in the first run was smaller than in the second one.
-//         } else {
-//             flush_starting_run(i, start_2 - 1, aux);
-//             *i = *j++;
-//             break;
-//         }
-//     }
-//     T *aux_end = aux + run_length - (i - start_1) - 1, *out = i + 1;
-//     i = aux;
-//     while (true) {
-//         if (*i <= *j) {
-//             *out++ = *i++;
-//             if (i > aux_end) {
-//                 return;
-//             }
-//         } else {
-//             *out++ = *j++;
-//             if (j > end_2) {
-//                 flush_batch(i, aux_end, out);
-//                 return;
-//             }
-//         }
-//     }
-// }
-
-// static void merge_sort_half_space(T * const start, T * const end) {
-//     /* Natural runs. */
-//     CREATE_STARTING_RUNS();
-//     /* Merging. */
-//     size_t const n = end - start + 1;
-//     for (size_t run_length = MERGE_THRESHOLD; run_length < n; run_length *= 2) {
-//         // Merge pairs of adjacent runs.
-//         for (T *i = start; i <= end; i += 2 * run_length) {
-//             // Only one run left?
-//             if (i + run_length - 1 >= end) {
-//                 break;
-//             }
-//             // … and merge the copy with the next run.
-//             T * const end_2 = (i + 2 * run_length - 1 > end) ? end : i + 2 * run_length - 1;
-//             merge_left_flush_only(i, i + run_length, end_2, end + 1, run_length);
-//             // merge_left_flush_only(i + run_length, end_2, i, end + 1, run_length);
-//         }
-//     }
-// }
-
 union algo_to_test __host algos[] = {
-    {{ "HeapOnlyDown", heap_sort_only_down }},
-    {{ "HeapUpDown", heap_sort_both_up_and_down }},
-    {{ "HeapSwapParity", heap_sort_both_up_and_down_swap_parity }},
     {{ "Merge", merge_sort_no_write_back}},
     {{ "MergeWriteBack", merge_sort_write_back }},
     {{ "MergeHalfSpace", merge_sort_half_space }},
 };
-// size_t __host lengths[] = { 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024, 1536, 2048, 3072 };
 size_t __host lengths[] = { 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };
 // size_t __host lengths[] = {  // for `MERGE_THRESHOLD` <= 15
 //     MERGE_THRESHOLD, MERGE_THRESHOLD + 1, 4*MERGE_THRESHOLD + 1, 16*MERGE_THRESHOLD + 1,
