@@ -4,7 +4,7 @@ NR_TASKLETS=1
 BLOCK_SIZE=16512
 SEQREAD_CACHE_SIZE=1024
 
-b=3
+b=4
 r=1000
 
 main_folder=scripts/heap

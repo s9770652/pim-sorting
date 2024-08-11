@@ -72,6 +72,7 @@ static void show_modes(void) {
         "\n     1   Base sorting algorithms"
         "\n     2   QuickSorts"
         "\n     3   Sorting on a full WRAM cache"
+        "\n     4   HeapSorts"
         "\n"
     );
 }
