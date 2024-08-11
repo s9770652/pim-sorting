@@ -391,9 +391,7 @@ union algo_to_test __host algos[] = {
     {{ "ThreshThenTriv", quick_sort_triviality_after_threshold }},
     {{ "TrivInThresh", quick_sort_triviality_within_threshold }},
 };
-size_t __host lengths[] = { 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024 };
 size_t __host num_of_algos = sizeof algos / sizeof algos[0];
-size_t __host num_of_lengths = sizeof lengths / sizeof lengths[0];
 
 int main(void) {
     if (me() != 0) return EXIT_SUCCESS;
@@ -401,14 +399,14 @@ int main(void) {
     /* Set up buffers. */
     if (buffers[me()].cache == NULL) {  // Only allocate on the first launch.
         allocate_triple_buffer(&buffers[me()]);
-        assert(lengths[num_of_lengths - 1] <= (TRIPLE_BUFFER_SIZE >> DIV));
     }
+    assert(host_to_dpu.length <= (TRIPLE_BUFFER_SIZE >> DIV));
     T * const cache = buffers[me()].cache;
 
     /* Set up dummy values if called via debugger. */
     if (host_to_dpu.length == 0) {
-        host_to_dpu.reps = 100;
-        host_to_dpu.length = lengths[0];
+        host_to_dpu.reps = 1;
+        host_to_dpu.length = 128;
         host_to_dpu.offset = ROUND_UP_POW2(host_to_dpu.length * sizeof(T), 8) / sizeof(T);
         host_to_dpu.basic_seed = 0b1011100111010;
         host_to_dpu.algo_index = 0;
@@ -416,6 +414,7 @@ int main(void) {
         mram_range range = { 0, host_to_dpu.length * host_to_dpu.reps };
         generate_uniform_distribution_mram(input, cache, &range, 0);
     }
+
     /* Perform test. */
     T __mram_ptr *read_from = input;
     T * const start = cache, * const end = &cache[host_to_dpu.length - 1];

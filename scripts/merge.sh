@@ -6,6 +6,7 @@ SEQREAD_CACHE_SIZE=1024
 
 b=3
 r=1000
+n="16,17,32,33,64,65,128,129,256,257,512,513,1024,1025"
 
 main_folder=scripts/merge
 mkdir -p ${main_folder}
@@ -21,6 +22,6 @@ do
     dists=("sorted" "reverse" "almost" "uniform" "zipf" "normal")
     for dist in "${!dists[@]}";
     do
-        bin/host -b ${b} -r ${r} -t ${dist} | tee ${folder}/${dists[${dist}]}.txt
+        bin/host -b ${b} -r ${r} -t ${dist} -n ${n} | tee ${folder}/${dists[${dist}]}.txt
     done
 done

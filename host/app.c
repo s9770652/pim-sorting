@@ -28,11 +28,26 @@
 #error The number of tasklets must be between 1 and 16!
 #endif
 
+/**
+ * @brief Frees an allocated set of DPUs.
+ *
+ * @param set The set of DPUs to free.
+ *
+ * @sa alloc_dpus
+**/
 static void free_dpus(struct dpu_set_t set) {
     DPU_ASSERT(dpu_free(set));
 }
 
-static void alloc_dpus(struct dpu_set_t *set, uint32_t *nr_dpus, unsigned const mode) {
+/**
+ * @brief Allocates a set of DPUs and loads the correct binaries.
+ *
+ * @param set The set of DPUs to load.
+ * @param mode The mode/benchmark Id passed via the CLI.
+ *
+ * @sa free_dpus
+**/
+static void alloc_dpus(struct dpu_set_t *set, unsigned const mode) {
     char binaries[] = BINARIES, *binary = strtok(binaries, ",");
     unsigned found_binaries = 0;
     while ((binary != NULL) && (found_binaries++ != mode)) {
@@ -44,7 +59,46 @@ static void alloc_dpus(struct dpu_set_t *set, uint32_t *nr_dpus, unsigned const 
     }
     DPU_ASSERT(dpu_alloc(1, NULL, set));
     DPU_ASSERT(dpu_load(*set, binary, NULL));
-    DPU_ASSERT(dpu_get_nr_dpus(*set, nr_dpus));
+}
+
+/**
+ * @brief Counts how many lengths to test have been passed through the CLI.
+ * 
+ * @param lengths List of comma separated values.
+ * 
+ * @return The number of values passed.
+**/
+static size_t get_num_of_lengths(char lengths[]) {
+    size_t nr_of_lengths = 1;
+    for (size_t i = 0; lengths[i]; i++)
+        nr_of_lengths += (lengths[i] == ',');
+    return nr_of_lengths;
+}
+
+/**
+ * @brief Returns a pointer to an array of all lengths passed through the CLI.
+ * 
+ * @param lengths List of comma separated values.
+ * @param nr_of_lengths The number of CSV in the list.
+ * 
+ * @return An array of all lengths.
+ * 
+ * @sa get_num_of_lengths
+**/
+static uint32_t *get_lengths(char lengths[], size_t nr_of_lengths) {
+    uint32_t *ns = malloc(sizeof(uint32_t[nr_of_lengths]));
+    char *lengths_to_read = malloc(strlen(lengths));  // My God …
+    memcpy(lengths_to_read, lengths, strlen(lengths));
+    char *n = strtok(lengths_to_read, ",");
+    for (size_t i = 0; i < nr_of_lengths; i++) {
+        ns[i] = (uint32_t)atof(n);
+        if (ns[i] == 0) {
+            printf("‘%s’ is not a valid length!\n", n);
+            abort();
+        }
+        n = strtok(NULL, ",");
+    }
+    return ns;
 }
 
 /**
@@ -146,23 +200,16 @@ static void print_measurements(size_t const num_of_algos, size_t const length, t
 int main(int argc, char **argv) {
     struct Params p = input_params(argc, argv);
     struct dpu_set_t set, dpu;
-    uint32_t nr_dpus;
-    alloc_dpus(&set, &nr_dpus, p.mode);
+    alloc_dpus(&set, p.mode);
 
     /* Read in test data. */
-    uint32_t num_of_lengths, num_of_algos;
-    uint32_t *lengths = NULL;
+    uint32_t num_of_algos;
     union algo_to_test *algos = NULL;
     DPU_FOREACH(set, dpu) {
         /* Get array of algorithms to test. */
         DPU_ASSERT(dpu_copy_from(dpu, "num_of_algos", 0, &num_of_algos, sizeof(num_of_algos)));
         algos = malloc(sizeof(union algo_to_test[num_of_algos]));
         DPU_ASSERT(dpu_copy_from(dpu, "algos", 0, algos, sizeof(union algo_to_test[num_of_algos])));
-
-        /* Get array of lengths to go through. */
-        DPU_ASSERT(dpu_copy_from(dpu, "num_of_lengths", 0, &num_of_lengths, sizeof(num_of_lengths)));
-        lengths = malloc(sizeof(uint32_t[num_of_lengths]));
-        DPU_ASSERT(dpu_copy_from(dpu, "lengths", 0, lengths, sizeof(uint32_t[num_of_lengths])));
     }
 
     /* Set up tests. */
@@ -172,6 +219,9 @@ int main(int argc, char **argv) {
         .basic_seed = 0b1011100111010,
     };
     srand((unsigned)1961071919591017);
+
+    size_t num_of_lengths = get_num_of_lengths(p.lengths);
+    uint32_t *lengths = get_lengths(p.lengths, num_of_lengths);
 
     /* Perform tests. */
     print_header(algos, num_of_algos, &p);

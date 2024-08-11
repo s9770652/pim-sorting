@@ -15,7 +15,7 @@
 #include "random_distribution.h"
 
 struct Params {
-    uint32_t length;  // number of elements to sort
+    char *lengths;  // number of elements to sort
     uint32_t mode;  // benchmark: ID (0=no benchmark)
     uint32_t n_reps;  // benchmark: how often to repeat measurements
     uint32_t dist_type;  // distribution to draw from
@@ -79,7 +79,7 @@ static void show_modes(void) {
 
 struct Params input_params(int argc, char **argv) {
     struct Params p;
-    p.length = 512;
+    p.lengths = "512";
     p.dist_type = 3;
     p.dist_param = 0;
     p.n_reps = 3;
@@ -94,8 +94,7 @@ struct Params input_params(int argc, char **argv) {
             exit(0);
             break;
         case 'n':
-            assert(value > 0 && "Input length must be positive!");
-            p.length = value;
+            p.lengths = optarg;
             break;
         case 't':
             if (strcmp(optarg, "-1") == 0) {

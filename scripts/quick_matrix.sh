@@ -6,6 +6,7 @@ SEQREAD_CACHE_SIZE=1024
 
 b=2
 r=1000
+n="16,24,32,48,64,96,128,192,256,384,512,768,1024"
 
 cmd="NR_TASKLETS=${NR_TASKLETS} BLOCK_SIZE=${BLOCK_SIZE} SEQREAD_CACHE_SIZE=${SEQREAD_CACHE_SIZE} make all"
 
@@ -45,7 +46,7 @@ do
                     then
                         continue
                     fi
-                    bin/host -b ${b} -r ${r} -t ${dist} | tee ${prio_folder}/${dists[${dist}]}.txt
+                    bin/host -b ${b} -r ${r} -t ${dist} -n ${n} | tee ${prio_folder}/${dists[${dist}]}.txt
                 done
             done
         done

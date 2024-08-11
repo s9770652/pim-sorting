@@ -6,6 +6,7 @@ SEQREAD_CACHE_SIZE=1024
 
 b=1
 r=1000
+n="16,24,32,48,64,96,128,192,256,384,512,768,1024"
 
 main_folder=scripts/shell/ciura
 mkdir -p ${main_folder}
@@ -21,6 +22,6 @@ do
     dists=("sorted" "reverse" "almost" "uniform" "zipf" "normal")
     for dist in "${!dists[@]}";
     do
-        bin/host -b ${b} -r ${r} -t ${dist} | tee ${folder}/${dists[${dist}]}.txt
+        bin/host -b ${b} -r ${r} -t ${dist} -n ${n} | tee ${folder}/${dists[${dist}]}.txt
     done
 done
