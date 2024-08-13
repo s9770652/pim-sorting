@@ -104,8 +104,11 @@ static __attribute__((unused)) void shell_sort(T * const start, T * const end) {
     insertion_sort_sentinel(start, end);
 }
 
-// Creating the starting runs for MergeSort.
-#define CREATE_STARTING_RUNS()                                                           \
+/**
+ * Creating the starting runs for MergeSort.
+ * The runs are created from left to right, such that the last run may be smaller.
+**/
+#define CREATE_STARTING_RUNS_LEFT2RIGHT()                                                \
 if (end - start + 1 <= MERGE_THRESHOLD) {                                                \
     shell_sort(start, end);                                                              \
     flags[me()] = false;                                                                 \
@@ -124,6 +127,31 @@ for (T *t = start + MERGE_THRESHOLD; t < end; t += MERGE_THRESHOLD) {           
     _Pragma("unroll")  /* Restore old values. */                                         \
     for (size_t i = 0; i < FIRST_STEP; i++) {                                            \
         *(t - i - 1) = before_sentinel[i];                                               \
+    }                                                                                    \
+}
+
+/**
+ * Creating the starting runs for MergeSort.
+ * The runs are created from right to left, such that the first run may be smaller.
+**/
+#define CREATE_STARTING_RUNS_RIGHT2LEFT()                                                \
+if (end - start + 1 <= MERGE_THRESHOLD) {                                                \
+    shell_sort(start, end);                                                              \
+    flags[me()] = false;                                                                 \
+    return;                                                                              \
+}                                                                                        \
+for (T *t = end; t > start; t -= MERGE_THRESHOLD) {                                      \
+    T *t_ = t - MERGE_THRESHOLD + 1 > start ? t - MERGE_THRESHOLD + 1 : start;           \
+    T before_sentinel[FIRST_STEP];                                                       \
+    _Pragma("unroll")  /* Set sentinel values. */                                        \
+    for (size_t i = 0; i < FIRST_STEP; i++) {                                            \
+        before_sentinel[i] = *(t_ - i - 1);                                              \
+        *(t_ - i - 1) = T_MIN;                                                           \
+    }                                                                                    \
+    shell_sort(t_, t);                                                                   \
+    _Pragma("unroll")  /* Restore old values. */                                         \
+    for (size_t i = 0; i < FIRST_STEP; i++) {                                            \
+        *(t_ - i - 1) = before_sentinel[i];                                              \
     }                                                                                    \
 }
 
@@ -155,6 +183,7 @@ static inline void flush_batch(T *in, T *until, T *out) {
  * The copying is done using batches of length `MERGE_THRESHOLD`:
  * If there are at least `MERGE_THRESHOLD` many elements to copy, they are copied at once.
  * This way, the loop overhead is cut by about a `MERGE_THRESHOLD`th in good cases.
+ * @sa flush_full_starting_run
  * 
  * @param in The first element to copy.
  * @param until The last element to copy.
@@ -170,6 +199,27 @@ static inline void flush_starting_run(T *in, T *until, T *out) {
     }
     while (in <= until) {
         *out++ = *in++;
+    }
+}
+
+/**
+ * @brief Copies a given range of values to some sepcified buffer.
+ * The copying is done using *only* batches of length `MERGE_THRESHOLD`:
+ * If there are at least `MERGE_THRESHOLD` many elements to copy, they are copied at once.
+ * For this reason, the length of the buffer must be a multiple of `MERGE_THRESHOLD`.
+ * @sa flush_starting_run
+ * 
+ * @param in The first element to copy.
+ * @param until The last element to copy.
+ * @param out Whither to place the first element to copy.
+**/
+static inline void flush_full_starting_run(T *in, T *until, T *out) {
+    while (in + MERGE_THRESHOLD - 1 <= until) {
+        #pragma unroll
+        for (size_t k = 0; k < MERGE_THRESHOLD; k++)
+            *(out + k) = *(in + k);
+        out += MERGE_THRESHOLD;
+        in += MERGE_THRESHOLD;
     }
 }
 
@@ -224,7 +274,7 @@ static inline void merge(T * const start_1, T * const start_2, T * const end_2, 
 **/
 static inline void merge_sort_no_write_back(T * const start, T * const end) {
     /* Natural runs. */
-    CREATE_STARTING_RUNS();
+    CREATE_STARTING_RUNS_LEFT2RIGHT();
     /* Merging. */
     T *in, *until, *out;  // Runs from `in` to `until` are merged and stored in `out`.
     bool flag = false;  // Used to determine the initial positions of `in`, `out`, and `until`.
@@ -322,28 +372,34 @@ static inline void merge_right_flush_only(T * const start_1, T * const end_1, T 
 **/
 static void merge_sort_half_space(T * const start, T * const end) {
     /* Natural runs. */
-    CREATE_STARTING_RUNS();
+    CREATE_STARTING_RUNS_RIGHT2LEFT();
     /* Merging. */
     size_t const n = end - start + 1;
+    // for (size_t run_length = MERGE_THRESHOLD; run_length < n; run_length *= 2) {
     for (size_t run_length = MERGE_THRESHOLD; run_length < n; run_length *= 2) {
         // Merge pairs of adjacent runs.
-        for (T *i = start; i <= end; i += 2 * run_length) {
+        for (T *i = end; i > start; i -= 2 * run_length) {
             // Only one run left?
-            if (i + run_length - 1 >= end) {
+            if ((intptr_t)(i - run_length) < (intptr_t)start) {
                 break;
             }
             // If not, copy the current run …
-            T *out = end + 1, *j = i;
-            do {
-                #pragma unroll
-                for (size_t k = 0; k < MERGE_THRESHOLD; k++)
-                    *(out + k) = *(j + k);
-                out += MERGE_THRESHOLD;
-                j += MERGE_THRESHOLD;
-            } while (j < i + run_length);
+            T *run_2_start;
+            if ((intptr_t)(i - 2 * run_length + 1) > (intptr_t)start) {
+                run_2_start = i - 2 * run_length + 1;
+                flush_full_starting_run(run_2_start, i - run_length, end + 1);
+            } else {
+                run_2_start = start;
+                flush_starting_run(run_2_start, i - run_length, end + 1);
+            }
             // … and merge the copy with the next run.
-            T * const run_1_end = (i + 2 * run_length - 1 > end) ? end : i + 2 * run_length - 1;
-            merge_right_flush_only(i + run_length, run_1_end, end + 1, end + run_length, i);
+            merge_right_flush_only(
+                i - run_length + 1,
+                i,
+                end + 1,
+                end + 1 + (i - run_length - run_2_start),
+                run_2_start
+            );
         }
     }
 }
