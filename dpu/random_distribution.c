@@ -4,6 +4,7 @@
 #include <defs.h>
 #include <mram.h>
 
+#include "buffers.h"
 #include "dpu_math.h"
 #include "random_distribution.h"
 #include "random_generator.h"
@@ -30,7 +31,7 @@ void generate_uniform_distribution_mram(T __mram_ptr *array, T * const cache,
     size_t i, curr_length, curr_size;
     LOOP_ON_MRAM(i, curr_length, curr_size, (*range)) {
         generate_uniform_distribution_wram(cache, &cache[curr_length-1], upper_bound);
-        mram_write(cache, &array[i], curr_size);
+        mram_write_triple(cache, &array[i], curr_size);
     }
 }
 
@@ -46,7 +47,7 @@ void generate_sorted_distribution_mram(T __mram_ptr *array, T * const cache,
     size_t i, curr_length, curr_size;
     LOOP_ON_MRAM(i, curr_length, curr_size, (*range)) {
         generate_sorted_distribution_wram(cache, &cache[curr_length-1]);
-        mram_write(cache, &array[i], curr_size);
+        mram_write_triple(cache, &array[i], curr_size);
     }
 }
 
@@ -62,7 +63,7 @@ void generate_reverse_sorted_distribution_mram(T __mram_ptr *array, T * const ca
     size_t i, curr_length, curr_size;
     LOOP_ON_MRAM(i, curr_length, curr_size, (*range)) {
         generate_reverse_sorted_distribution_wram(cache, &cache[curr_length-1]);
-        mram_write(cache, &array[i], curr_size);
+        mram_write_triple(cache, &array[i], curr_size);
     }
 }
 
