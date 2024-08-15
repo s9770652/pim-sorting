@@ -229,7 +229,7 @@ static inline void flush_full_starting_run(T *in, T *until, T *out) {
  * but making `end_2` exclusive also worsens the runtime, hence the asymmetry.
  * 
  * @param start_1 The first element of the first run.
- * @param start_2 The first element of the second run. Must be follow the end of the first run.
+ * @param start_2 The first element of the second run. Must follow the end of the first run.
  * @param end_2 The last element of the second run.
  * @param out Whither the merged runs are written.
 **/
@@ -298,7 +298,7 @@ static inline void merge_sort_no_write_back(T * const start, T * const end) {
                 break;
             }
             // If not, merge the next two runs.
-            T * const run_2_end = (in + 2 * run_length - 1 > until) ? until : in + 2 * run_length - 1;
+            T * const run_2_end = (in + 2 * run_length > until) ? until : in + 2 * run_length - 1;
             merge(in, in + run_length, run_2_end, out);
         }
     }
@@ -375,30 +375,30 @@ static void merge_sort_half_space(T * const start, T * const end) {
     CREATE_STARTING_RUNS_RIGHT2LEFT();
     /* Merging. */
     size_t const n = end - start + 1;
-    // for (size_t run_length = MERGE_THRESHOLD; run_length < n; run_length *= 2) {
     for (size_t run_length = MERGE_THRESHOLD; run_length < n; run_length *= 2) {
         // Merge pairs of adjacent runs.
         for (T *i = end; i > start; i -= 2 * run_length) {
             // Only one run left?
-            if ((intptr_t)(i - run_length) < (intptr_t)start) {
+            T * const run_1_end = i - run_length;
+            if ((intptr_t)run_1_end < (intptr_t)start) {
                 break;
             }
             // If not, copy the current run …
-            T *run_2_start;
-            if ((intptr_t)(i - 2 * run_length + 1) > (intptr_t)start) {
-                run_2_start = i - 2 * run_length + 1;
-                flush_full_starting_run(run_2_start, i - run_length, end + 1);
+            T *run_1_start;  // Using a tertiary operator worsens the runtime.
+            if ((intptr_t)(run_1_end - run_length + 1) > (intptr_t)start) {
+                run_1_start = run_1_end - run_length + 1;
+                flush_full_starting_run(run_1_start, run_1_end, end + 1);
             } else {
-                run_2_start = start;
-                flush_starting_run(run_2_start, i - run_length, end + 1);
+                run_1_start = start;
+                flush_starting_run(run_1_start, run_1_end, end + 1);
             }
             // … and merge the copy with the next run.
             merge_right_flush_only(
-                i - run_length + 1,
+                run_1_end + 1,
                 i,
                 end + 1,
-                end + 1 + (i - run_length - run_2_start),
-                run_2_start
+                end + 1 + (run_1_end - run_1_start),
+                run_1_start
             );
         }
     }
