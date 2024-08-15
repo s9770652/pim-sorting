@@ -95,9 +95,6 @@ swap(i, right)
 // They are distinct only in the iterative variant.
 #define QUICK_HEAD() T *left = start, *right = end
 
-// Performs a recursive call.
-#define QUICK_CALL(name, l, r) name(l, r)
-
 // Unneeded for the recursive variant.
 #define QUICK_TAIL()
 
@@ -118,9 +115,6 @@ T **call_stack = start_of_call_stack;                   \
 *call_stack++ = end;                                    \
 do {                                                    \
     T *right = *--call_stack, *left = *--call_stack
-
-// Instead of recursive calls, the required variables are put on the stack.
-#define QUICK_CALL(name, l, r) do {*call_stack++ = l; *call_stack++ = r;} while (false)
 
 // Closing the loop which pops from the stack.
 #define QUICK_TAIL() } while (call_stack != start_of_call_stack)
