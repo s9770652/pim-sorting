@@ -287,6 +287,7 @@ int main(void) {
 
     /* Set up buffers. */
     size_t num_of_sentinels = 16;  // 17 is the maximum step, 1 is already present.
+    assert(host_to_dpu.length + num_of_sentinels <= (TRIPLE_BUFFER_SIZE >> DIV));
     if (buffers[me()].cache == NULL) {  // Only allocate on the first launch.
         allocate_triple_buffer(&buffers[me()]);
         /* Add additional sentinel values. */
@@ -295,7 +296,6 @@ int main(void) {
         buffers[me()].cache += num_of_sentinels;
         assert(!((uintptr_t)buffers[me()].cache & 7) && "Cache address not aligned on 8 bytes!");
     }
-    assert(host_to_dpu.length + num_of_sentinels <= (TRIPLE_BUFFER_SIZE >> DIV));
     T * const cache = buffers[me()].cache;
 
     /* Set up dummy values if called via debugger. */
