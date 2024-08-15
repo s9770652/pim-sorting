@@ -273,7 +273,7 @@ static inline void merge(T * const start_1, T * const start_2, T * const end_2, 
  * @param end The last element of said array.
 **/
 static inline void merge_sort_no_write_back(T * const start, T * const end) {
-    /* Natural runs. */
+    /* Starting runs. */
     CREATE_STARTING_RUNS_LEFT2RIGHT();
     /* Merging. */
     T *in, *until, *out;  // Runs from `in` to `until` are merged and stored in `out`.
@@ -371,7 +371,7 @@ static inline void merge_right_flush_only(T * const start_1, T * const end_1, T 
  * @param end The last element of said array.
 **/
 static void merge_sort_half_space(T * const start, T * const end) {
-    /* Natural runs. */
+    /* Starting runs. */
     CREATE_STARTING_RUNS_RIGHT2LEFT();
     /* Merging. */
     size_t const n = end - start + 1;
