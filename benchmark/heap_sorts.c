@@ -30,8 +30,8 @@ struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input 
 struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the pivot
 
 // The input length at which HeapSort changes to InsertionSort.
-#define HEAP_TO_INSERTION (15)
-static_assert(HEAP_TO_INSERTION & 1, "Applying to right sons, HEAP_TO_INSERTION should be odd!");
+#define HEAP_THRESHOLD (15)
+static_assert(HEAP_THRESHOLD & 1, "Applying to right sons, HEAP_THRESHOLD should be odd!");
 
 /**
  * @brief An implementation of standard InsertionSort.
@@ -203,7 +203,7 @@ static void heap_sort_only_down(T * const start, T * const end) {
     // which is now a left one. Since the right brothers of nodes are checked,
     // a sentinel value erases the need for an additional bounds check.
     size_t i;
-    for (i = n; i > HEAP_TO_INSERTION; i -= 2) {
+    for (i = n; i > HEAP_THRESHOLD; i -= 2) {
         T const biggest_element = heap[1];
         heap[1] = heap[i];
         heap[i] = T_MIN;
@@ -213,9 +213,9 @@ static void heap_sort_only_down(T * const start, T * const end) {
         swap(&heap[1], &heap[i - 1]);
         repair_down(heap, i - 2, 1);
     }
-#if (HEAP_TO_INSERTION > 2)
+#if (HEAP_THRESHOLD > 2)
     insertion_sort_sentinel(&heap[1], &heap[i]);
-#endif  // HEAP_TO_INSERTION > 2
+#endif  // HEAP_THRESHOLD > 2
 }
 
 /**
@@ -247,7 +247,7 @@ static void heap_sort_both_up_and_down(T * const start, T * const end) {
     // which is now a left one. Since the right brothers of nodes are checked,
     // a sentinel value erases the need for an additional bounds check.
     size_t i;
-    for (i = n; i > HEAP_TO_INSERTION; i -= 2) {
+    for (i = n; i > HEAP_THRESHOLD; i -= 2) {
         T const biggest_element = extract_root(heap, i);
 
         heap[i] = T_MIN;  // The last leaf is now a left one, so a sentinel value is needed.
@@ -257,9 +257,9 @@ static void heap_sort_both_up_and_down(T * const start, T * const end) {
         heap[i - 1] = second_biggest_element;
     }
     heap[0] = prev_value;
-#if (HEAP_TO_INSERTION > 2)
+#if (HEAP_THRESHOLD > 2)
     insertion_sort_sentinel(&heap[1], &heap[i]);
-#endif  // HEAP_TO_INSERTION > 2
+#endif  // HEAP_THRESHOLD > 2
 }
 
 /**
@@ -291,7 +291,7 @@ static void heap_sort_both_up_and_down_swap_parity(T * const start, T * const en
     // which is now a left one. Since the right brothers of nodes are checked,
     // a sentinel value erases the need for an additional bounds check.
     size_t i;
-    for (i = n; i > HEAP_TO_INSERTION; i -= 2) {
+    for (i = n; i > HEAP_THRESHOLD; i -= 2) {
         T const biggest_element = extract_root_swap_parity(heap, i);
 
         heap[i] = T_MIN;  // The last leaf is now a left one, so a sentinel value is needed.
@@ -301,9 +301,9 @@ static void heap_sort_both_up_and_down_swap_parity(T * const start, T * const en
         heap[i - 1] = second_biggest_element;
     }
     heap[0] = prev_value;
-#if (HEAP_TO_INSERTION > 2)
+#if (HEAP_THRESHOLD > 2)
     insertion_sort_sentinel(&heap[1], &heap[i]);
-#endif  // HEAP_TO_INSERTION > 2
+#endif  // HEAP_THRESHOLD > 2
 }
 
 union algo_to_test __host algos[] = {
