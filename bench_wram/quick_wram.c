@@ -377,14 +377,14 @@ static void quick_sort_triviality_within_threshold(T * const start, T * const en
 }
 
 union algo_to_test __host algos[] = {
-    {{ "Normal", quick_sort }},
-    {{ "TrivialBC", quick_sort_check_trivial_before_call }},
-    {{ "NoTrivial", quick_sort_no_triviality }},
-    {{ "OneInsertion", sort_with_one_insertion_sort }},
-    {{ "ThreshBC", quick_sort_check_threshold_before_call }},
-    {{ "ThreshTrivBC", quick_sort_check_triviality_and_threshold_before_call }},
-    {{ "ThreshThenTriv", quick_sort_triviality_after_threshold }},
-    {{ "TrivInThresh", quick_sort_triviality_within_threshold }},
+    {{ "Normal", { .wram = quick_sort } }},
+    {{ "TrivialBC", { .wram = quick_sort_check_trivial_before_call } }},
+    {{ "NoTrivial", { .wram = quick_sort_no_triviality } }},
+    {{ "OneInsertion", { .wram = sort_with_one_insertion_sort } }},
+    {{ "ThreshBC", { .wram = quick_sort_check_threshold_before_call } }},
+    {{ "ThreshTrivBC", { .wram = quick_sort_check_triviality_and_threshold_before_call } }},
+    {{ "ThreshThenTriv", { .wram = quick_sort_triviality_after_threshold } }},
+    {{ "TrivInThresh", { .wram = quick_sort_triviality_within_threshold } }},
 };
 size_t __host num_of_algos = sizeof algos / sizeof algos[0];
 
@@ -414,7 +414,7 @@ int main(void) {
     T __mram_ptr *read_from = input;
     T * const start = cache, * const end = &cache[host_to_dpu.length - 1];
     unsigned int const transfer_size = DMA_ALIGNED(sizeof(T[host_to_dpu.length]));
-    base_sort_algo * const algo = algos[host_to_dpu.algo_index].data.fct;
+    sort_algo_wram * const algo = algos[host_to_dpu.algo_index].data.fct.wram;
     memset(&dpu_to_host, 0, sizeof dpu_to_host);
 
     for (uint32_t rep = 0; rep < host_to_dpu.reps; rep++) {

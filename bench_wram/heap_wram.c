@@ -308,9 +308,9 @@ static void heap_sort_both_up_and_down_swap_parity(T * const start, T * const en
 }
 
 union algo_to_test __host algos[] = {
-    {{ "HeapOnlyDown", heap_sort_only_down }},
-    {{ "HeapUpDown", heap_sort_both_up_and_down }},
-    {{ "HeapSwapParity", heap_sort_both_up_and_down_swap_parity }},
+    {{ "HeapOnlyDown", { .wram = heap_sort_only_down } }},
+    {{ "HeapUpDown", { .wram = heap_sort_both_up_and_down } }},
+    {{ "HeapSwapParity", { .wram = heap_sort_both_up_and_down_swap_parity } }},
 };
 size_t __host num_of_algos = sizeof algos / sizeof algos[0];
 
@@ -340,7 +340,7 @@ int main(void) {
     T __mram_ptr *read_from = input;
     T * const start = cache, * const end = &cache[host_to_dpu.length - 1];
     unsigned int const transfer_size = DMA_ALIGNED(sizeof(T[host_to_dpu.length]));
-    base_sort_algo * const algo = algos[host_to_dpu.algo_index].data.fct;
+    sort_algo_wram * const algo = algos[host_to_dpu.algo_index].data.fct.wram;
     memset(&dpu_to_host, 0, sizeof dpu_to_host);
 
     for (uint32_t rep = 0; rep < host_to_dpu.reps; rep++) {

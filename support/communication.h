@@ -10,6 +10,8 @@
 
 #include "common.h"
 
+/* Defining some elements missing on the host. */
+
 #ifndef DMA_ALIGNMENT  // Define missing DMA constants for the host.
 
 #define DMA_ALIGNMENT (8)
@@ -23,6 +25,12 @@
 
 #endif
 
+#ifndef __mram_ptr  // Ignore this identifier on the host.
+#define __mram_ptr
+#endif
+
+/* Defining elements common to both the host and the DPUs. */
+
 /// @brief The maximum number of elements loaded into MRAM.
 /// Their size must be divisible by `DMA_ALIGNMENT`.
 #define LOAD_INTO_MRAM ((1024 * 1024 * 25) >> DIV)
@@ -31,8 +39,18 @@
 #error The size of elements to load into MRAM must be divisible by `DMA_ALIGNMENT`.
 #endif
 
-/// @brief Every WRAM sorting functions must adher to this pattern.
-typedef void base_sort_algo(T *, T *);
+/// @brief Every WRAM sorting function must adher to this pattern.
+typedef void sort_algo_wram(T *, T *);
+
+/// @brief Every MRAM sorting function must adher to this pattern.
+typedef void sort_algo_mram(T __mram_ptr *, T __mram_ptr *);
+
+/// @brief A general sorting function.
+union sort_algo
+{
+    sort_algo_wram *wram;
+    sort_algo_mram *mram;
+};
 
 /// @brief Information sent from the host to the DPU.
 struct dpu_arguments {
@@ -61,7 +79,6 @@ struct dpu_results {
     time seconds;
 };
 
-
 /// @brief A sorting algorithm and its name.
 struct algo_data {
     /// @brief The name of the algorithm to print in the console.
@@ -69,7 +86,7 @@ struct algo_data {
     /// @brief A pointer to a sorting function of type `base_sort_algo`.
     /// Since pointers have different sizes on the host and the DPU,
     /// a conversion to a normal integer is needed.
-    base_sort_algo *fct;
+    union sort_algo fct;
 };
 
 /// @brief Holds a sorting algorithm and its name.

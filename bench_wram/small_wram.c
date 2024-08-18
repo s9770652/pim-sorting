@@ -264,23 +264,23 @@ SHELL_SORT_CUSTOM_STEP_X(9)
 static __attribute__((unused)) void empty_sort(T *start, T *end) { (void)start; (void)end; }
 
 union algo_to_test __host algos[] = {
-    // {{ "Empty", empty_sort }},
-    {{ "1", insertion_sort_sentinel }},
-    {{ "2", shell_sort_custom_step_2 }},
-    {{ "3", shell_sort_custom_step_3 }},
-    {{ "4", shell_sort_custom_step_4 }},
-    {{ "5", shell_sort_custom_step_5 }},
-    {{ "6", shell_sort_custom_step_6 }},
-    {{ "7", shell_sort_custom_step_7 }},
-    {{ "8", shell_sort_custom_step_8 }},
-    {{ "9", shell_sort_custom_step_9 }},
-    // {{ "Ciura", shell_sort_ciura }},
-    {{ "1NoSentinel", insertion_sort_nosentinel }},
-    {{ "1Implicit", insertion_sort_implicit_sentinel }},
-    // {{ "1Assembly", insertion_sort_assembly }},
-    {{ "BubbleAdapt", bubble_sort_adaptive }},
-    {{ "BubbleNonAdapt", bubble_sort_nonadaptive }},
-    {{ "Selection", selection_sort }},
+    // {{ "Empty", { .wram = empty_sort } }},
+    {{ "1", { .wram = insertion_sort_sentinel } }},
+    {{ "2", { .wram = shell_sort_custom_step_2 } }},
+    {{ "3", { .wram = shell_sort_custom_step_3 } }},
+    {{ "4", { .wram = shell_sort_custom_step_4 } }},
+    {{ "5", { .wram = shell_sort_custom_step_5 } }},
+    {{ "6", { .wram = shell_sort_custom_step_6 } }},
+    {{ "7", { .wram = shell_sort_custom_step_7 } }},
+    {{ "8", { .wram = shell_sort_custom_step_8 } }},
+    {{ "9", { .wram = shell_sort_custom_step_9 } }},
+    // {{ "Ciura", { .wram = shell_sort_ciura } }},
+    {{ "1NoSentinel", { .wram = insertion_sort_nosentinel } }},
+    {{ "1Implicit", { .wram = insertion_sort_implicit_sentinel } }},
+    // {{ "1Assembly", { .wram = insertion_sort_assembly } }},
+    {{ "BubbleAdapt", { .wram = bubble_sort_adaptive } }},
+    {{ "BubbleNonAdapt", { .wram = bubble_sort_nonadaptive } }},
+    {{ "Selection", { .wram = selection_sort } }},
 };
 size_t __host num_of_algos = sizeof algos / sizeof algos[0];
 
@@ -319,7 +319,7 @@ int main(void) {
     T __mram_ptr *read_from = input;
     T * const start = cache, * const end = &cache[host_to_dpu.length - 1];
     unsigned int const transfer_size = DMA_ALIGNED(sizeof(T[host_to_dpu.length]));
-    base_sort_algo * const algo = algos[host_to_dpu.algo_index].data.fct;
+    sort_algo_wram * const algo = algos[host_to_dpu.algo_index].data.fct.wram;
     memset(&dpu_to_host, 0, sizeof dpu_to_host);
 
     for (uint32_t rep = 0; rep < host_to_dpu.reps; rep++) {

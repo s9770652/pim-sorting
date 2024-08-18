@@ -173,7 +173,7 @@ static void merge_sort(T __mram_ptr * const start, T __mram_ptr * const end) {
 }
 
 union algo_to_test __host algos[] = {
-    {{ "MergeHalfSpace", NULL }}
+    {{ "MergeHalfSpace", { .mram = merge_sort } }},
 };
 size_t __host num_of_algos = sizeof algos / sizeof algos[0];
 
@@ -200,7 +200,7 @@ int main(void) {
 
     /* Perform test. */
     mram_range range = { 0, host_to_dpu.length };
-    // base_sort_algo * const algo = algos[host_to_dpu.algo_index].data.fct;
+    sort_algo_mram * const algo = algos[host_to_dpu.algo_index].data.fct.mram;
     memset(&dpu_to_host, 0, sizeof dpu_to_host);
 
     for (uint32_t rep = 0; rep < host_to_dpu.reps; rep++) {
@@ -211,8 +211,7 @@ int main(void) {
 
         perfcounter_config(COUNT_CYCLES, true);
         time new_time = perfcounter_get();
-        // algo(&input[range.start], &input[range.end - 1]);
-        merge_sort(&input[range.start], &input[range.end - 1]);
+        algo(&input[range.start], &input[range.end - 1]);
         new_time = perfcounter_get() - new_time - CALL_OVERHEAD;
         dpu_to_host.firsts += new_time;
         dpu_to_host.seconds += new_time * new_time;
