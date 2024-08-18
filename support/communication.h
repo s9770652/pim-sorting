@@ -10,11 +10,25 @@
 
 #include "common.h"
 
-/// @brief The maximum number of elements loaded into MRAM. Their size must be divisible by 8.
+#ifndef DMA_ALIGNMENT  // Define missing DMA constants for the host.
+
+#define DMA_ALIGNMENT (8)
+#define DMA_ALIGNED(x) (((x) + (DMA_ALIGNMENT - 1)) & ~(DMA_ALIGNMENT - 1))
+
+#else  // Check if the constants have changed.
+
+#if (DMA_ALIGNMENT != 8)
+#error `DMA_ALIGNMENT` is not 8 anymore! Change the makeshift definitions for the host accordingly!
+#endif
+
+#endif
+
+/// @brief The maximum number of elements loaded into MRAM.
+/// Their size must be divisible by `DMA_ALIGNMENT`.
 #define LOAD_INTO_MRAM ((1024 * 1024 * 25) >> DIV)
 
-#if (LOAD_INTO_MRAM % 2)
-#error `LOAD_INTO_MRAM` must be an even number!
+#if ((LOAD_INTO_MRAM << DIV) != DMA_ALIGNED(LOAD_INTO_MRAM << DIV))
+#error The size of elements to load into MRAM must be divisible by `DMA_ALIGNMENT`.
 #endif
 
 /// @brief Every WRAM sorting functions must adher to this pattern.

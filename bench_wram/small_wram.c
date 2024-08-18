@@ -10,6 +10,7 @@
 
 #include <alloc.h>
 #include <defs.h>
+#include <memmram_utils.h>
 #include <perfcounter.h>
 
 #include "buffers.h"
@@ -294,7 +295,10 @@ int main(void) {
         for (size_t i = 0; i < num_of_sentinels; i++)
             buffers[me()].cache[i] = T_MIN;
         buffers[me()].cache += num_of_sentinels;
-        assert(!((uintptr_t)buffers[me()].cache & 7) && "Cache address not aligned on 8 bytes!");
+        assert(
+            (uintptr_t)buffers[me()].cache == DMA_ALIGNED((uintptr_t)buffers[me()].cache) 
+            && "Cache address not aligned for DMAs!"
+        );
     }
     T * const cache = buffers[me()].cache;
 
@@ -302,7 +306,7 @@ int main(void) {
     if (host_to_dpu.length == 0) {
         host_to_dpu.reps = 1;
         host_to_dpu.length = 128;
-        host_to_dpu.offset = ROUND_UP_POW2(host_to_dpu.length * sizeof(T), 8) / sizeof(T);
+        host_to_dpu.offset = DMA_ALIGNED(host_to_dpu.length * sizeof(T)) / sizeof(T);
         host_to_dpu.basic_seed = 0b1011100111010;
         host_to_dpu.algo_index = 0;
         input_rngs[me()] = seed_xs(host_to_dpu.basic_seed + me());
@@ -313,7 +317,7 @@ int main(void) {
     /* Perform test. */
     T __mram_ptr *read_from = input;
     T * const start = cache, * const end = &cache[host_to_dpu.length - 1];
-    unsigned int const transfer_size = ROUND_UP_POW2(sizeof(T[host_to_dpu.length]), 8);
+    unsigned int const transfer_size = DMA_ALIGNED(sizeof(T[host_to_dpu.length]));
     base_sort_algo * const algo = algos[host_to_dpu.algo_index].data.fct;
     memset(&dpu_to_host, 0, sizeof dpu_to_host);
 

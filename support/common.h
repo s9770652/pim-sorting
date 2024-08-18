@@ -26,15 +26,10 @@ typedef uint64_t T;
 
 /// @brief Computes `n` ÷ `m` rounded up.
 #define DIV_CEIL(n, m) (((n) - 1) / (m) + 1)
-/// @brief Rounds `n` up to the next highest multiple of `m` if not already a multiple.
-#define ROUND_UP(n, m) ((((n) + (m) - 1) / (m)) * (m))
-/// @brief Rounds `n` up to the next highest multiple of `m` if not already a multiple.
-/// `m` must be a power of two.
-#define ROUND_UP_POW2(n, m) (((n) + (m) - 1) & -(m))
 
 /**
  * @brief Swaps the content of two addresses.
- * @note If any address involved is a MRAM address,
+ * @note If any address involved is an MRAM address,
  * a solution with `mram_write/copy` should be employed.
  * 
  * @param a First address.

@@ -15,20 +15,22 @@
 #include <stddef.h>
 
 #include <mram.h>
+#include <memmram_utils.h>
 #include <seqread.h>
 
 #include "common.h"
 
 /// @brief The minimum size of a general-purpose buffer & two sequential-reader buffers.
-#define TRIPLE_BUFFER_SIZE (BLOCK_SIZE + 4 * SEQREAD_CACHE_SIZE)
+#define TRIPLE_BUFFER_SIZE ((BLOCK_SIZE + 4 * SEQREAD_CACHE_SIZE) & ~DMA_OFF_MASK)
 /// @brief The min. number of elements in a general-purpose buffer & two sequential-reader buffers.
 #define TRIPLE_BUFFER_LENGTH (TRIPLE_BUFFER_SIZE / sizeof(T))
 /// @brief The maximum number of bytes transferrable at once between MRAM and a triple buffer.
-#define MAX_TRANSFER_SIZE_TRIPLE (((TRIPLE_BUFFER_SIZE > 2048) ? 2048 : TRIPLE_BUFFER_SIZE) & ~7)
+#define MAX_TRANSFER_SIZE_TRIPLE (((TRIPLE_BUFFER_SIZE > 2048) ? 2048 : TRIPLE_BUFFER_SIZE) \
+        & ~DMA_OFF_MASK)
 /// @brief The maximum number of elements transferrable at once between MRAM and a triple buffer.
 #define MAX_TRANSFER_LENGTH_TRIPLE (MAX_TRANSFER_SIZE_TRIPLE / sizeof(T))
 /// @brief The maximum number of bytes transferrable at once between MRAM and the cache.
-#define MAX_TRANSFER_SIZE_CACHE (((BLOCK_SIZE > 2048) ? 2048 : BLOCK_SIZE) & ~7)
+#define MAX_TRANSFER_SIZE_CACHE (((BLOCK_SIZE > 2048) ? 2048 : BLOCK_SIZE) & ~DMA_OFF_MASK)
 /// @brief The maximum number of elements transferrable at once between MRAM and the cache.
 #define MAX_TRANSFER_LENGTH_CACHE (MAX_TRANSFER_SIZE_CACHE / sizeof(T))
 

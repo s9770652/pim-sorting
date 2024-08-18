@@ -9,6 +9,7 @@
 #include <stddef.h>
 
 #include <attributes.h>
+#include <memmram_utils.h>
 
 #include "buffers.h"
 #include "common.h"
@@ -36,7 +37,7 @@ typedef struct mram_range_ptr {
  * 
  * @param i Current index, i. e. the start of the current block.
  * @param curr_length Length of the current block as number of elements.
- * @param curr_size Size of the current block, aligned on 8 bytes.
+ * @param curr_size Size of the current block, properly aligned for DMAs.
  * @param range Start and end of the tasklet’s range.
 **/
 #define LOOP_ON_MRAM(i, curr_length, curr_size, range)         \
@@ -46,7 +47,7 @@ for (                                                          \
             ? range.end - i                                    \
             : MAX_TRANSFER_LENGTH_TRIPLE,                      \
     curr_size = (i + MAX_TRANSFER_LENGTH_TRIPLE > range.end)   \
-            ? ROUND_UP_POW2(curr_length << DIV, 8)             \
+            ? DMA_ALIGNED(curr_length << DIV)                  \
             : MAX_TRANSFER_SIZE_TRIPLE                         \
     ;                                                          \
     i < range.end                                              \
@@ -56,7 +57,7 @@ for (                                                          \
             ? range.end - i                                    \
             : MAX_TRANSFER_LENGTH_TRIPLE,                      \
     curr_size = (i + MAX_TRANSFER_LENGTH_TRIPLE > range.end)   \
-            ? ROUND_UP_POW2(curr_length << DIV, 8)             \
+            ? DMA_ALIGNED(curr_length << DIV)                  \
             : MAX_TRANSFER_SIZE_TRIPLE                         \
 )
 
@@ -67,7 +68,7 @@ for (                                                                   \
             ? range.end - i                                             \
             : (block_length),                                           \
     curr_size = (i + (block_length) > range.end)                        \
-            ? ROUND_UP_POW2(curr_length << DIV, 8)                      \
+            ? DMA_ALIGNED(curr_length << DIV)                           \
             : (block_length) << DIV                                     \
     ;                                                                   \
     i < range.end                                                       \
@@ -77,7 +78,7 @@ for (                                                                   \
             ? range.end - i                                             \
             : (block_length),                                           \
     curr_size = (i + (block_length) > range.end)                        \
-            ? ROUND_UP_POW2(curr_length << DIV, 8)                      \
+            ? DMA_ALIGNED(curr_length << DIV)                           \
             : (block_length) << DIV                                     \
 )
 
@@ -88,7 +89,7 @@ for (                                                                           
             : range.end - range.start,                                              \
     curr_size = ((intptr_t)(range.end - (block_length)) >= (intptr_t)range.start)   \
             ? (block_length) << DIV                                                 \
-            : ROUND_UP_POW2(curr_length << DIV, 8),                                 \
+            : DMA_ALIGNED(curr_length << DIV),                                      \
     i = ((intptr_t)(range.end - (block_length)) >= (intptr_t)range.start)           \
             ? range.end - (block_length)                                            \
             : start                                                                 \
@@ -100,7 +101,7 @@ for (                                                                           
             : i - range.start,                                                      \
     curr_size = ((intptr_t)(i - (block_length)) >= (intptr_t)range.start)           \
             ? (block_length) << DIV                                                 \
-            : ROUND_UP_POW2(curr_length << DIV, 8),                                 \
+            : DMA_ALIGNED(curr_length << DIV),                                      \
     i = ((intptr_t)(i - (block_length)) >= (intptr_t)range.start)                   \
             ? i - (block_length)                                                    \
             : range.start                                                           \

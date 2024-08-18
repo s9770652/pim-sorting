@@ -5,6 +5,7 @@
 
 #include <alloc.h>
 #include <defs.h>
+#include <memmram_utils.h>
 #include <perfcounter.h>
 
 #include "wram_sorts.h"
@@ -26,7 +27,10 @@ struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the p
 
 #define STARTING_RUN_LENGTH (TRIPLE_BUFFER_LENGTH)
 #define STARTING_RUN_SIZE (STARTING_RUN_LENGTH * sizeof(T))
-static_assert(!(STARTING_RUN_SIZE % 8), "The size of starting runs must be aligned on 8 bytes!");
+static_assert(
+    STARTING_RUN_SIZE == DMA_ALIGNED(STARTING_RUN_SIZE),
+    "The size of starting runs must be properly aligned for DMAs!"
+);
 static_assert(
     STARTING_RUN_SIZE <= TRIPLE_BUFFER_SIZE,
     "The starting runs are sorted entirely in WRAM and, thus, must fit in there!"
@@ -75,7 +79,7 @@ static __noinline void flush_first(T __mram_ptr *in, T __mram_ptr *out, __attrib
 
     // Transfer from MRAM to MRAM.
     do {
-        // Thanks to the dummy values, even for numbers smaller than 8 bytes,
+        // Thanks to the dummy values, even for numbers smaller than `DMA_ALIGNMENT` bytes,
         // there is no need to round the size up.
         size_t const rem_size = (in + MAX_TRANSFER_LENGTH_TRIPLE > end)
                 ? (size_t)end - (size_t)in + sizeof(T)
@@ -181,7 +185,7 @@ int main(void) {
     if (host_to_dpu.length == 0) {
         host_to_dpu.reps = 1;
         host_to_dpu.length = 1024;
-        host_to_dpu.offset = ROUND_UP_POW2(host_to_dpu.length * sizeof(T), 8) / sizeof(T);
+        host_to_dpu.offset = DMA_ALIGNED(host_to_dpu.length * sizeof(T)) / sizeof(T);
         host_to_dpu.basic_seed = 0b1011100111010;
         host_to_dpu.algo_index = 0;
         input_rngs[me()] = seed_xs(host_to_dpu.basic_seed + me());

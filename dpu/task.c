@@ -3,6 +3,7 @@
 #include <alloc.h>
 #include <barrier.h>
 #include <defs.h>
+#include <memmram_utils.h>
 #include <mram.h>
 #include <perfcounter.h>
 
@@ -34,9 +35,8 @@ BARRIER_INIT(omni_barrier, NR_TASKLETS);
 perfcounter_t cycles[NR_TASKLETS];  // Used to measure the time for each tasklet.
 #endif
 
-
 inline size_t align(size_t to_align) {
-    return ROUND_UP_POW2(to_align << DIV, 8) >> DIV;
+    return DMA_ALIGNED(to_align << DIV) >> DIV;
 }
 
 int main(void) {
@@ -66,7 +66,7 @@ int main(void) {
     const size_t part_start = me() * part_length;
     // end of the tasklet’s subarray
 #ifdef UINT32
-    const size_t part_end = (me() == NR_TASKLETS - 1) ? ROUND_UP_POW2(length, 2) : part_start + part_length;
+    const size_t part_end = (me() == NR_TASKLETS - 1) ? ALIGN(length, 2) : part_start + part_length;
 #else
     const size_t part_end = (me() == NR_TASKLETS - 1) ? length : part_start + part_length;
 #endif
