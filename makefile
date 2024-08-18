@@ -1,7 +1,7 @@
 # Folder structure.
 HOST_DIR := host
 DPU_DIR := dpu
-BENCHMARK_DIR := benchmark
+BENCHMARK_DIR := bench_*
 BUILD_DIR ?= bin
 OBJ_DIR ?= obj
 
