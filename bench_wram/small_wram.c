@@ -288,7 +288,7 @@ int main(void) {
 
     /* Set up buffers. */
     size_t num_of_sentinels = 16;  // 17 is the maximum step, 1 is already present.
-    assert(host_to_dpu.length + num_of_sentinels <= (TRIPLE_BUFFER_SIZE >> DIV));
+    assert(host_to_dpu.length + num_of_sentinels <= TRIPLE_BUFFER_LENGTH);
     if (buffers[me()].cache == NULL) {  // Only allocate on the first launch.
         allocate_triple_buffer(&buffers[me()]);
         /* Add additional sentinel values. */

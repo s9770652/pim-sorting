@@ -57,7 +57,7 @@ static void flush_second(T __mram_ptr *out, __attribute__((unused)) T * const pt
         cache[i++] = *ptr;  // Possible since `ptr` must have at least one element.
     }
 #endif
-    mram_write(cache, out, i << DIV);
+    mram_write(cache, out, i * sizeof(T));
 }
 
 // Inlining actually worsens performance. // todo: really?
@@ -69,12 +69,12 @@ static __noinline void flush_first(T __mram_ptr *in, T __mram_ptr *out, __attrib
     if (i & 1) {  // Is there need for alignment?
         cache[i++] = *ptr;  // Possible since `ptr` must have at least one element.
         if (++in > end) {
-            mram_write(cache, out, i << DIV);
+            mram_write(cache, out, i * sizeof(T));
             return;
         }
     }
 #endif
-    mram_write(cache, out, i << DIV);
+    mram_write(cache, out, i * sizeof(T));
     out += i;
 
     // Transfer from MRAM to MRAM.

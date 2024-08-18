@@ -417,7 +417,7 @@ int main(void) {
 
     /* Set up buffers. */
     size_t const num_of_sentinels = DMA_ALIGNED(FIRST_STEP * sizeof(T)) / sizeof(T);
-    assert(2 * host_to_dpu.length + num_of_sentinels <= (TRIPLE_BUFFER_SIZE >> DIV));
+    assert(2 * host_to_dpu.length + num_of_sentinels <= TRIPLE_BUFFER_LENGTH);
     if (buffers[me()].cache == NULL) {  // Only allocate on the first launch.
         allocate_triple_buffer(&buffers[me()]);
         /* Add additional sentinel values. */

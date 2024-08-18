@@ -47,7 +47,7 @@ for (                                                          \
             ? range.end - i                                    \
             : MAX_TRANSFER_LENGTH_TRIPLE,                      \
     curr_size = (i + MAX_TRANSFER_LENGTH_TRIPLE > range.end)   \
-            ? DMA_ALIGNED(curr_length << DIV)                  \
+            ? DMA_ALIGNED(curr_length * sizeof(T))             \
             : MAX_TRANSFER_SIZE_TRIPLE                         \
     ;                                                          \
     i < range.end                                              \
@@ -57,7 +57,7 @@ for (                                                          \
             ? range.end - i                                    \
             : MAX_TRANSFER_LENGTH_TRIPLE,                      \
     curr_size = (i + MAX_TRANSFER_LENGTH_TRIPLE > range.end)   \
-            ? DMA_ALIGNED(curr_length << DIV)                  \
+            ? DMA_ALIGNED(curr_length * sizeof(T))             \
             : MAX_TRANSFER_SIZE_TRIPLE                         \
 )
 
@@ -68,8 +68,8 @@ for (                                                                   \
             ? range.end - i                                             \
             : (block_length),                                           \
     curr_size = (i + (block_length) > range.end)                        \
-            ? DMA_ALIGNED(curr_length << DIV)                           \
-            : (block_length) << DIV                                     \
+            ? DMA_ALIGNED(curr_length * sizeof(T))                      \
+            : (block_length) * sizeof(T)                                \
     ;                                                                   \
     i < range.end                                                       \
     ;                                                                   \
@@ -78,8 +78,8 @@ for (                                                                   \
             ? range.end - i                                             \
             : (block_length),                                           \
     curr_size = (i + (block_length) > range.end)                        \
-            ? DMA_ALIGNED(curr_length << DIV)                           \
-            : (block_length) << DIV                                     \
+            ? DMA_ALIGNED(curr_length * sizeof(T))                      \
+            : (block_length) * sizeof(T)                                \
 )
 
 #define LOOP_BACKWARDS_ON_MRAM_BL(i, curr_length, curr_size, range, block_length)   \
@@ -88,8 +88,8 @@ for (                                                                           
             ? (block_length)                                                        \
             : range.end - range.start,                                              \
     curr_size = ((intptr_t)(range.end - (block_length)) >= (intptr_t)range.start)   \
-            ? (block_length) << DIV                                                 \
-            : DMA_ALIGNED(curr_length << DIV),                                      \
+            ? (block_length) * sizeof(T)                                            \
+            : DMA_ALIGNED(curr_length * sizeof(T)),                                 \
     i = ((intptr_t)(range.end - (block_length)) >= (intptr_t)range.start)           \
             ? range.end - (block_length)                                            \
             : start                                                                 \
@@ -100,8 +100,8 @@ for (                                                                           
             ? (block_length)                                                        \
             : i - range.start,                                                      \
     curr_size = ((intptr_t)(i - (block_length)) >= (intptr_t)range.start)           \
-            ? (block_length) << DIV                                                 \
-            : DMA_ALIGNED(curr_length << DIV),                                      \
+            ? (block_length) * sizeof(T)                                            \
+            : DMA_ALIGNED(curr_length * sizeof(T)),                                 \
     i = ((intptr_t)(i - (block_length)) >= (intptr_t)range.start)                   \
             ? i - (block_length)                                                    \
             : range.start                                                           \

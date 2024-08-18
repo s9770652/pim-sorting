@@ -318,7 +318,7 @@ int main(void) {
     if (me() != 0) return EXIT_SUCCESS;
 
     /* Set up buffers. */
-    assert(host_to_dpu.length <= (TRIPLE_BUFFER_SIZE >> DIV));
+    assert(host_to_dpu.length <= TRIPLE_BUFFER_LENGTH);
     if (buffers[me()].cache == NULL) {  // Only allocate on the first launch.
         allocate_triple_buffer(&buffers[me()]);
     }

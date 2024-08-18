@@ -113,12 +113,12 @@ static __noinline void flush(T __mram_ptr *input, T __mram_ptr *output, T *cache
     if (i & 1) {  // Is there need for alignment?
         cache[i++] = *ptr++;  // Possible since `ptr` must have at least one element.
         if (++input == end) {
-            mram_write(cache, output, i << DIV);
+            mram_write(cache, output, i * sizeof(T));
             return;
         }
     }
 #endif
-    mram_write(cache, output, i << DIV);
+    mram_write(cache, output, i * sizeof(T));
     output += i;
 
     // Transfer from MRAM to MRAM.

@@ -36,7 +36,7 @@ perfcounter_t cycles[NR_TASKLETS];  // Used to measure the time for each tasklet
 #endif
 
 inline size_t align(size_t to_align) {
-    return DMA_ALIGNED(to_align << DIV) >> DIV;
+    return DMA_ALIGNED(to_align * sizeof(T)) / sizeof(T);
 }
 
 int main(void) {
@@ -53,7 +53,7 @@ int main(void) {
         // printf("HEAPPOINTER: %p\n", DPU_MRAM_HEAP_POINTER);
         // printf("T in MRAM: %d\n", 2 * LOAD_INTO_MRAM);
         // printf("free in MRAM: %d\n", 1024*1024*64 - (uint32_t)DPU_MRAM_HEAP_POINTER);
-        // printf("more T in MRAM: %d\n", (1024*1024*64 - (uint32_t)DPU_MRAM_HEAP_POINTER) >> DIV);
+        // printf("more T in MRAM: %d\n", (1024*1024*64 - (uint32_t)DPU_MRAM_HEAP_POINTER) / sizeof(T));
     }
     barrier_wait(&omni_barrier);
 

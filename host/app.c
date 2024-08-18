@@ -218,7 +218,7 @@ int main(int argc, char **argv) {
     /* Perform tests. */
     print_header(algos, num_of_algos, &p);
     for (uint32_t li = 0; li < num_of_lengths; li++) {
-        uint32_t const len = lengths[li], offset = DMA_ALIGNED(len << DIV) >> DIV;
+        uint32_t const len = lengths[li], offset = DMA_ALIGNED(len * sizeof(T)) / sizeof(T);
         host_to_dpu.length = len;
         host_to_dpu.offset = offset;
         uint32_t const reps_per_launch = LOAD_INTO_MRAM / len;
