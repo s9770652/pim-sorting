@@ -46,24 +46,24 @@ static inline void flush_starting_run(T __mram_ptr *in, T __mram_ptr *until, T _
 }
 
 // todo: does inlining affect performance?
-static void flush_second(T __mram_ptr *out, T *ptr, size_t i) {
+static void flush_second(T __mram_ptr *out, __attribute__((unused)) T * const ptr, size_t i) {
     T * const cache = buffers[me()].cache;
 #ifdef UINT32
     if (i & 1) {  // Is there need for alignment?
-        cache[i++] = *ptr++;  // Possible since `ptr` must have at least one element.
+        cache[i++] = *ptr;  // Possible since `ptr` must have at least one element.
     }
 #endif
     mram_write(cache, out, i << DIV);
 }
 
 // Inlining actually worsens performance. // todo: really?
-static __noinline void flush_first(T __mram_ptr *in, T __mram_ptr *out, T *ptr,
+static __noinline void flush_first(T __mram_ptr *in, T __mram_ptr *out, __attribute__((unused)) T * const ptr,
         size_t i, T __mram_ptr const *end) {
     T * const cache = buffers[me()].cache;
     // Transfer cache to MRAM.
 #ifdef UINT32
     if (i & 1) {  // Is there need for alignment?
-        cache[i++] = *ptr++;  // Possible since `ptr` must have at least one element.
+        cache[i++] = *ptr;  // Possible since `ptr` must have at least one element.
         if (++in > end) {
             mram_write(cache, out, i << DIV);
             return;
@@ -77,11 +77,13 @@ static __noinline void flush_first(T __mram_ptr *in, T __mram_ptr *out, T *ptr,
     do {
         // Thanks to the dummy values, even for numbers smaller than 8 bytes,
         // there is no need to round the size up.
-        size_t rem_size = (in + MAX_TRANSFER_LENGTH_CACHE > end) ? (size_t)end - (size_t)in + 4 : MAX_TRANSFER_SIZE_CACHE;
+        size_t const rem_size = (in + MAX_TRANSFER_LENGTH_TRIPLE > end)
+                ? (size_t)end - (size_t)in + sizeof(T)
+                : MAX_TRANSFER_SIZE_TRIPLE;
         mram_read(in, cache, rem_size);
         mram_write(cache, out, rem_size);
-        in += MAX_TRANSFER_LENGTH_CACHE;  // Value may be wrong for the last transfer …
-        out += MAX_TRANSFER_LENGTH_CACHE;  // … after which it is not needed anymore, however.
+        in += MAX_TRANSFER_LENGTH_TRIPLE;  // Value may be wrong for the last transfer …
+        out += MAX_TRANSFER_LENGTH_TRIPLE;  // … after which it is not needed anymore, however.
     } while (in <= end);
 }
 
@@ -116,10 +118,11 @@ static inline void merge_half_space(T __mram_ptr *out,
 
 static void merge_sort(T __mram_ptr * const start, T __mram_ptr * const end) {
     T * const cache = buffers[me()].cache;
-    mram_range_ptr range = { start, end + 1 };
+
     /* Starting runs. */
     T __mram_ptr *i;
     size_t curr_length, curr_size;
+    mram_range_ptr range = { start, end + 1 };
     LOOP_BACKWARDS_ON_MRAM_BL(i, curr_length, curr_size, range, STARTING_RUN_LENGTH) {
         mram_read_triple(i, cache, curr_size); // todo: erstetzbar durch mram_read
         quick_sort_wram(cache, cache + curr_length - 1);
@@ -138,7 +141,9 @@ static void merge_sort(T __mram_ptr * const start, T __mram_ptr * const end) {
                 break;
             }
             // If not, copy the current run …
-            T __mram_ptr *run_1_start = ((intptr_t)(run_1_end - run_length + 1) > (intptr_t)start) ? run_1_end - run_length + 1 : start;  // todo: use if with different flushing like with seq. MS
+            T __mram_ptr *run_1_start = ((intptr_t)(run_1_end - run_length + 1) > (intptr_t)start)
+                    ? run_1_end - run_length + 1
+                    : start;  // todo: use if with different flushing like with seq. MS
             flush_starting_run(run_1_start, run_1_end, output);
             // … and merge the copy with the next run.
             T __mram_ptr * const ends[2] = { output + (run_1_end - run_1_start), i };
