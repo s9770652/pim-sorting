@@ -20,14 +20,12 @@ typedef uint64_t T;
 #define T_QUALIFIER "lu"
 #endif
 
-#define BLOCK_LENGTH (BLOCK_SIZE >> DIV)
-
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"
 #define ANSI_COLOR_RESET   "\x1b[0m"
 
 /// @brief Computes `n` ÷ `m` rounded up.
-#define DIV_CEIL(n, m) (((n)-1) / (m) + 1)
+#define DIV_CEIL(n, m) (((n) - 1) / (m) + 1)
 /// @brief Rounds `n` up to the next highest multiple of `m` if not already a multiple.
 #define ROUND_UP(n, m) ((((n) + (m) - 1) / (m)) * (m))
 /// @brief Rounds `n` up to the next highest multiple of `m` if not already a multiple.

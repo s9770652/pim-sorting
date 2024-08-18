@@ -116,7 +116,7 @@ void get_stats_sorted(T __mram_ptr const * const array, T * const cache, mram_ra
             }
             unsorted[me()] |= cache[j-1] > cache[j];  // `j-1` possible due to the sentinel value
         }
-        prev = cache[BLOCK_LENGTH-1];
+        prev = cache[MAX_TRANSFER_LENGTH_TRIPLE-1];
     }
     barrier_wait(&checking_barrier);
     accumulate_stats(dummy, result);

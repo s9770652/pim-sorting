@@ -16,7 +16,7 @@
 #include "mram_loop.h"
 
 /**
- * @brief Prints an MRAM array in lines of `BLOCK_LENGTH` numbers.
+ * @brief Prints an MRAM array in lines of `MAX_TRANSFER_LENGTH_TRIPLE` numbers.
  * The background colour is changed according to the values.
  * Only prints up to some maximum length (currently: 2048).
  * 
