@@ -1,3 +1,8 @@
+/**
+ * @file
+ * @brief Measures runtimes of MergeSorts (sequential, MRAM).
+**/
+
 #include <assert.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -8,13 +13,13 @@
 #include <memmram_utils.h>
 #include <perfcounter.h>
 
-#include "wram_sorts.h"
 #include "buffers.h"
 #include "checkers.h"
 #include "common.h"
 #include "communication.h"
 #include "random_distribution.h"
 #include "random_generator.h"
+#include "wram_sorts.h"
 
 struct dpu_arguments __host host_to_dpu;
 struct dpu_results __host dpu_to_host;

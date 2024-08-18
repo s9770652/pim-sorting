@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Measures runtimes of QuickSorts.
+ * @brief Measures runtimes of QuickSorts (sequential, WRAM).
 **/
 
 #include <assert.h>

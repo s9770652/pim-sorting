@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Measures runtimes of MergeSorts.
+ * @brief Measures runtimes of MergeSorts (sequential, WRAM).
 **/
 
 #include <assert.h>
