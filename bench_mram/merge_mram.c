@@ -24,7 +24,7 @@ triple_buffers buffers[NR_TASKLETS];
 struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input (in debug mode)
 struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the pivot
 
-#define STARTING_RUN_LENGTH (768)
+#define STARTING_RUN_LENGTH (TRIPLE_BUFFER_LENGTH)
 #define STARTING_RUN_SIZE (STARTING_RUN_LENGTH * sizeof(T))
 static_assert(!(STARTING_RUN_SIZE % 8), "The size of starting runs must be aligned on 8 bytes!");
 static_assert(
@@ -120,19 +120,7 @@ static void merge_sort(T __mram_ptr * const start, T __mram_ptr * const end) {
     /* Starting runs. */
     T __mram_ptr *i;
     size_t curr_length, curr_size;
-
-    size_t block_length = STARTING_RUN_LENGTH;
-    for (
-        curr_length = ((intptr_t)(range.end - (block_length)) >= (intptr_t)range.start) ? (block_length) : range.end - range.start,
-        curr_size = ((intptr_t)(range.end - (block_length)) >= (intptr_t)range.start) ? (block_length) << DIV : ROUND_UP_POW2(curr_length << DIV, 8),
-        i = ((intptr_t)(range.end - (block_length)) >= (intptr_t)range.start) ? range.end - (block_length) : start;
-
-        (intptr_t)curr_length > 0;
-
-        curr_length = ((intptr_t)(i - (block_length)) >= (intptr_t)range.start) ? (block_length) : i - range.start,
-        curr_size = ((intptr_t)(i - (block_length)) >= (intptr_t)range.start) ? (block_length) << DIV : ROUND_UP_POW2(curr_length << DIV, 8),
-        i = ((intptr_t)(i - (block_length)) >= (intptr_t)range.start) ? i - (block_length) : range.start
-    ) {
+    LOOP_BACKWARDS_ON_MRAM_BL(i, curr_length, curr_size, range, STARTING_RUN_LENGTH) {
         mram_read_triple(i, cache, curr_size); // todo: erstetzbar durch mram_read
         quick_sort_wram(cache, cache + curr_length - 1);
         mram_write_triple(cache, i, curr_size);

@@ -81,4 +81,29 @@ for (                                                                   \
             : (block_length) << DIV                                     \
 )
 
+#define LOOP_BACKWARDS_ON_MRAM_BL(i, curr_length, curr_size, range, block_length)   \
+for (                                                                               \
+    curr_length = ((intptr_t)(range.end - (block_length)) >= (intptr_t)range.start) \
+            ? (block_length)                                                        \
+            : range.end - range.start,                                              \
+    curr_size = ((intptr_t)(range.end - (block_length)) >= (intptr_t)range.start)   \
+            ? (block_length) << DIV                                                 \
+            : ROUND_UP_POW2(curr_length << DIV, 8),                                 \
+    i = ((intptr_t)(range.end - (block_length)) >= (intptr_t)range.start)           \
+            ? range.end - (block_length)                                            \
+            : start                                                                 \
+    ;                                                                               \
+    (intptr_t)curr_length > 0                                                       \
+    ;                                                                               \
+    curr_length = ((intptr_t)(i - (block_length)) >= (intptr_t)range.start)         \
+            ? (block_length)                                                        \
+            : i - range.start,                                                      \
+    curr_size = ((intptr_t)(i - (block_length)) >= (intptr_t)range.start)           \
+            ? (block_length) << DIV                                                 \
+            : ROUND_UP_POW2(curr_length << DIV, 8),                                 \
+    i = ((intptr_t)(i - (block_length)) >= (intptr_t)range.start)                   \
+            ? i - (block_length)                                                    \
+            : range.start                                                           \
+)
+
 #endif  // _MRAM_LOOP_H_

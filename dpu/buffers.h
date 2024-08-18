@@ -19,8 +19,10 @@
 
 #include "common.h"
 
-/// @brief The (minimum) size of a general-purpose buffer and two sequential-reader buffers.
+/// @brief The minimum size of a general-purpose buffer & two sequential-reader buffers.
 #define TRIPLE_BUFFER_SIZE (BLOCK_SIZE + 4 * SEQREAD_CACHE_SIZE)
+/// @brief The min. number of elements in a general-purpose buffer & two sequential-reader buffers.
+#define TRIPLE_BUFFER_LENGTH (TRIPLE_BUFFER_SIZE / sizeof(T))
 /// @brief The maximum number of bytes transferrable at once between MRAM and a triple buffer.
 #define MAX_TRANSFER_SIZE_TRIPLE (((TRIPLE_BUFFER_SIZE > 2048) ? 2048 : TRIPLE_BUFFER_SIZE) & ~7)
 /// @brief The maximum number of elements transferrable at once between MRAM and a triple buffer.
