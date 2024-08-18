@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Measures runtimes of InsertionSort, ShellSort, BubbleSort, and SelectionSort.
+ * @brief Measures runtimes of InsertionSorts, ShellSorts, BubbleSorts, and SelectionSort.
 **/
 
 #include <assert.h>
