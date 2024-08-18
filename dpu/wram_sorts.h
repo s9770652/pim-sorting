@@ -72,8 +72,8 @@ swap(i, right)
 // Obviously, ending the current QuickSort is done via `return`.
 #define QUICK_STOP() return
 
-#define QUICK_CALL_LEFT(name) name(left, i - 1)
-#define QUICK_CALL_RIGHT(name) name(i + 1, right)
+#define QUICK_CALL_LEFT() quick_sort_wram(left, i - 1)
+#define QUICK_CALL_RIGHT() quick_sort_wram(i + 1, right)
 
 #else  // UINT64
 
@@ -116,14 +116,14 @@ static void quick_sort_wram(T * const start, T * const end) {
     QUICK_BODY();
     if (QUICK_GET_SHORTER_PARTITION()) {
         if (!QUICK_IS_TRIVIAL_LEFT())
-            QUICK_CALL_LEFT(quick_sort);
+            QUICK_CALL_LEFT();
         if (!QUICK_IS_TRIVIAL_RIGHT())
-            QUICK_CALL_RIGHT(quick_sort);
+            QUICK_CALL_RIGHT();
     } else {
         if (!QUICK_IS_TRIVIAL_RIGHT())
-            QUICK_CALL_RIGHT(quick_sort);
+            QUICK_CALL_RIGHT();
         if (!QUICK_IS_TRIVIAL_LEFT())
-            QUICK_CALL_LEFT(quick_sort);
+            QUICK_CALL_LEFT();
     }
     QUICK_TAIL();
 }
