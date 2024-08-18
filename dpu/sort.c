@@ -125,11 +125,11 @@ static __noinline void flush(T __mram_ptr *input, T __mram_ptr *output, T *cache
     do {
         // Thanks to the dummy values, even for numbers smaller than 8 bytes,
         // there is no need to round the size up.
-        size_t rem_size = (input + BLOCK_LENGTH > end) ? (size_t)end - (size_t)input : BLOCK_SIZE;
+        size_t rem_size = (input + MAX_TRANSFER_LENGTH_CACHE > end) ? (size_t)end - (size_t)input : BLOCK_SIZE;
         mram_read(input, cache, rem_size);
         mram_write(cache, output, rem_size);
-        input += BLOCK_LENGTH;  // Value may be wrong for the last transfer …
-        output += BLOCK_LENGTH;  // … after which it is not needed anymore, however.
+        input += MAX_TRANSFER_LENGTH_CACHE;  // Value may be wrong for the last transfer …
+        output += MAX_TRANSFER_LENGTH_CACHE;  // … after which it is not needed anymore, however.
     } while (input < end);
 }
 
@@ -179,10 +179,10 @@ static bool merge(T __mram_ptr *input, T __mram_ptr *output, triple_buffers *buf
                         INSERT(1, 0);
                     }
                     // If the cache is full, write its content to `output`.
-                    if (i == BLOCK_LENGTH) {
-                        mram_write(cache, &output[j + written], BLOCK_SIZE);
+                    if (i == MAX_TRANSFER_LENGTH_CACHE) {
+                        mram_write(cache, &output[j + written], MAX_TRANSFER_SIZE_CACHE);
                         i = 0;
-                        written += BLOCK_LENGTH;
+                        written += MAX_TRANSFER_LENGTH_CACHE;
                     }
                 }
             }
@@ -210,7 +210,7 @@ bool sort(T __mram_ptr *input, T __mram_ptr *output, triple_buffers *buffers, co
     /* Insertion sort by each tasklet. */
     size_t i, curr_length, curr_size;
     LOOP_ON_MRAM_BL(i, curr_length, curr_size, ranges[me()], BASE_LENGTH) {
-#if (BASE_SIZE <= MAX_TRANSFER_SIZE)
+#if (BASE_SIZE <= MAX_TRANSFER_SIZE_TRIPLE)
         mram_read(&input[i], cache, curr_size);
         base_sort(cache, curr_length);
         mram_write(cache, &input[i], curr_size);

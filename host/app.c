@@ -12,17 +12,11 @@
 #include "random_distribution.h"
 
 // Sanity Checks
-#if (BLOCK_SIZE > 2048)
-#error `BLOCK_SIZE` too big! `mram_read` and `mram_write` can transfer at most 2048 bytes.
-#endif
 #if (BLOCK_SIZE < 8)
 #error `BLOCK_SIZE` too small! `mram_read` and `mram_write` must transfer at least 8 bytes.
 #endif
-#if (BLOCK_SIZE % 8)
-#error `BLOCK_SIZE` is not divisble by eight! Accesses to MRAM must be aligned on 8 bytes.
-#endif
-#if (NR_DPUS <= 0)
-#error The number of DPUs must be positive!
+#if (NR_DPUS != 1)
+#error Only one DPU can be used!
 #endif
 #if (NR_TASKLETS <= 0 || NR_TASKLETS > 16)
 #error The number of tasklets must be between 1 and 16!
@@ -30,10 +24,9 @@
 
 /**
  * @brief Frees an allocated set of DPUs.
+ * @sa alloc_dpus
  *
  * @param set The set of DPUs to free.
- *
- * @sa alloc_dpus
 **/
 static void free_dpus(struct dpu_set_t set) {
     DPU_ASSERT(dpu_free(set));
@@ -41,11 +34,10 @@ static void free_dpus(struct dpu_set_t set) {
 
 /**
  * @brief Allocates a set of DPUs and loads the correct binaries.
+ * @sa free_dpus
  *
  * @param set The set of DPUs to load.
  * @param mode The mode/benchmark Id passed via the CLI.
- *
- * @sa free_dpus
 **/
 static void alloc_dpus(struct dpu_set_t *set, unsigned const mode) {
     char binaries[] = BINARIES, *binary = strtok(binaries, ",");
@@ -63,6 +55,7 @@ static void alloc_dpus(struct dpu_set_t *set, unsigned const mode) {
 
 /**
  * @brief Counts how many lengths to test have been passed through the CLI.
+ * @sa get_lengths
  * 
  * @param lengths List of comma separated values.
  * 
@@ -77,19 +70,18 @@ static size_t get_num_of_lengths(char lengths[]) {
 
 /**
  * @brief Returns a pointer to an array of all lengths passed through the CLI.
+ * @sa get_num_of_lengths
  * 
  * @param lengths List of comma separated values.
  * @param nr_of_lengths The number of CSV in the list.
  * 
  * @return An array of all lengths.
- * 
- * @sa get_num_of_lengths
 **/
 static uint32_t *get_lengths(char lengths[], size_t nr_of_lengths) {
     uint32_t *ns = malloc(sizeof(uint32_t[nr_of_lengths]));
-    char *lengths_to_read = malloc(strlen(lengths));  // My God …
-    memcpy(lengths_to_read, lengths, strlen(lengths));
-    char *n = strtok(lengths_to_read, ",");
+    char *lengths_to_read = malloc(strlen(lengths));  // Oh …
+    memcpy(lengths_to_read, lengths, strlen(lengths));  // … my …
+    char *n = strtok(lengths_to_read, ",");  // … God!
     for (size_t i = 0; i < nr_of_lengths; i++) {
         ns[i] = (uint32_t)atof(n);
         if (ns[i] == 0) {

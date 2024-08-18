@@ -19,11 +19,16 @@
 
 #include "common.h"
 
-
 /// @brief The (minimum) size of a general-purpose buffer and two sequential-reader buffers.
 #define TRIPLE_BUFFER_SIZE (BLOCK_SIZE + 4 * SEQREAD_CACHE_SIZE)
 /// @brief The maximum number of bytes transferrable at once between MRAM and a triple buffer.
-#define MAX_TRANSFER_SIZE ((TRIPLE_BUFFER_SIZE > 2048) ? 2048 : TRIPLE_BUFFER_SIZE)
+#define MAX_TRANSFER_SIZE_TRIPLE (((TRIPLE_BUFFER_SIZE > 2048) ? 2048 : TRIPLE_BUFFER_SIZE) & ~7)
+/// @brief The maximum number of elements transferrable at once between MRAM and a triple buffer.
+#define MAX_TRANSFER_LENGTH_TRIPLE (MAX_TRANSFER_SIZE_TRIPLE / sizeof(T))
+/// @brief The maximum number of bytes transferrable at once between MRAM and the cache.
+#define MAX_TRANSFER_SIZE_CACHE (((BLOCK_SIZE > 2048) ? 2048 : BLOCK_SIZE) & ~7)
+/// @brief The maximum number of elements transferrable at once between MRAM and the cache.
+#define MAX_TRANSFER_LENGTH_CACHE (MAX_TRANSFER_SIZE_CACHE / sizeof(T))
 
 /**
  * @brief Holds the WRAM addresses of one general-purpose buffer and two sequential-read buffers.
@@ -59,7 +64,9 @@ void allocate_triple_buffer(triple_buffers *buffers);
 **/
 static inline void mram_read_triple(void const __mram_ptr *from, void *to, size_t nb_of_bytes) {
     do {
-        size_t const read_size = (nb_of_bytes > MAX_TRANSFER_SIZE) ? MAX_TRANSFER_SIZE : nb_of_bytes;
+        size_t const read_size = (nb_of_bytes > MAX_TRANSFER_SIZE_TRIPLE)
+                ? MAX_TRANSFER_SIZE_TRIPLE
+                : nb_of_bytes;
         mram_read(from, to, read_size);
         from += read_size;
         to += read_size;
@@ -76,7 +83,9 @@ static inline void mram_read_triple(void const __mram_ptr *from, void *to, size_
 **/
 static inline void mram_write_triple(void const *from, void __mram_ptr *to, size_t nb_of_bytes) {
     do {
-        size_t const read_size = (nb_of_bytes > MAX_TRANSFER_SIZE) ? MAX_TRANSFER_SIZE : nb_of_bytes;
+        size_t const read_size = (nb_of_bytes > MAX_TRANSFER_SIZE_TRIPLE)
+                ? MAX_TRANSFER_SIZE_TRIPLE
+                : nb_of_bytes;
         mram_write(from, to, read_size);
         from += read_size;
         to += read_size;
