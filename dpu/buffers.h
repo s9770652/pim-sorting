@@ -23,16 +23,16 @@
 /// @brief The minimum size of a general-purpose buffer & two sequential-reader buffers.
 #define TRIPLE_BUFFER_SIZE ((BLOCK_SIZE + 4 * SEQREAD_CACHE_SIZE) & ~DMA_OFF_MASK)
 /// @brief The min. number of elements in a general-purpose buffer & two sequential-reader buffers.
-#define TRIPLE_BUFFER_LENGTH (TRIPLE_BUFFER_SIZE / sizeof(T))
+#define TRIPLE_BUFFER_LENGTH (TRIPLE_BUFFER_SIZE >> DIV)
 /// @brief The maximum number of bytes transferrable at once between MRAM and a triple buffer.
 #define MAX_TRANSFER_SIZE_TRIPLE (((TRIPLE_BUFFER_SIZE > 2048) ? 2048 : TRIPLE_BUFFER_SIZE) \
         & ~DMA_OFF_MASK)
 /// @brief The maximum number of elements transferrable at once between MRAM and a triple buffer.
-#define MAX_TRANSFER_LENGTH_TRIPLE (MAX_TRANSFER_SIZE_TRIPLE / sizeof(T))
+#define MAX_TRANSFER_LENGTH_TRIPLE (MAX_TRANSFER_SIZE_TRIPLE >> DIV)
 /// @brief The maximum number of bytes transferrable at once between MRAM and the cache.
 #define MAX_TRANSFER_SIZE_CACHE (((BLOCK_SIZE > 2048) ? 2048 : BLOCK_SIZE) & ~DMA_OFF_MASK)
 /// @brief The maximum number of elements transferrable at once between MRAM and the cache.
-#define MAX_TRANSFER_LENGTH_CACHE (MAX_TRANSFER_SIZE_CACHE / sizeof(T))
+#define MAX_TRANSFER_LENGTH_CACHE (MAX_TRANSFER_SIZE_CACHE >> DIV)
 
 /**
  * @brief Holds the WRAM addresses of one general-purpose buffer and two sequential-read buffers.
