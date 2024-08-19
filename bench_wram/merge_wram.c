@@ -107,9 +107,9 @@ static __attribute__((unused)) void shell_sort(T * const start, T * const end) {
 
 /**
  * Creating the starting runs for MergeSort.
- * The runs are created from left to right, such that the last run may be smaller.
+ * The runs are formed from left to right, such that the last run may be smaller.
 **/
-#define CREATE_STARTING_RUNS_LEFT2RIGHT()                                                \
+#define FORM_STARTING_RUNS_LEFT2RIGHT()                                                  \
 if (end - start + 1 <= MERGE_THRESHOLD) {                                                \
     shell_sort(start, end);                                                              \
     flags[me()] = false;                                                                 \
@@ -133,9 +133,9 @@ for (T *t = start + MERGE_THRESHOLD; t < end; t += MERGE_THRESHOLD) {           
 
 /**
  * Creating the starting runs for MergeSort.
- * The runs are created from right to left, such that the first run may be smaller.
+ * The runs are formed from right to left, such that the first run may be smaller.
 **/
-#define CREATE_STARTING_RUNS_RIGHT2LEFT()                                                \
+#define FORM_STARTING_RUNS_RIGHT2LEFT()                                                  \
 if (end - start + 1 <= MERGE_THRESHOLD) {                                                \
     shell_sort(start, end);                                                              \
     flags[me()] = false;                                                                 \
@@ -275,7 +275,7 @@ static inline void merge(T * const start_1, T * const start_2, T * const end_2, 
 **/
 static inline void merge_sort_no_write_back(T * const start, T * const end) {
     /* Starting runs. */
-    CREATE_STARTING_RUNS_LEFT2RIGHT();
+    FORM_STARTING_RUNS_LEFT2RIGHT();
     /* Merging. */
     T *in, *until, *out;  // Runs from `in` to `until` are merged and stored in `out`.
     bool flag = false;  // Used to determine the initial positions of `in`, `out`, and `until`.
@@ -373,7 +373,7 @@ static inline void merge_right_flush_only(T * const start_1, T * const end_1, T 
 **/
 static void merge_sort_half_space(T * const start, T * const end) {
     /* Starting runs. */
-    CREATE_STARTING_RUNS_RIGHT2LEFT();
+    FORM_STARTING_RUNS_RIGHT2LEFT();
     /* Merging. */
     size_t const n = end - start + 1;
     for (size_t run_length = MERGE_THRESHOLD; run_length < n; run_length *= 2) {
