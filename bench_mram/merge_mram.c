@@ -31,7 +31,7 @@ struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input 
 struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the pivot
 
 #define STARTING_RUN_LENGTH (TRIPLE_BUFFER_LENGTH)
-#define STARTING_RUN_SIZE (STARTING_RUN_LENGTH * sizeof(T))
+#define STARTING_RUN_SIZE (STARTING_RUN_LENGTH << DIV)
 static_assert(
     STARTING_RUN_SIZE == DMA_ALIGNED(STARTING_RUN_SIZE),
     "The size of starting runs must be properly aligned for DMAs!"
@@ -40,6 +40,24 @@ static_assert(
     STARTING_RUN_SIZE <= TRIPLE_BUFFER_SIZE,
     "The starting runs are sorted entirely in WRAM and, thus, must fit in there!"
 );
+
+static void form_starting_runs_half_space(T __mram_ptr * const start, T __mram_ptr * const end) {
+    T * const cache = buffers[me()].cache;
+    T __mram_ptr *i;
+    size_t curr_length, curr_size;
+    mram_range_ptr range = { start, end + 1 };
+    LOOP_BACKWARDS_ON_MRAM_BL(i, curr_length, curr_size, range, STARTING_RUN_LENGTH) {
+#if (STARTING_RUN_SIZE > 2048)
+        mram_read_triple(i, cache, curr_size);
+        quick_sort_wram(cache, cache + curr_length - 1);
+        mram_write_triple(cache, i, curr_size);
+#else
+        mram_read(i, cache, curr_size);
+        quick_sort_wram(cache, cache + curr_length - 1);
+        mram_write(cache, i, curr_size);
+#endif
+    }
+}
 
 // todo: flush from back to front such that the last ones in the cache can be kept
 static inline void flush_starting_run(T __mram_ptr *in, T __mram_ptr *until, T __mram_ptr *out) {
@@ -126,17 +144,8 @@ static inline void merge_half_space(T __mram_ptr *out,
 }
 
 static void merge_sort(T __mram_ptr * const start, T __mram_ptr * const end) {
-    T * const cache = buffers[me()].cache;
-
     /* Starting runs. */
-    T __mram_ptr *i;
-    size_t curr_length, curr_size;
-    mram_range_ptr range = { start, end + 1 };
-    LOOP_BACKWARDS_ON_MRAM_BL(i, curr_length, curr_size, range, STARTING_RUN_LENGTH) {
-        mram_read_triple(i, cache, curr_size); // todo: erstetzbar durch mram_read
-        quick_sort_wram(cache, cache + curr_length - 1);
-        mram_write_triple(cache, i, curr_size);
-    }
+    form_starting_runs_half_space(start, end);
 
     /* Merging. */
     seqreader_t sr[2];
