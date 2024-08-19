@@ -59,42 +59,30 @@ static void form_starting_runs_half_space(T __mram_ptr * const start, T __mram_p
     }
 }
 
-// todo: flush from back to front such that the last ones in the cache can be kept
-static inline void flush_starting_run(T __mram_ptr *in, T __mram_ptr *until, T __mram_ptr *out) {
+static void flush_starting_run(T __mram_ptr *in, T __mram_ptr *until, T __mram_ptr *out) {
     T * const cache = buffers[me()].cache;
     mram_range_ptr range = { in, until + 1 };
     T __mram_ptr *i;
     size_t curr_length, curr_size;
-    LOOP_ON_MRAM_BL(i, curr_length, curr_size, range, STARTING_RUN_LENGTH) {
+    LOOP_ON_MRAM_BL(i, curr_length, curr_size, range, MAX_TRANSFER_LENGTH_TRIPLE) {
         mram_read_triple(i, cache, curr_size);
         mram_write_triple(cache, out, curr_size);
         out += curr_length;
     }
 }
 
-// todo: does inlining affect performance?
-static void flush_second(T __mram_ptr *out, __attribute__((unused)) T * const ptr, size_t i) {
-    T * const cache = buffers[me()].cache;
-#ifdef UINT32
-    if (i & 1) {  // Is there need for alignment?
-        cache[i++] = *ptr;  // Possible since `ptr` must have at least one element.
-    }
-#endif
-    mram_write(cache, out, i * sizeof(T));
-}
-
-// Inlining actually worsens performance. // todo: really?
-static __noinline void flush_first(T __mram_ptr *in, T __mram_ptr *out, __attribute__((unused)) T * const ptr,
+static void flush_first(T __mram_ptr *in, T __mram_ptr *out, __attribute__((unused)) T * const ptr,
         size_t i, T __mram_ptr const *end) {
     T * const cache = buffers[me()].cache;
     // Transfer cache to MRAM.
 #ifdef UINT32
     if (i & 1) {  // Is there need for alignment?
         cache[i++] = *ptr;  // Possible since `ptr` must have at least one element.
-        if (++in > end) {
+        if (in >= end) {
             mram_write(cache, out, i * sizeof(T));
             return;
         }
+        in++;
     }
 #endif
     mram_write(cache, out, i * sizeof(T));
@@ -114,8 +102,19 @@ static __noinline void flush_first(T __mram_ptr *in, T __mram_ptr *out, __attrib
     } while (in <= end);
 }
 
-static inline void merge_half_space(T __mram_ptr *out,
-        T __mram_ptr * const ends[2], seqreader_t sr[2], T *ptr[2], size_t elems_left[2]) {
+static void flush_second(T __mram_ptr * const out, __attribute__((unused)) T * const ptr,
+        size_t i) {
+    T * const cache = buffers[me()].cache;
+#ifdef UINT32
+    if (i & 1) {  // Is there need for alignment?
+        cache[i++] = *ptr;  // Possible since `ptr` must have at least one element.
+    }
+#endif
+    mram_write(cache, out, i * sizeof(T));
+}
+
+static void merge_half_space(T __mram_ptr *out, T __mram_ptr * const ends[2], seqreader_t sr[2],
+        T *ptr[2], size_t elems_left[2]) {
     T * const cache = buffers[me()].cache;
     size_t i = 0;
     while (true) {
@@ -143,7 +142,7 @@ static inline void merge_half_space(T __mram_ptr *out,
     }
 }
 
-static void merge_sort(T __mram_ptr * const start, T __mram_ptr * const end) {
+static void merge_sort_half_space(T __mram_ptr * const start, T __mram_ptr * const end) {
     /* Starting runs. */
     form_starting_runs_half_space(start, end);
 
@@ -161,13 +160,13 @@ static void merge_sort(T __mram_ptr * const start, T __mram_ptr * const end) {
             // If not, copy the current run …
             T __mram_ptr *run_1_start = ((intptr_t)(run_1_end - run_length + 1) > (intptr_t)start)
                     ? run_1_end - run_length + 1
-                    : start;  // todo: use if with different flushing like with seq. MS
+                    : start;
             flush_starting_run(run_1_start, run_1_end, output);
             // … and merge the copy with the next run.
             T __mram_ptr * const ends[2] = { output + (run_1_end - run_1_start), i };
             T *ptr[2] = {
                 seqread_init(buffers[me()].seq_1, output, &sr[0]),
-                seqread_init(buffers[me()].seq_2, run_1_end + 1, &sr[1])  // todo: wiederverwenden als ersten
+                seqread_init(buffers[me()].seq_2, run_1_end + 1, &sr[1]),
             };
             size_t elems_left[2] = { run_1_end - run_1_start + 1, run_length };
             merge_half_space(
@@ -182,7 +181,7 @@ static void merge_sort(T __mram_ptr * const start, T __mram_ptr * const end) {
 }
 
 union algo_to_test __host algos[] = {
-    {{ "MergeHalfSpace", { .mram = merge_sort } }},
+    {{ "MergeHalfSpace", { .mram = merge_sort_half_space } }},
 };
 size_t __host num_of_algos = sizeof algos / sizeof algos[0];
 
