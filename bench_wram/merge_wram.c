@@ -226,12 +226,9 @@ static inline void flush_full_starting_run(T *in, T *until, T *out) {
 
 /**
  * @brief How many iterations in the mergers are unrolled.
- * If `MERGE_THRESHOLD` is at most 16, `UNROLL_BY` is set to `MERGE_THRESHOLD`.
- * Otherwise, `UNROLL_BY` is set to 16 if `MERGE_THRESHOLD` is a power of two
- * and to 12 if not. This way, `UNROLL_BY` is always a divisor of `MERGE_THRESHOLD`.
+ * @note This value is capped at 16, as otherwise the IRAM is in danger of overflowing.
 **/
-#define UNROLL_BY (MERGE_THRESHOLD <= 16 ? MERGE_THRESHOLD : \
-        ((MERGE_THRESHOLD & (MERGE_THRESHOLD - 1)) == 0 ? 16 : 12))
+#define UNROLL_BY (MIN(MERGE_THRESHOLD, 16))
 
 /**
  * @brief Merges the two runs within the merger functions in unrolled loops.
