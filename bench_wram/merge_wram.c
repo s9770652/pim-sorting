@@ -225,6 +225,52 @@ static inline void flush_full_starting_run(T *in, T *until, T *out) {
 }
 
 /**
+ * @brief How many iterations in the mergers are unrolled.
+ * If `MERGE_THRESHOLD` is at most 16, `UNROLL_BY` is set to `MERGE_THRESHOLD`.
+ * Otherwise, `UNROLL_BY` is set to 16 if `MERGE_THRESHOLD` is a power of two
+ * and to 12 if not. This way, `UNROLL_BY` is always a divisor of `MERGE_THRESHOLD`.
+**/
+#define UNROLL_BY (MERGE_THRESHOLD <= 16 ? MERGE_THRESHOLD : \
+        ((MERGE_THRESHOLD & (MERGE_THRESHOLD - 1)) == 0 ? 16 : 12))
+
+/**
+ * @brief Merges the two runs within the merger functions in unrolled loops.
+ * 
+ * @param ptr The pointer of the run whose last element is less than that of the other run.
+ * @param end The address of said last element.
+ * @param on_depletion An if-block for when and what to do if said run is fully merged.
+**/
+#define UNROLLED_MERGER(ptr, end, on_depletion) \
+while (ptr <= end - UNROLL_BY + 1) {                \
+    _Pragma("unroll")                               \
+    for (size_t k = 0; k < UNROLL_BY; k++) {        \
+        if (val_i <= val_j) {                       \
+            *(out + k) = val_i;                     \
+            val_i = *++i;                           \
+        } else {                                    \
+            *(out + k) = val_j;                     \
+            val_j = *++j;                           \
+        }                                           \
+    }                                               \
+    out += UNROLL_BY;                               \
+};                                                  \
+on_depletion                                        \
+while (ptr <= end - (UNROLL_BY / 2) + 1) {          \
+    _Pragma("unroll")                               \
+    for (size_t k = 0; k < UNROLL_BY / 2; k++) {    \
+        if (val_i <= val_j) {                       \
+            *(out + k) = val_i;                     \
+            val_i = *++i;                           \
+        } else {                                    \
+            *(out + k) = val_j;                     \
+            val_j = *++j;                           \
+        }                                           \
+    }                                               \
+    out += UNROLL_BY / 2;                           \
+}                                                   \
+on_depletion
+
+/**
  * @brief Merges two runs ranging from [`start_1`, `start_2`[ and [`start_2`, `end_2`].
  * @internal Using `end_1 = start_2 - 1` worsens the runtime
  * but making `end_2` exclusive also worsens the runtime, hence the asymmetry.
@@ -236,24 +282,31 @@ static inline void flush_full_starting_run(T *in, T *until, T *out) {
 **/
 static inline void merge(T * const start_1, T * const start_2, T * const end_2, T *out) {
     T *i = start_1, *j = start_2;
+    T val_i = *i, val_j = *j;
     if (*(start_2 - 1) <= *(end_2)) {
+        UNROLLED_MERGER(i, start_2 - 1, if (i == start_2) { flush_batch(j, end_2, out); return; });
         while (true) {
-            if (*i <= *j) {
-                *out++ = *i++;
+            if (val_i <= val_j) {
+                *out++ = val_i;
+                val_i = *++i;
                 if (i == start_2) {  // Pulling these if-statements out of the loop …
                     flush_batch(j, end_2, out);
                     return;
                 }
             } else {
-                *out++ = *j++;
+                *out++ = val_j;
+                val_j = *++j;
             }
         }
     } else {
+        UNROLLED_MERGER(j, end_2, if (j > end_2) { flush_batch(i, start_2 - 1, out); return; });
         while (true) {
-            if (*i <= *j) {
-                *out++ = *i++;
+            if (val_i <= val_j) {
+                *out++ = val_i;
+                val_i = *++i;
             } else {
-                *out++ = *j++;
+                *out++ = val_j;
+                val_j = *++j;
                 if (j > end_2) {  // … worsens the runtime.
                     flush_batch(i, start_2 - 1, out);
                     return;
@@ -337,25 +390,32 @@ static void merge_sort_write_back(T * const start, T * const end) {
 static inline void merge_right_flush_only(T * const start_1, T * const end_1, T * const start_2,
         T * const end_2, T *out) {
     T *i = start_1, *j = start_2;
-    if (*end_1 < *end_2) {
+    T val_i = *i, val_j = *j;
+    if (*end_1 <= *end_2) {
+        UNROLLED_MERGER(i, end_1, if (i > end_1) { return; });
         while (true) {
-            if (*i < *j) {
-                *out++ = *i++;
+            if (val_i <= val_j) {
+                *out++ = val_i;
+                val_i = *++i;
                 if (i > end_1) {
-                    flush_batch(j, end_2, out);
                     return;
                 }
             } else {
-                *out++ = *j++;
+                *out++ = val_j;
+                val_j = *++j;
             }
         }
     } else {
+        UNROLLED_MERGER(j, end_2, if (j > end_2) { flush_batch(i, end_1, out); return; });
         while (true) {
-            if (*i < *j) {
-                *out++ = *i++;
+            if (val_i <= val_j) {
+                *out++ = val_i;
+                val_i = *++i;
             } else {
-                *out++ = *j++;
+                *out++ = val_j;
+                val_j = *++j;
                 if (j > end_2) {
+                    flush_batch(i, end_1, out);
                     return;
                 }
             }
@@ -395,10 +455,10 @@ static void merge_sort_half_space(T * const start, T * const end) {
             }
             // … and merge the copy with the next run.
             merge_right_flush_only(
-                run_1_end + 1,
-                i,
                 end + 1,
                 end + 1 + (run_1_end - run_1_start),
+                run_1_end + 1,
+                i,
                 run_1_start
             );
         }
