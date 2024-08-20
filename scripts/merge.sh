@@ -3,13 +3,22 @@
 NR_TASKLETS=1
 BLOCK_SIZE=16512
 SEQREAD_CACHE_SIZE=1024
+MERGE_THRESHOLD=14
 
 b=3
 r=1000
-n="16,17,32,33,64,65,128,129,256,257,512,513,1024,1025"
+n=""
 
 main_folder=scripts/merge
 mkdir -p ${main_folder}
+
+n="$((${MERGE_THRESHOLD})),$((${MERGE_THRESHOLD} + 1))"
+curr_n=${MERGE_THRESHOLD}
+while [ $(( ${curr_n} + 1 )) -le 1024 ]
+do
+    n="${n},$((2 * ${curr_n})),$((2 * ${curr_n} + 1))"
+    curr_n=$((2 * ${curr_n}))
+done
 
 for type in 32 64
 do
