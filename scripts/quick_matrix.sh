@@ -36,7 +36,7 @@ do
                 prio_folder=${pivot_folder}/${prio,,}/uint${type}
                 mkdir -p ${prio_folder}
 
-                rm obj/benchmark/quick_sorts.o bin/quick_sorts obj/host/app.o
+                rm obj/bench_*/quick_wram.o bin/quick_wram obj/host/app.o
                 eval "RECURSIVE=${way} PIVOT=${pivot} PARTITION_PRIO=${prio} TYPE=UINT${type} ${cmd}"
 
                 dists=("sorted" "reverse" "almost" "uniform" "zipf" "normal")

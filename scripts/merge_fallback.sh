@@ -25,12 +25,12 @@ for type in 32 64
 do
     make clean
     NR_TASKLETS=${NR_TASKLETS} BLOCK_SIZE=${BLOCK_SIZE} SEQREAD_CACHE_SIZE=${SEQREAD_CACHE_SIZE} TYPE=UINT${type} make all
-    for threshold in 12 13 14 15 16 17 18 24 32 48 64 96
+    for threshold in 12 13 14 15 16 24 32 48 64 96
     do
         folder=${main_folder}/threshold=${threshold}/uint${type}
         mkdir -p ${folder}
 
-        rm obj/benchmark/merge_sorts.o bin/merge_sorts obj/host/app.o
+        rm obj/bench_*/merge_wram.o bin/merge_wram obj/host/app.o
         NR_TASKLETS=${NR_TASKLETS} BLOCK_SIZE=${BLOCK_SIZE} SEQREAD_CACHE_SIZE=${SEQREAD_CACHE_SIZE} TYPE=UINT${type} MERGE_THRESHOLD=${threshold} make all
 
         get_n ${threshold}
