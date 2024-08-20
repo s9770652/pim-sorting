@@ -20,7 +20,7 @@ QUICK_THRESHOLD ?= 18
 PIVOT ?= MEDIAN_OF_RANDOM
 PARTITION_PRIO ?= RIGHT
 RECURSIVE ?= false
-MERGE_THRESHOLD ?= 16
+MERGE_THRESHOLD ?= 14
 
 # A file whose name reflects the set constants.
 define conf_filename
