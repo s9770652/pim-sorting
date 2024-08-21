@@ -30,7 +30,7 @@ triple_buffers buffers[NR_TASKLETS];
 struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input (in debug mode)
 struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the pivot
 
-static bool flags[NR_TASKLETS];  // Whether a write-back from the auxiliary array is (not) needed.
+static bool flipped[NR_TASKLETS];  // Whether a write-back from the auxiliary array is (not) needed.
 
 #define FLUSH_BATCH_LENGTH (24)  // The number of elements flushed at once if possible.
 
@@ -112,7 +112,7 @@ static __attribute__((unused)) void shell_sort(T * const start, T * const end) {
 #define FORM_STARTING_RUNS_LEFT2RIGHT()                                                  \
 if (end - start + 1 <= MERGE_THRESHOLD) {                                                \
     shell_sort(start, end);                                                              \
-    flags[me()] = false;                                                                 \
+    flipped[me()] = false;                                                                 \
     return;                                                                              \
 }                                                                                        \
 shell_sort(start, start + MERGE_THRESHOLD - 1);                                          \
@@ -138,7 +138,7 @@ for (T *t = start + MERGE_THRESHOLD; t < end; t += MERGE_THRESHOLD) {           
 #define FORM_STARTING_RUNS_RIGHT2LEFT()                                                  \
 if (end - start + 1 <= MERGE_THRESHOLD) {                                                \
     shell_sort(start, end);                                                              \
-    flags[me()] = false;                                                                 \
+    flipped[me()] = false;                                                                 \
     return;                                                                              \
 }                                                                                        \
 for (T *t = end; t > start; t -= MERGE_THRESHOLD) {                                      \
@@ -353,7 +353,7 @@ static inline void merge_sort_no_write_back(T * const start, T * const end) {
             merge(in, in + run_length, run_2_end, out);
         }
     }
-    flags[me()] = flag;
+    flipped[me()] = flag;
 }
 
 /**
@@ -367,7 +367,7 @@ static inline void merge_sort_no_write_back(T * const start, T * const end) {
 static void merge_sort_write_back(T * const start, T * const end) {
     merge_sort_no_write_back(start, end);
     /* Writing back. */
-    if (!flags[me()])
+    if (!flipped[me()])
         return;
     T *in = end + 1, *until = end + (end - start) + 1, *out = start;
     flush_starting_run(in, until, out);
@@ -522,10 +522,10 @@ int main(void) {
         dpu_to_host.seconds += new_time * new_time;
 
         size_t offset = 0;  // Needed because of the MergeSort not writing back.
-        if (flags[me()]) {
+        if (flipped[me()]) {
             offset = host_to_dpu.length;
             cache[host_to_dpu.length - 1] = T_MIN;  // `get_stats_sorted_wram` relies on sentinels.
-            flags[me()] = false;  // Following sorting algorithms may not reset this value.
+            flipped[me()] = false;  // Following sorting algorithms may not reset this value.
         }
         array_stats stats_after;
         get_stats_sorted_wram(cache + offset, host_to_dpu.length, &stats_after);
