@@ -12,6 +12,9 @@
 #include "random_distribution.h"
 
 // Sanity Checks
+#if (BLOCK_SIZE % DMA_ALIGNMENT)
+#error `BLOCK_SIZE` is not divisble by `DMA_ALIGNMENT`!
+#endif
 #if (BLOCK_SIZE < DMA_ALIGNMENT)
 #error `BLOCK_SIZE` too small! The cache must be capable of holding at least `DMA_ALIGNMENT` bytes.
 #endif
