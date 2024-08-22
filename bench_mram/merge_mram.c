@@ -30,7 +30,8 @@ triple_buffers buffers[NR_TASKLETS];
 struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input (in debug mode)
 struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the pivot
 
-#define STARTING_RUN_LENGTH (TRIPLE_BUFFER_LENGTH)
+// #define STARTING_RUN_LENGTH (TRIPLE_BUFFER_LENGTH)
+#define STARTING_RUN_LENGTH (64)
 #define STARTING_RUN_SIZE (STARTING_RUN_LENGTH << DIV)
 static_assert(
     STARTING_RUN_SIZE == DMA_ALIGNED(STARTING_RUN_SIZE),
@@ -113,32 +114,79 @@ static void flush_second(T __mram_ptr * const out, __attribute__((unused)) T * c
     mram_write(cache, out, i * sizeof(T));
 }
 
+#define UNROLL_BY (16)
+static_assert(!(MAX_TRANSFER_LENGTH_CACHE % UNROLL_BY), "");
+
+#define UNROLLED_MERGE(update_0, update_1, flush_0, flush_1)            \
+for (size_t j = 0; j < MAX_TRANSFER_LENGTH_CACHE / UNROLL_BY; j++) {    \
+    _Pragma("unroll")                                                   \
+    for (size_t k = 0; k < UNROLL_BY; k++) {                            \
+        if (val[0] <= val[1]) {                                         \
+            cache[i++] = val[0];                                        \
+            val[0] = *update_0;                                         \
+            --elems_left[0];                                            \
+            flush_0;                                                    \
+        } else {                                                        \
+            cache[i++] = val[1];                                        \
+            val[1] = *update_1;                                         \
+            --elems_left[1];                                            \
+            flush_1;                                                    \
+        }                                                               \
+    }                                                                   \
+}
+
+#define MERGE_WITH_POINTER_CHECK(flush_0, flush_1)                                                                          \
+if ((ptr[0] + MAX_TRANSFER_LENGTH_CACHE <= sr_mids[0]) && ptr[1] + MAX_TRANSFER_LENGTH_CACHE <= sr_mids[1]) {               \
+    UNROLLED_MERGE(                                                                                                         \
+        ++ptr[0],                                                                                                           \
+        ++ptr[1],                                                                                                           \
+        flush_0,                                                                                                            \
+        flush_1                                                                                                             \
+    );                                                                                                                      \
+} else {                                                                                                                    \
+    UNROLLED_MERGE(                                                                                                         \
+        (ptr[0] = seqread_get(ptr[0], sizeof(T), &sr[0])),                                                                  \
+        (ptr[1] = seqread_get(ptr[1], sizeof(T), &sr[1])),                                                                  \
+        flush_0,                                                                                                            \
+        flush_1                                                                                                             \
+    );                                                                                                                      \
+}                                                                                                                           \
+mram_write(cache, out, MAX_TRANSFER_SIZE_CACHE);                                                                            \
+i = 0;                                                                                                                      \
+out += MAX_TRANSFER_LENGTH_CACHE;
+
+/// @todo: check which end is smaller
 static void merge_half_space(T __mram_ptr *out, T __mram_ptr * const ends[2], seqreader_t sr[2],
         T *ptr[2], size_t elems_left[2]) {
     T * const cache = buffers[me()].cache;
+    T const * const sr_mids[2] = {
+        (T*)(buffers[me()].seq_1 + SEQREAD_CACHE_SIZE),
+        (T*)(buffers[me()].seq_2 + SEQREAD_CACHE_SIZE),
+    };
     size_t i = 0;
+    T val[2] = { *ptr[0], *ptr[1] };
+    while ((elems_left[0] > MAX_TRANSFER_LENGTH_CACHE) && (elems_left[1] > MAX_TRANSFER_LENGTH_CACHE)) {
+        MERGE_WITH_POINTER_CHECK({}, {});
+    }
+    if (elems_left[0] == 0) {
+        flush_second(out, ptr[1], i);
+        return;
+    }  
+    if (elems_left[1] == 0) {
+        flush_first(seqread_tell(ptr[0], &sr[0]), out, ptr[0], i, ends[0]);
+        return;
+    }
     while (true) {
-        if (*ptr[0] <= *ptr[1]) {
-            cache[i++] = *ptr[0];
-            ptr[0] = seqread_get(ptr[0], sizeof(T), &sr[0]);
-            if (--elems_left[0] == 0) {
+        MERGE_WITH_POINTER_CHECK(
+            if (elems_left[0] == 0) {
                 flush_second(out, ptr[1], i);
-                break;
-            }
-        } else {
-            cache[i++] = *ptr[1];
-            ptr[1] = seqread_get(ptr[1], sizeof(T), &sr[1]);
-            if (--elems_left[1] == 0) {
+                return;
+            },
+            if (elems_left[1] == 0) {
                 flush_first(seqread_tell(ptr[0], &sr[0]), out, ptr[0], i, ends[0]);
-                break;
+                return;
             }
-        }
-        // If the cache is full, write its content to `output`.
-        if (i == MAX_TRANSFER_LENGTH_CACHE) {
-            mram_write(cache, out, MAX_TRANSFER_SIZE_CACHE);
-            i = 0;
-            out += MAX_TRANSFER_LENGTH_CACHE;
-        }
+        );
     }
 }
 
