@@ -114,10 +114,11 @@ static void flush_second(T __mram_ptr * const out, __attribute__((unused)) T * c
 }
 
 #define UNROLL_BY (8)
-static_assert(!(MAX_TRANSFER_LENGTH_CACHE % UNROLL_BY), "");
+#define UNROLLING_CACHE_LENGTH (MAX_TRANSFER_LENGTH_CACHE / UNROLL_BY * UNROLL_BY)
+#define UNROLLING_CACHE_SIZE (UNROLLING_CACHE_LENGTH << DIV)
 
 #define UNROLLED_MERGE(update_0, update_1, elems_0, elems_1, flush_0, flush_1)            \
-for (size_t j = 0; j < MAX_TRANSFER_LENGTH_CACHE / UNROLL_BY; j++) {    \
+for (size_t j = 0; j < UNROLLING_CACHE_LENGTH / UNROLL_BY; j++) {    \
     _Pragma("unroll")                                                   \
     for (size_t k = 0; k < UNROLL_BY; k++) {                            \
         if (val[0] <= val[1]) {                                         \
@@ -135,7 +136,7 @@ for (size_t j = 0; j < MAX_TRANSFER_LENGTH_CACHE / UNROLL_BY; j++) {    \
 }
 
 #define MERGE_WITH_POINTER_CHECK(elems_0, elems_1, flush_0, flush_1)                                                        \
-if ((ptr[0] + MAX_TRANSFER_LENGTH_CACHE <= sr_mids[0]) && ptr[1] + MAX_TRANSFER_LENGTH_CACHE <= sr_mids[1]) {               \
+if ((ptr[0] + UNROLLING_CACHE_LENGTH <= sr_mids[0]) && ptr[1] + UNROLLING_CACHE_LENGTH <= sr_mids[1]) {               \
     UNROLLED_MERGE(                                                                                                         \
         ++ptr[0],                                                                                                           \
         ++ptr[1],                                                                                                           \
@@ -154,9 +155,9 @@ if ((ptr[0] + MAX_TRANSFER_LENGTH_CACHE <= sr_mids[0]) && ptr[1] + MAX_TRANSFER_
         flush_1                                                                                                             \
     );                                                                                                                      \
 }                                                                                                                           \
-mram_write(cache, out, MAX_TRANSFER_SIZE_CACHE);                                                                            \
+mram_write(cache, out, UNROLLING_CACHE_SIZE);                                                                            \
 i = 0;                                                                                                                      \
-out += MAX_TRANSFER_LENGTH_CACHE;
+out += UNROLLING_CACHE_LENGTH;
 
 static void merge_half_space(T __mram_ptr *out, T __mram_ptr * const ends[2], seqreader_t sr[2],
         T *ptr[2], size_t elems_left[2]) {
@@ -168,7 +169,7 @@ static void merge_half_space(T __mram_ptr *out, T __mram_ptr * const ends[2], se
     size_t i = 0;
     T val[2] = { *ptr[0], *ptr[1] };
     if (*ends[0] <= *ends[1]) {
-        while (elems_left[0] > MAX_TRANSFER_LENGTH_CACHE) {
+        while (elems_left[0] > UNROLLING_CACHE_LENGTH) {
             MERGE_WITH_POINTER_CHECK(--elems_left[0], {}, {}, {});
         }
         if (elems_left[0] == 0) {
@@ -187,7 +188,7 @@ static void merge_half_space(T __mram_ptr *out, T __mram_ptr * const ends[2], se
             );
         }
     } else {
-        while (elems_left[1] > MAX_TRANSFER_LENGTH_CACHE) {
+        while (elems_left[1] > UNROLLING_CACHE_LENGTH) {
             MERGE_WITH_POINTER_CHECK({}, --elems_left[1], {}, {});
         }
         if (elems_left[1] == 0) {
