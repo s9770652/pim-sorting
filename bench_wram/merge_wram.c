@@ -112,7 +112,7 @@ static __attribute__((unused)) void shell_sort(T * const start, T * const end) {
 #define FORM_STARTING_RUNS_LEFT2RIGHT()                                                  \
 if (end - start + 1 <= MERGE_THRESHOLD) {                                                \
     shell_sort(start, end);                                                              \
-    flipped[me()] = false;                                                                 \
+    flipped[me()] = false;                                                               \
     return;                                                                              \
 }                                                                                        \
 shell_sort(start, start + MERGE_THRESHOLD - 1);                                          \
@@ -135,25 +135,25 @@ for (T *t = start + MERGE_THRESHOLD; t < end; t += MERGE_THRESHOLD) {           
  * Creating the starting runs for MergeSort.
  * The runs are formed from right to left, such that the first run may be smaller.
 **/
-#define FORM_STARTING_RUNS_RIGHT2LEFT()                                                  \
-if (end - start + 1 <= MERGE_THRESHOLD) {                                                \
-    shell_sort(start, end);                                                              \
-    flipped[me()] = false;                                                                 \
-    return;                                                                              \
-}                                                                                        \
-for (T *t = end; t > start; t -= MERGE_THRESHOLD) {                                      \
-    T *t_ = t - MERGE_THRESHOLD + 1 > start ? t - MERGE_THRESHOLD + 1 : start;           \
-    T before_sentinel[FIRST_STEP];                                                       \
-    _Pragma("unroll")  /* Set sentinel values. */                                        \
-    for (size_t i = 0; i < FIRST_STEP; i++) {                                            \
-        before_sentinel[i] = *(t_ - i - 1);                                              \
-        *(t_ - i - 1) = T_MIN;                                                           \
-    }                                                                                    \
-    shell_sort(t_, t);                                                                   \
-    _Pragma("unroll")  /* Restore old values. */                                         \
-    for (size_t i = 0; i < FIRST_STEP; i++) {                                            \
-        *(t_ - i - 1) = before_sentinel[i];                                              \
-    }                                                                                    \
+#define FORM_STARTING_RUNS_RIGHT2LEFT()                                        \
+if (end - start + 1 <= MERGE_THRESHOLD) {                                      \
+    shell_sort(start, end);                                                    \
+    flipped[me()] = false;                                                     \
+    return;                                                                    \
+}                                                                              \
+for (T *t = end; t > start; t -= MERGE_THRESHOLD) {                            \
+    T *t_ = t - MERGE_THRESHOLD + 1 > start ? t - MERGE_THRESHOLD + 1 : start; \
+    T before_sentinel[FIRST_STEP];                                             \
+    _Pragma("unroll")  /* Set sentinel values. */                              \
+    for (size_t i = 0; i < FIRST_STEP; i++) {                                  \
+        before_sentinel[i] = *(t_ - i - 1);                                    \
+        *(t_ - i - 1) = T_MIN;                                                 \
+    }                                                                          \
+    shell_sort(t_, t);                                                         \
+    _Pragma("unroll")  /* Restore old values. */                               \
+    for (size_t i = 0; i < FIRST_STEP; i++) {                                  \
+        *(t_ - i - 1) = before_sentinel[i];                                    \
+    }                                                                          \
 }
 
 /**
@@ -237,34 +237,34 @@ static inline void flush_full_starting_run(T *in, T *until, T *out) {
  * @param end The address of said last element.
  * @param on_depletion An if-block for when and what to do if said run is fully merged.
 **/
-#define UNROLLED_MERGER(ptr, end, on_depletion) \
-while (ptr <= end - UNROLL_BY + 1) {                \
-    _Pragma("unroll")                               \
-    for (size_t k = 0; k < UNROLL_BY; k++) {        \
-        if (val_i <= val_j) {                       \
-            *(out + k) = val_i;                     \
-            val_i = *++i;                           \
-        } else {                                    \
-            *(out + k) = val_j;                     \
-            val_j = *++j;                           \
-        }                                           \
-    }                                               \
-    out += UNROLL_BY;                               \
-};                                                  \
-on_depletion                                        \
-while (ptr <= end - (UNROLL_BY / 2) + 1) {          \
-    _Pragma("unroll")                               \
-    for (size_t k = 0; k < UNROLL_BY / 2; k++) {    \
-        if (val_i <= val_j) {                       \
-            *(out + k) = val_i;                     \
-            val_i = *++i;                           \
-        } else {                                    \
-            *(out + k) = val_j;                     \
-            val_j = *++j;                           \
-        }                                           \
-    }                                               \
-    out += UNROLL_BY / 2;                           \
-}                                                   \
+#define UNROLLED_MERGER(ptr, end, on_depletion)  \
+while (ptr <= end - UNROLL_BY + 1) {             \
+    _Pragma("unroll")                            \
+    for (size_t k = 0; k < UNROLL_BY; k++) {     \
+        if (val_i <= val_j) {                    \
+            *(out + k) = val_i;                  \
+            val_i = *++i;                        \
+        } else {                                 \
+            *(out + k) = val_j;                  \
+            val_j = *++j;                        \
+        }                                        \
+    }                                            \
+    out += UNROLL_BY;                            \
+};                                               \
+on_depletion                                     \
+while (ptr <= end - (UNROLL_BY / 2) + 1) {       \
+    _Pragma("unroll")                            \
+    for (size_t k = 0; k < UNROLL_BY / 2; k++) { \
+        if (val_i <= val_j) {                    \
+            *(out + k) = val_i;                  \
+            val_i = *++i;                        \
+        } else {                                 \
+            *(out + k) = val_j;                  \
+            val_j = *++j;                        \
+        }                                        \
+    }                                            \
+    out += UNROLL_BY / 2;                        \
+}                                                \
 on_depletion
 
 /**
@@ -342,16 +342,16 @@ static inline void merge_sort_no_write_back(T * const start, T * const end) {
             out = start;
         }
         // Merge pairs of adjacent runs.
-        for (; in <= until; in += 2 * run_length, out += 2 * run_length) {
-            // Only one run left?
-            if (in + run_length > until) {
-                flush_starting_run(in, until, out);
-                break;
-            }
-            // If not, merge the next two runs.
+        for (; in <= until - run_length; in += 2 * run_length, out += 2 * run_length) {
+            // Calculating `run_2_end` is cheaper than changing the loop structure
+            // (changing conditions to include only full pairs,
+            // adding another loop for a last, incomplete pair).
             T * const run_2_end = (in + 2 * run_length > until) ? until : in + 2 * run_length - 1;
             merge(in, in + run_length, run_2_end, out);
         }
+        // A single remaining run gets flushed straight away.
+        if (in >= until)
+            flush_starting_run(in, until, out);
     }
     flipped[me()] = flag;
 }
@@ -435,27 +435,26 @@ static void merge_sort_half_space(T * const start, T * const end) {
     size_t const n = end - start + 1;
     for (size_t run_length = MERGE_THRESHOLD; run_length < n; run_length *= 2) {
         // Merge pairs of adjacent runs.
-        for (T *i = end; i > start; i -= 2 * run_length) {
-            // Only one run left?
-            T * const run_1_end = i - run_length;
-            if ((intptr_t)run_1_end < (intptr_t)start) {
-                break;
-            }
+        for (T *run_1_end = end - run_length; (intptr_t)run_1_end >= (intptr_t)start;
+                run_1_end -= 2 * run_length) {
             // If not, copy the current run …
             T *run_1_start;  // Using a tertiary operator worsens the runtime.
-            if ((intptr_t)(run_1_end - run_length + 1) > (intptr_t)start) {
+            size_t run_1_length;
+            if ((intptr_t)(run_1_end - run_length + 1) >= (intptr_t)start) {
                 run_1_start = run_1_end - run_length + 1;
+                run_1_length = run_length;
                 flush_full_starting_run(run_1_start, run_1_end, end + 1);
             } else {
                 run_1_start = start;
+                run_1_length = run_1_end - run_1_start + 1;
                 flush_starting_run(run_1_start, run_1_end, end + 1);
             }
             // … and merge the copy with the next run.
             merge_right_flush_only(
                 end + 1,
-                end + 1 + (run_1_end - run_1_start),
+                end + run_1_length,
                 run_1_end + 1,
-                i,
+                run_1_end + run_length,
                 run_1_start
             );
         }
