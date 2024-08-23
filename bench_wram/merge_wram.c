@@ -107,32 +107,6 @@ static __attribute__((unused)) void shell_sort(T * const start, T * const end) {
 
 /**
  * Creating the starting runs for MergeSort.
- * The runs are formed from left to right, such that the last run may be smaller.
-**/
-#define FORM_STARTING_RUNS_LEFT2RIGHT()                                                  \
-if (end - start + 1 <= MERGE_THRESHOLD) {                                                \
-    shell_sort(start, end);                                                              \
-    flipped[me()] = false;                                                               \
-    return;                                                                              \
-}                                                                                        \
-shell_sort(start, start + MERGE_THRESHOLD - 1);                                          \
-for (T *t = start + MERGE_THRESHOLD; t < end; t += MERGE_THRESHOLD) {                    \
-    T before_sentinel[FIRST_STEP];                                                       \
-    _Pragma("unroll")  /* Set sentinel values. */                                        \
-    for (size_t i = 0; i < FIRST_STEP; i++) {                                            \
-        before_sentinel[i] = *(t - i - 1);                                               \
-        *(t - i - 1) = T_MIN;                                                            \
-    }                                                                                    \
-    T * const run_end = (t + MERGE_THRESHOLD - 1 > end) ? end : t + MERGE_THRESHOLD - 1; \
-    shell_sort(t, run_end);                                                              \
-    _Pragma("unroll")  /* Restore old values. */                                         \
-    for (size_t i = 0; i < FIRST_STEP; i++) {                                            \
-        *(t - i - 1) = before_sentinel[i];                                               \
-    }                                                                                    \
-}
-
-/**
- * Creating the starting runs for MergeSort.
  * The runs are formed from right to left, such that the first run may be smaller.
 **/
 #define FORM_STARTING_RUNS_RIGHT2LEFT()                                        \
@@ -325,35 +299,40 @@ static inline void merge(T * const start_1, T * const start_2, T * const end_2, 
 **/
 static inline void merge_sort_no_write_back(T * const start, T * const end) {
     /* Starting runs. */
-    FORM_STARTING_RUNS_LEFT2RIGHT();
+    FORM_STARTING_RUNS_RIGHT2LEFT();
     /* Merging. */
-    T *in, *until, *out;  // Runs from `in` to `until` are merged and stored in `out`.
-    bool flag = false;  // Used to determine the initial positions of `in`, `out`, and `until`.
+    T *in, *until, *out;  // Runs from `in` to `until` are merged and stored in front of `out`.
+    bool flip = false;  // Used to determine the initial positions of `in`, `out`, and `until`.
     size_t const n = end - start + 1;
     for (size_t run_length = MERGE_THRESHOLD; run_length < n; run_length *= 2) {
         // Set the positions to read from and write to.
-        if ((flag = !flag)) {
+        if ((flip = !flip)) {
             in = start;
             until = end;
-            out = end + 1;
+            out = end + n + 1;
         } else {
             in = end + 1;
             until = end + n;
-            out = start;
+            out = end + 1;
         }
-        // Merge pairs of adjacent runs.
-        for (; in <= until - run_length; in += 2 * run_length, out += 2 * run_length) {
-            // Calculating `run_2_end` is cheaper than changing the loop structure
-            // (changing conditions to include only full pairs,
-            // adding another loop for a last, incomplete pair).
-            T * const run_2_end = (in + 2 * run_length > until) ? until : in + 2 * run_length - 1;
-            merge(in, in + run_length, run_2_end, out);
+        // Merge pairs of adjacent runs which are all of the same length.
+        T *run_1_end = until - run_length;
+        for (; (intptr_t)run_1_end >= (intptr_t)(in + run_length - 1); run_1_end -= 2*run_length) {
+            out -= 2*run_length;
+            merge(run_1_end + 1 - run_length, run_1_end + 1, run_1_end + run_length, out);
         }
-        // A single remaining run gets flushed straight away.
-        if (in >= until)
-            flush_starting_run(in, until, out);
+        // Merge pair at the beginning where the first run is shorter.
+        if ((intptr_t)run_1_end >= (intptr_t)in) {
+            size_t const run_1_length = run_1_end + 1 - in;
+            out -= run_length + run_1_length;
+            merge(in, run_1_end + 1, run_1_end + run_length, out);
+        // Flush single run at the beginning straight away
+        } else if ((intptr_t)(run_1_end + run_length) >= (intptr_t)in) {
+            out = (flip) ? end + 1 : start;
+            flush_starting_run(in, run_1_end + run_length, out);
+        }
     }
-    flipped[me()] = flag;
+    flipped[me()] = flip;
 }
 
 /**
