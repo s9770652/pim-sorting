@@ -119,7 +119,7 @@ static void flush_second(T __mram_ptr * const out, __attribute__((unused)) T * c
 
 #define UNROLLED_MERGE(ptr_0, ptr_1, get_0, get_1, elems_0, elems_1, flush_0, flush_1)      \
 for (size_t j = 0; j < UNROLLING_CACHE_LENGTH / UNROLL_BY; j++) {                           \
-    if ((ptr[0] + UNROLL_BY < sr_mids[0]) && ptr[1] + UNROLL_BY < sr_mids[1]) {             \
+    if ((ptr[0] + UNROLL_BY <= sr_mids[0]) && ptr[1] + UNROLL_BY <= sr_mids[1]) {           \
         _Pragma("unroll")                                                                   \
         for (size_t k = 0; k < UNROLL_BY; k++) {                                            \
             if (val[0] <= val[1]) {                                                         \
@@ -152,27 +152,27 @@ for (size_t j = 0; j < UNROLLING_CACHE_LENGTH / UNROLL_BY; j++) {               
     }                                                                                       \
 }
 
-#define MERGE_WITH_CACHE_FLUSH(elems_0, elems_1, flush_0, flush_1)          \
-UNROLLED_MERGE(                                                             \
-    ++ptr[0],                                                               \
-    ++ptr[1],                                                               \
-    (ptr[0] = seqread_get(ptr[0], sizeof(T), &sr[0])),                      \
-    (ptr[1] = seqread_get(ptr[1], sizeof(T), &sr[1])),                      \
-    elems_0,                                                                \
-    elems_1,                                                                \
-    flush_0,                                                                \
-    flush_1                                                                 \
-)                                                                           \
-mram_write(cache, out, UNROLLING_CACHE_SIZE);                               \
-i = 0;                                                                      \
+#define MERGE_WITH_CACHE_FLUSH(elems_0, elems_1, flush_0, flush_1)                        \
+UNROLLED_MERGE(                                                                           \
+    ++ptr[0],                                                                             \
+    ++ptr[1],                                                                             \
+    (ptr[0] = (ptr[0] < sr_mids[0]) ? ++ptr[0] : seqread_get(ptr[0], sizeof(T), &sr[0])), \
+    (ptr[1] = (ptr[1] < sr_mids[1]) ? ++ptr[1] : seqread_get(ptr[1], sizeof(T), &sr[1])), \
+    elems_0,                                                                              \
+    elems_1,                                                                              \
+    flush_0,                                                                              \
+    flush_1                                                                               \
+)                                                                                         \
+mram_write(cache, out, UNROLLING_CACHE_SIZE);                                             \
+i = 0;                                                                                    \
 out += UNROLLING_CACHE_LENGTH;
 
 static void merge_half_space(T __mram_ptr *out, T __mram_ptr * const ends[2], seqreader_t sr[2],
         T *ptr[2], size_t elems_left[2]) {
     T * const cache = buffers[me()].cache;
     T const * const sr_mids[2] = {
-        (T*)(buffers[me()].seq_1 + SEQREAD_CACHE_SIZE),
-        (T*)(buffers[me()].seq_2 + SEQREAD_CACHE_SIZE),
+        (T *)(buffers[me()].seq_1 + SEQREAD_CACHE_SIZE) - 1,
+        (T *)(buffers[me()].seq_2 + SEQREAD_CACHE_SIZE) - 1,
     };
     size_t i = 0;
     T val[2] = { *ptr[0], *ptr[1] };
