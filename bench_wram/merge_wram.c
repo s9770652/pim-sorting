@@ -416,7 +416,7 @@ static void merge_sort_half_space(T * const start, T * const end) {
         // Merge pairs of adjacent runs.
         for (T *run_1_end = end - run_length; (intptr_t)run_1_end >= (intptr_t)start;
                 run_1_end -= 2 * run_length) {
-            // If not, copy the current run …
+            // Copy the current run …
             T *run_1_start;  // Using a tertiary operator worsens the runtime.
             size_t run_1_length;
             if ((intptr_t)(run_1_end - run_length + 1) >= (intptr_t)start) {
