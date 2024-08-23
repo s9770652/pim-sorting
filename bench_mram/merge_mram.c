@@ -117,46 +117,54 @@ static void flush_second(T __mram_ptr * const out, __attribute__((unused)) T * c
 #define UNROLLING_CACHE_LENGTH (MAX_TRANSFER_LENGTH_CACHE / UNROLL_BY * UNROLL_BY)
 #define UNROLLING_CACHE_SIZE (UNROLLING_CACHE_LENGTH << DIV)
 
-#define UNROLLED_MERGE(update_0, update_1, elems_0, elems_1, flush_0, flush_1)            \
-for (size_t j = 0; j < UNROLLING_CACHE_LENGTH / UNROLL_BY; j++) {    \
-    _Pragma("unroll")                                                   \
-    for (size_t k = 0; k < UNROLL_BY; k++) {                            \
-        if (val[0] <= val[1]) {                                         \
-            cache[i++] = val[0];                                        \
-            val[0] = *update_0;                                         \
-            elems_0;                                                    \
-            flush_0;                                                    \
-        } else {                                                        \
-            cache[i++] = val[1];                                        \
-            val[1] = *update_1;                                         \
-            elems_1;                                                    \
-            flush_1;                                                    \
-        }                                                               \
-    }                                                                   \
+#define UNROLLED_MERGE(ptr_0, ptr_1, get_0, get_1, elems_0, elems_1, flush_0, flush_1)      \
+for (size_t j = 0; j < UNROLLING_CACHE_LENGTH / UNROLL_BY; j++) {                           \
+    if ((ptr[0] + UNROLL_BY < sr_mids[0]) && ptr[1] + UNROLL_BY < sr_mids[1]) {             \
+        _Pragma("unroll")                                                                   \
+        for (size_t k = 0; k < UNROLL_BY; k++) {                                            \
+            if (val[0] <= val[1]) {                                                         \
+                cache[i++] = val[0];                                                        \
+                val[0] = *ptr_0;                                                            \
+                elems_0;                                                                    \
+                flush_0;                                                                    \
+            } else {                                                                        \
+                cache[i++] = val[1];                                                        \
+                val[1] = *ptr_1;                                                            \
+                elems_1;                                                                    \
+                flush_1;                                                                    \
+            }                                                                               \
+        }                                                                                   \
+    } else {                                                                                \
+        _Pragma("unroll")                                                                   \
+        for (size_t k = 0; k < UNROLL_BY; k++) {                                            \
+            if (val[0] <= val[1]) {                                                         \
+                cache[i++] = val[0];                                                        \
+                val[0] = *get_0;                                                            \
+                elems_0;                                                                    \
+                flush_0;                                                                    \
+            } else {                                                                        \
+                cache[i++] = val[1];                                                        \
+                val[1] = *get_1;                                                            \
+                elems_1;                                                                    \
+                flush_1;                                                                    \
+            }                                                                               \
+        }                                                                                   \
+    }                                                                                       \
 }
 
-#define MERGE_WITH_POINTER_CHECK(elems_0, elems_1, flush_0, flush_1)                                                        \
-if ((ptr[0] + UNROLLING_CACHE_LENGTH <= sr_mids[0]) && ptr[1] + UNROLLING_CACHE_LENGTH <= sr_mids[1]) {               \
-    UNROLLED_MERGE(                                                                                                         \
-        ++ptr[0],                                                                                                           \
-        ++ptr[1],                                                                                                           \
-        elems_0,                                                                                                            \
-        elems_1,                                                                                                            \
-        flush_0,                                                                                                            \
-        flush_1                                                                                                             \
-    );                                                                                                                      \
-} else {                                                                                                                    \
-    UNROLLED_MERGE(                                                                                                         \
-        (ptr[0] = seqread_get(ptr[0], sizeof(T), &sr[0])),                                                                  \
-        (ptr[1] = seqread_get(ptr[1], sizeof(T), &sr[1])),                                                                  \
-        elems_0,                                                                                                            \
-        elems_1,                                                                                                            \
-        flush_0,                                                                                                            \
-        flush_1                                                                                                             \
-    );                                                                                                                      \
-}                                                                                                                           \
-mram_write(cache, out, UNROLLING_CACHE_SIZE);                                                                            \
-i = 0;                                                                                                                      \
+#define MERGE_WITH_CACHE_FLUSH(elems_0, elems_1, flush_0, flush_1)          \
+UNROLLED_MERGE(                                                             \
+    ++ptr[0],                                                               \
+    ++ptr[1],                                                               \
+    (ptr[0] = seqread_get(ptr[0], sizeof(T), &sr[0])),                      \
+    (ptr[1] = seqread_get(ptr[1], sizeof(T), &sr[1])),                      \
+    elems_0,                                                                \
+    elems_1,                                                                \
+    flush_0,                                                                \
+    flush_1                                                                 \
+)                                                                           \
+mram_write(cache, out, UNROLLING_CACHE_SIZE);                               \
+i = 0;                                                                      \
 out += UNROLLING_CACHE_LENGTH;
 
 static void merge_half_space(T __mram_ptr *out, T __mram_ptr * const ends[2], seqreader_t sr[2],
@@ -170,14 +178,14 @@ static void merge_half_space(T __mram_ptr *out, T __mram_ptr * const ends[2], se
     T val[2] = { *ptr[0], *ptr[1] };
     if (*ends[0] <= *ends[1]) {
         while (elems_left[0] > UNROLLING_CACHE_LENGTH) {
-            MERGE_WITH_POINTER_CHECK(--elems_left[0], {}, {}, {});
+            MERGE_WITH_CACHE_FLUSH(--elems_left[0], {}, {}, {});
         }
         if (elems_left[0] == 0) {
             flush_second(out, ptr[1], i);
             return;
         }
         while (true) {
-            MERGE_WITH_POINTER_CHECK(
+            MERGE_WITH_CACHE_FLUSH(
                 --elems_left[0],
                 {},
                 if (elems_left[0] == 0) {
@@ -189,14 +197,14 @@ static void merge_half_space(T __mram_ptr *out, T __mram_ptr * const ends[2], se
         }
     } else {
         while (elems_left[1] > UNROLLING_CACHE_LENGTH) {
-            MERGE_WITH_POINTER_CHECK({}, --elems_left[1], {}, {});
+            MERGE_WITH_CACHE_FLUSH({}, --elems_left[1], {}, {});
         }
         if (elems_left[1] == 0) {
             flush_first(seqread_tell(ptr[0], &sr[0]), out, ptr[0], i, ends[0]);
             return;
         }
         while (true) {
-            MERGE_WITH_POINTER_CHECK(
+            MERGE_WITH_CACHE_FLUSH(
                 {},
                 --elems_left[1],
                 {},
@@ -264,7 +272,7 @@ int main(void) {
     /* Set up dummy values if called via debugger. */
     if (host_to_dpu.length == 0) {
         host_to_dpu.reps = 1;
-        host_to_dpu.length = 1024;
+        host_to_dpu.length = 0x1000;
         host_to_dpu.offset = DMA_ALIGNED(host_to_dpu.length * sizeof(T)) / sizeof(T);
         host_to_dpu.basic_seed = 0b1011100111010;
         host_to_dpu.algo_index = 0;
