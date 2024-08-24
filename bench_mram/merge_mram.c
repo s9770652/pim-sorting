@@ -119,7 +119,7 @@ static void flush_second(T __mram_ptr * const out, __attribute__((unused)) T * c
 
 #define UNROLLED_MERGE(ptr_0, ptr_1, get_0, get_1, elems_0, elems_1, flush_0, flush_1)      \
 for (size_t j = 0; j < UNROLLING_CACHE_LENGTH / UNROLL_BY; j++) {                           \
-    if ((ptr[0] + UNROLL_BY <= sr_mids[0]) && ptr[1] + UNROLL_BY <= sr_mids[1]) {           \
+    if ((ptr[0] + UNROLL_BY <= sr_mids[0]) && (ptr[1] + UNROLL_BY <= sr_mids[1])) {         \
         _Pragma("unroll")                                                                   \
         for (size_t k = 0; k < UNROLL_BY; k++) {                                            \
             if (val[0] <= val[1]) {                                                         \
@@ -168,12 +168,8 @@ i = 0;                                                                          
 out += UNROLLING_CACHE_LENGTH;
 
 static void merge_half_space(T __mram_ptr *out, T __mram_ptr * const ends[2], seqreader_t sr[2],
-        T *ptr[2], size_t elems_left[2]) {
+        T *ptr[2], size_t elems_left[2], T const * const sr_mids[2]) {
     T * const cache = buffers[me()].cache;
-    T const * const sr_mids[2] = {
-        (T *)(buffers[me()].seq_1 + SEQREAD_CACHE_SIZE) - 1,
-        (T *)(buffers[me()].seq_2 + SEQREAD_CACHE_SIZE) - 1,
-    };
     size_t i = 0;
     T val[2] = { *ptr[0], *ptr[1] };
     if (*ends[0] <= *ends[1]) {
@@ -223,22 +219,23 @@ static void merge_sort_half_space(T __mram_ptr * const start, T __mram_ptr * con
 
     /* Merging. */
     seqreader_t sr[2];
+    T const * const sr_mids[2] = {
+        (T *)(buffers[me()].seq_1 + SEQREAD_CACHE_SIZE) - 1,
+        (T *)(buffers[me()].seq_2 + SEQREAD_CACHE_SIZE) - 1,
+    };
     size_t const n = end - start + 1;
     for (size_t run_length = STARTING_RUN_LENGTH; run_length < n; run_length *= 2) {
         // Merge pairs of adjacent runs.
-        for (T __mram_ptr *i = end; i > start; i -= 2 * run_length) {
-            // Only one run left?
-            T __mram_ptr * const run_1_end = i - run_length;
-            if ((intptr_t)run_1_end < (intptr_t)start) {
-                break;
-            }
-            // If not, copy the current run …
+        for (T __mram_ptr *run_1_end = end - run_length, *run_2_end = end;
+                (intptr_t)run_1_end >= (intptr_t)start;
+                run_1_end -= 2 * run_length, run_2_end -= 2 * run_length) {
+            // Copy the current run …
             T __mram_ptr *run_1_start = ((intptr_t)(run_1_end - run_length + 1) > (intptr_t)start)
                     ? run_1_end - run_length + 1
                     : start;
             flush_starting_run(run_1_start, run_1_end, output);
             // … and merge the copy with the next run.
-            T __mram_ptr * const ends[2] = { output + (run_1_end - run_1_start), i };
+            T __mram_ptr * const ends[2] = { output + (run_1_end - run_1_start), run_2_end };
             T *ptr[2] = {
                 seqread_init(buffers[me()].seq_1, output, &sr[0]),
                 seqread_init(buffers[me()].seq_2, run_1_end + 1, &sr[1]),
@@ -249,7 +246,8 @@ static void merge_sort_half_space(T __mram_ptr * const start, T __mram_ptr * con
                 ends,
                 sr,
                 ptr,
-                elems_left
+                elems_left,
+                sr_mids
             );
         }
     }
