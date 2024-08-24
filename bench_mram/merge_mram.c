@@ -124,14 +124,14 @@ for (size_t j = 0; j < UNROLLING_CACHE_LENGTH / UNROLL_BY; j++) {               
         for (size_t k = 0; k < UNROLL_BY; k++) {                                            \
             if (val[0] <= val[1]) {                                                         \
                 cache[i++] = val[0];                                                        \
-                val[0] = *ptr_0;                                                            \
                 elems_0;                                                                    \
                 flush_0;                                                                    \
+                val[0] = *ptr_0;                                                            \
             } else {                                                                        \
                 cache[i++] = val[1];                                                        \
-                val[1] = *ptr_1;                                                            \
                 elems_1;                                                                    \
                 flush_1;                                                                    \
+                val[1] = *ptr_1;                                                            \
             }                                                                               \
         }                                                                                   \
     } else {                                                                                \
@@ -139,14 +139,14 @@ for (size_t j = 0; j < UNROLLING_CACHE_LENGTH / UNROLL_BY; j++) {               
         for (size_t k = 0; k < UNROLL_BY; k++) {                                            \
             if (val[0] <= val[1]) {                                                         \
                 cache[i++] = val[0];                                                        \
-                val[0] = *get_0;                                                            \
                 elems_0;                                                                    \
                 flush_0;                                                                    \
+                val[0] = *get_0;                                                            \
             } else {                                                                        \
                 cache[i++] = val[1];                                                        \
-                val[1] = *get_1;                                                            \
                 elems_1;                                                                    \
                 flush_1;                                                                    \
+                val[1] = *get_1;                                                            \
             }                                                                               \
         }                                                                                   \
     }                                                                                       \
