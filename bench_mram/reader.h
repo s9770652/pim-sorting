@@ -6,11 +6,19 @@
 struct reader {
     T __mram_ptr *mram;
     T __mram_ptr *mram_end;
-    T *buffer;
+    T * const buffer;
+    T * const buffer_end;
 };
 
-static inline void setup_reader(struct reader * const rdr, T * const buffer) {
-    rdr->buffer = buffer;
+static inline void setup_reader(struct reader * const rdr, uintptr_t const buffer) {
+    memcpy(
+        rdr,
+        &(struct reader){
+            .buffer = (T *)buffer,
+            .buffer_end = (T *)(buffer + 2 * SEQREAD_CACHE_SIZE) - 1
+        },
+        sizeof(struct reader)
+    );
 }
 
 static inline T *reset_reader(struct reader * const rdr, T __mram_ptr *from, T __mram_ptr *until) {
@@ -22,7 +30,6 @@ static inline T *reset_reader(struct reader * const rdr, T __mram_ptr *from, T _
 
 static inline T *update_reader(struct reader * const rdr) {
     rdr->mram += 2 * SEQREAD_CACHE_SIZE / sizeof(T);
-    // printf("Updating at %p…\n", rdr->mram);
     mram_read(rdr->mram, rdr->buffer, 2 * SEQREAD_CACHE_SIZE);
     return rdr->buffer;
 }
