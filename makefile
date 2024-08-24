@@ -32,7 +32,7 @@ CONF := ${call conf_filename,${NR_DPUS},${NR_TASKLETS},${TYPE},${BLOCK_SIZE},${S
 comma := ,
 empty :=
 space := ${empty} ${empty}
-BENCHMARKS := small_wram quick_wram merge_wram heap_wram merge_mram
+BENCHMARKS := small_wram quick_wram merge_wram heap_wram merge_mram merge_mram_custom
 BINARIES := ${patsubst %,./${BUILD_DIR}/%,sorting ${BENCHMARKS}}
 BINARIES := ${subst ${space},${comma},${BINARIES}}
 
