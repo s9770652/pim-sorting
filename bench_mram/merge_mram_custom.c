@@ -72,14 +72,13 @@ static void flush_starting_run(T __mram_ptr *in, T __mram_ptr *until, T __mram_p
     }
 }
 
-static void flush_first(struct reader * const reader, T __mram_ptr *out,
-        __attribute__((unused)) T * const ptr, size_t i) {
+static void flush_first(struct reader * const reader, T __mram_ptr *out, size_t i) {
     T * const cache = buffers[me()].cache;
-    T __mram_ptr *in = get_reader_mram_address(reader, ptr);
+    T __mram_ptr *in = get_reader_mram_address(reader);
     // Transfer cache to MRAM.
 #ifdef UINT32
     if (i & 1) {  // Is there need for alignment?
-        cache[i++] = *ptr;  // Possible since `ptr` must have at least one element.
+        cache[i++] = *reader->ptr;  // Possible since `ptr` must have at least one element.
         if (in >= reader->mram_end) {
             mram_write(cache, out, i * sizeof(T));
             return;
@@ -89,8 +88,6 @@ static void flush_first(struct reader * const reader, T __mram_ptr *out,
 #endif
     mram_write(cache, out, i * sizeof(T));
     out += i;
-    // printf("Flushing\n");
-    // print_single_line(cache, i);;
 
     // Transfer from MRAM to MRAM.
     do {
@@ -101,18 +98,17 @@ static void flush_first(struct reader * const reader, T __mram_ptr *out,
                 : MAX_TRANSFER_SIZE_TRIPLE;
         mram_read(in, cache, rem_size);
         mram_write(cache, out, rem_size);
-        // for (int k = -2; k < 4; k++) printf("%u ", in[k]); printf("\n");
         in += MAX_TRANSFER_LENGTH_TRIPLE;  // Value may be wrong for the last transfer …
         out += MAX_TRANSFER_LENGTH_TRIPLE;  // … after which it is not needed anymore, however.
     } while (in <= reader->mram_end);
 }
 
-static void flush_second(T __mram_ptr * const out, __attribute__((unused)) T * const ptr,
-        size_t i) {
+static void flush_second(struct reader * const reader, T __mram_ptr * const out, size_t i) {
     T * const cache = buffers[me()].cache;
+    (void)reader;
 #ifdef UINT32
     if (i & 1) {  // Is there need for alignment?
-        cache[i++] = *ptr;  // Possible since `ptr` must have at least one element.
+        cache[i++] = *reader->ptr;  // Possible since `ptr` must have at least one element.
     }
 #endif
     mram_write(cache, out, i * sizeof(T));
@@ -122,85 +118,78 @@ static void flush_second(T __mram_ptr * const out, __attribute__((unused)) T * c
 #define UNROLLING_CACHE_LENGTH (MIN(256, MAX_TRANSFER_LENGTH_CACHE) / UNROLL_BY * UNROLL_BY)
 #define UNROLLING_CACHE_SIZE (UNROLLING_CACHE_LENGTH << DIV)
 
-#define UNROLLED_MERGE(ptr_0, ptr_1, get_0, get_1, flush_0, flush_1) \
-for (size_t j = 0; j < UNROLLING_CACHE_LENGTH / UNROLL_BY; j++) {    \
-    if ((ptr[0] <= readers[0].buffer_early_end)                      \
-            && (ptr[1] <= readers[1].buffer_early_end)) {            \
-        _Pragma("unroll")                                            \
-        for (size_t k = 0; k < UNROLL_BY; k++) {                     \
-            if (val[0] <= val[1]) {                                  \
-                cache[i++] = val[0];                                 \
-                flush_0;                                             \
-                val[0] = *ptr_0;                                     \
-            } else {                                                 \
-                cache[i++] = val[1];                                 \
-                flush_1;                                             \
-                val[1] = *ptr_1;                                     \
-            }                                                        \
-        }                                                            \
-    } else {                                                         \
-        _Pragma("unroll")                                            \
-        for (size_t k = 0; k < UNROLL_BY; k++) {                     \
-            if (val[0] <= val[1]) {                                  \
-                cache[i++] = val[0];                                 \
-                flush_0;                                             \
-                val[0] = *get_0;                                     \
-            } else {                                                 \
-                cache[i++] = val[1];                                 \
-                flush_1;                                             \
-                val[1] = *get_1;                                     \
-            }                                                        \
-        }                                                            \
-    }                                                                \
+#define UNROLLED_MERGE(flush_0, flush_1)                          \
+for (size_t j = 0; j < UNROLLING_CACHE_LENGTH / UNROLL_BY; j++) { \
+    if ((readers[0].ptr <= readers[0].buffer_early_end)           \
+            && (readers[1].ptr <= readers[1].buffer_early_end)) { \
+        _Pragma("unroll")                                         \
+        for (size_t k = 0; k < UNROLL_BY; k++) {                  \
+            if (val[0] <= val[1]) {                               \
+                cache[i++] = val[0];                              \
+                flush_0;                                          \
+                val[0] = *update_reader_partially(&readers[0]);   \
+            } else {                                              \
+                cache[i++] = val[1];                              \
+                flush_1;                                          \
+                val[1] = *update_reader_partially(&readers[1]);   \
+            }                                                     \
+        }                                                         \
+    } else {                                                      \
+        _Pragma("unroll")                                         \
+        for (size_t k = 0; k < UNROLL_BY; k++) {                  \
+            if (val[0] <= val[1]) {                               \
+                cache[i++] = val[0];                              \
+                flush_0;                                          \
+                val[0] = *update_reader_fully(&readers[0]);       \
+            } else {                                              \
+                cache[i++] = val[1];                              \
+                flush_1;                                          \
+                val[1] = *update_reader_fully(&readers[1]);       \
+            }                                                     \
+        }                                                         \
+    }                                                             \
 }
 
-#define MERGE_WITH_CACHE_FLUSH(flush_0, flush_1)                                         \
-UNROLLED_MERGE(                                                                          \
-    ++ptr[0],                                                                            \
-    ++ptr[1],                                                                            \
-    (ptr[0] = (ptr[0] < readers[0].buffer_end) ? ++ptr[0] : update_reader(&readers[0])), \
-    (ptr[1] = (ptr[1] < readers[1].buffer_end) ? ++ptr[1] : update_reader(&readers[1])), \
-    flush_0,                                                                             \
-    flush_1                                                                              \
-)                                                                                        \
-mram_write(cache, out, UNROLLING_CACHE_SIZE);                                            \
-i = 0;                                                                                   \
+#define MERGE_WITH_CACHE_FLUSH(flush_0, flush_1) \
+UNROLLED_MERGE(flush_0, flush_1)                 \
+mram_write(cache, out, UNROLLING_CACHE_SIZE);    \
+i = 0;                                           \
 out += UNROLLING_CACHE_LENGTH;
 
-static void merge_half_space(T __mram_ptr *out, T *ptr[2], struct reader readers[2]) {
+static void merge_half_space(T __mram_ptr *out, struct reader readers[2]) {
     T * const cache = buffers[me()].cache;
     size_t i = 0;
-    T val[2] = { *ptr[0], *ptr[1] };
+    T val[2] = { *readers[0].ptr, *readers[1].ptr };
     if (*readers[0].mram_end <= *readers[1].mram_end) {
-        while (elems_left_in_reader(&readers[0], ptr[0]) >= UNROLLING_CACHE_LENGTH) {
+        while (elems_left_in_reader(&readers[0]) >= UNROLLING_CACHE_LENGTH) {
             MERGE_WITH_CACHE_FLUSH({}, {});
         }
-        if (is_ptr_at_last(&readers[0], ptr[0])) {
-            flush_second(out, ptr[1], i);
+        if (is_ptr_at_last(&readers[0])) {
+            flush_second(&readers[1], out, i);
             return;
         }
         while (true) {
             MERGE_WITH_CACHE_FLUSH(
-                if (is_ptr_at_last(&readers[0], ptr[0])) {
-                    flush_second(out, ptr[1], i);
+                if (is_ptr_at_last(&readers[0])) {
+                    flush_second(&readers[1], out, i);
                     return;
                 },
                 {}
             );
         }
     } else {
-        while (elems_left_in_reader(&readers[1], ptr[1]) >= UNROLLING_CACHE_LENGTH) {
+        while (elems_left_in_reader(&readers[1]) >= UNROLLING_CACHE_LENGTH) {
             MERGE_WITH_CACHE_FLUSH({}, {});
         }
-        if (is_ptr_at_last(&readers[1], ptr[1])) {
-            flush_first(&readers[0], out, ptr[0], i);
+        if (is_ptr_at_last(&readers[1])) {
+            flush_first(&readers[0], out, i);
             return;
         }
         while (true) {
             MERGE_WITH_CACHE_FLUSH(
                 {},
-                if (is_ptr_at_last(&readers[1], ptr[1])) {
-                    flush_first(&readers[0], out, ptr[0], i);
+                if (is_ptr_at_last(&readers[1])) {
+                    flush_first(&readers[0], out, i);
                     return;
                 }
             );
@@ -228,15 +217,9 @@ static void merge_sort_half_space(T __mram_ptr * const start, T __mram_ptr * con
                     : start;
             flush_starting_run(run_1_start, run_1_end, output);
             // … and merge the copy with the next run.
-            T *ptr[2] = {
-                reset_reader(&readers[0], output, output + (run_1_end - run_1_start)),
-                reset_reader(&readers[1], run_1_end + 1, run_2_end),
-            };
-            merge_half_space(
-                run_1_start,
-                ptr,
-                readers
-            );
+            reset_reader(&readers[0], output, output + (run_1_end - run_1_start));
+            reset_reader(&readers[1], run_1_end + 1, run_2_end);
+            merge_half_space(run_1_start, readers);
         }
     }
 }
