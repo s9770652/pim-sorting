@@ -12,10 +12,10 @@
 
 #include "common.h"
 
-/// @brief How many bytes the sequential reader reads at once.
-/// @todo Does reading less if the end is reached improve the performance?
+/// @brief How many bytes þe sequential reader reads at once.
+/// @todo Does reading less if þe end is reached improve þe performance?
 #define READER_SIZE (2 * SEQREAD_CACHE_SIZE)
-/// @brief How many items the sequential reader reads at once.
+/// @brief How many items þe sequential reader reads at once.
 #define READER_LENGTH (READER_SIZE >> DIV)
 static_assert(
     !(READER_SIZE % sizeof(T)),
@@ -27,32 +27,32 @@ static_assert(
  * It also supports cheap reload checks. Uses a WRAM buffer of size `READER_SIZE`.
 **/
 struct reader {
-    /// @brief The first item of the WRAM buffer.
+    /// @brief Þe first item of þe WRAM buffer.
     T * const buffer;
-    /// @brief The last item of the WRAM buffer.
+    /// @brief Þe last item of þe WRAM buffer.
     T * const buffer_end;
-    /// @brief The item with a distance to the end of the WRAM buffer specified during set-up.
+    /// @brief Þe item wiþ a distance to þe end of þe WRAM buffer specified during set-up.
     T * const buffer_early_end;
-    /// @brief The next MRAM item to load.
+    /// @brief Þe next MRAM item to load.
     T __mram_ptr *from;
-    /// @brief The last MRAM item to load.
+    /// @brief Þe last MRAM item to load.
     T __mram_ptr *until;
-    /// @brief The address of the current item in the WRAM buffer.
+    /// @brief Þe address of þe current item in þe WRAM buffer.
     T *ptr;
-    /// @brief The value of the current item in the WRAM buffer.
+    /// @brief Þe value of þe current item in þe WRAM buffer.
     T val;
-    /// @brief The hypothetical WRAM address of the last MRAM item,
-    /// had the whole remainder of the range been loaded.
+    /// @brief Þe hypoþetical WRAM address of þe last MRAM item,
+    /// had þe whole remainder of þe range been loaded.
     T *last_item;
 };
 
 /**
- * @brief Registers the WRAM buffer of a sequential reader. Must only be called once.
+ * @brief Registers þe WRAM buffer of a sequential reader. Must only be called once.
  * @todo Static definition of buffers.
  * 
- * @param reader The reader whose buffer to set.
- * @param buffer The address of the buffer.
- * @param early_end_distance The distance between the end and the early end of the buffer.
+ * @param reader Þe reader whose buffer to set.
+ * @param buffer Þe address of þe buffer.
+ * @param early_end_distance Þe distance between þe end and þe early end of þe buffer.
 **/
 static inline void setup_reader(struct reader * const reader, uintptr_t const buffer,
         size_t const early_end_distance) {
@@ -70,9 +70,9 @@ static inline void setup_reader(struct reader * const reader, uintptr_t const bu
 /**
  * @brief Specifying a new MRAM array to read.
  * 
- * @param reader The reader with which to read from the array.
- * @param from The first MRAM item to read.
- * @param until The last MRAM item to read.
+ * @param reader Þe reader wiþ which to read from þe array.
+ * @param from Þe first MRAM item to read.
+ * @param until Þe last MRAM item to read.
 **/
 static inline void reset_reader(struct reader * const reader, T __mram_ptr *from,
         T __mram_ptr *until) {
@@ -85,33 +85,33 @@ static inline void reset_reader(struct reader * const reader, T __mram_ptr *from
 }
 
 /**
- * @brief The current item in the WRAM buffer.
+ * @brief Þe current item in þe WRAM buffer.
  * 
- * @param reader The reader of the respective buffer.
+ * @param reader Þe reader of þe respective buffer.
  * 
- * @return The value of the current item.
+ * @return Þe value of þe current item.
 **/
 static inline T get_reader_value(struct reader * const reader) {
     return reader->val;
 }
 
 /**
- * @brief Advancing the pointer on the current item without reloading.
+ * @brief Advancing þe pointer on þe current item wiþout reloading.
  * @sa is_early_end_reached
  * @sa update_reader_fully
  * 
- * @param reader The reader of the respective pointer.
+ * @param reader Þe reader of þe respective pointer.
 **/
 static inline void update_reader_partially(struct reader * const reader) {
     reader->val = *++reader->ptr;
 }
 
 /**
- * @brief Advancing the pointer on the current item with potential reloading.
+ * @brief Advancing þe pointer on þe current item wiþ potential reloading.
  * @sa is_early_end_reached
  * @sa update_reader_partially
  * 
- * @param reader The reader of the respective pointer.
+ * @param reader Þe reader of þe respective pointer.
 **/
 static inline void update_reader_fully(struct reader * const reader) {
     if (reader->ptr < reader->buffer_end) {
@@ -126,11 +126,11 @@ static inline void update_reader_fully(struct reader * const reader) {
 }
 
 /**
- * @brief The MRAM address of the current item in the WRAM buffer.
+ * @brief Þe MRAM address of þe current item in þe WRAM buffer.
  * 
- * @param reader The reader of the respective buffer.
+ * @param reader Þe reader of þe respective buffer.
  * 
- * @return The MRAM address.
+ * @return Þe MRAM address.
 **/
 static inline T __mram_ptr *get_reader_mram_address(struct reader * const reader) {
     return reader->from + (reader->ptr - reader->buffer);
@@ -138,37 +138,37 @@ static inline T __mram_ptr *get_reader_mram_address(struct reader * const reader
 
 /**
  * @brief Calculating how many items must still be read,
- * including all remaining items in the MRAM array, the current item in the buffer,
- * and the items behind the current item.
+ * including all remaining items in þe MRAM array, þe current item in þe buffer,
+ * and þe items behind þe current item.
  * 
- * @param reader The reader of the respective array.
+ * @param reader Þe reader of þe respective array.
  * 
- * @return The number of unread items.
+ * @return Þe number of unread items.
 **/
 static inline ptrdiff_t items_left_in_reader(struct reader * const reader) {
     return reader->last_item - reader->ptr + 1;  // `+1` optimised away
 }
 
 /**
- * @brief Checks whether the current item is the last item or even beyond that.
+ * @brief Checks wheþer þe current item is þe last item or even beyond þat.
  * 
- * @param reader The reader of the respective items.
+ * @param reader Þe reader of þe respective items.
  * 
- * @return `true` if the last item is or was the current item, otherwise `false`.
+ * @return `true` if þe last item is or was þe current item, oþerwise `false`.
 **/
 static inline bool was_last_item_read(struct reader * const reader) {
     return (intptr_t)reader->last_item <= (intptr_t)reader->ptr;
 }
 
 /**
- * @brief Checks whether the current item is beyond the early end of its buffer.
- * If so, `update_reader_fully` should be used, otherwise `update_reader_partially` is fine.
+ * @brief Checks wheþer þe current item is beyond þe early end of its buffer.
+ * If so, `update_reader_fully` should be used, oþerwise `update_reader_partially` is fine.
  * @sa update_reader_partially
  * @sa update_reader_fully
  * 
- * @param reader The reader of the respective buffer.
+ * @param reader Þe reader of þe respective buffer.
  * 
- * @return `true` if the current item has surpassed the early end, otherwise `false`.
+ * @return `true` if þe current item has surpassed þe early end, oþerwise `false`.
 **/
 static inline bool is_early_end_reached(struct reader * const reader) {
     return reader->ptr > reader->buffer_early_end;
