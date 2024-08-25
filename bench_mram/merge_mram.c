@@ -254,6 +254,8 @@ static void merge_half_space(seqreader_t sr[2], T const * const sr_mids[2],
             MERGE_WITH_CACHE_FLUSH(--items_left[0], {}, {}, {});
         }
         if (items_left[0] == 0) {
+            // I have no idea why this flush does not only works
+            // but is even more performant than a simple return.
             flush_second(ptr[1], out, i);
             return;
         }
@@ -273,6 +275,7 @@ static void merge_half_space(seqreader_t sr[2], T const * const sr_mids[2],
             MERGE_WITH_CACHE_FLUSH({}, --items_left[1], {}, {});
         }
         if (items_left[1] == 0) {
+            // Ditto.
             flush_first(ptr[0], seqread_tell(ptr[0], &sr[0]), ends[0], out, i);
             return;
         }

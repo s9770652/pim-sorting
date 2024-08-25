@@ -100,8 +100,8 @@ static void copy_run(T __mram_ptr *from, T __mram_ptr *until, T __mram_ptr *out)
 /**
  * @brief Flushes the first run in a pair of runs once the tail of the second one is reached.
  * This includes writing whatever is still in the cache to the MRAM
- * and copying whatever is still in the copy of the first run back to the input array.
- * @todo Flush whatever is in the reader.
+ * and copying whatever is still in the copy of the first run back to the input.
+ * @todo Flush whatever is in the reader?
  * 
  * @param reader A reader on the first run.
  * @param out Whither to flush.
@@ -140,6 +140,30 @@ static void flush_first(struct reader * const reader, T __mram_ptr *out, size_t 
 }
 
 /**
+ * @brief Flushes the first run in a pair of runs once the tail of the second one is reached.
+ * This includes only copying whatever is still in the copy of the first run back to the input.
+ * 
+ * @param reader A reader on the first run.
+ * @param out Whither to flush.
+**/
+static void flush_first_emptied_cache(struct reader * const reader, T __mram_ptr *out) {
+    T * const cache = buffers[me()].cache;
+    T __mram_ptr *from = get_reader_mram_address(reader);
+    /* Transfer from MRAM to MRAM. */
+    do {
+        // Thanks to the dummy values, even for numbers smaller than `DMA_ALIGNMENT` bytes,
+        // there is no need to round the size up.
+        size_t const rem_size = (from + MAX_TRANSFER_LENGTH_TRIPLE > reader->until)
+                ? (size_t)reader->until - (size_t)from + sizeof(T)
+                : MAX_TRANSFER_SIZE_TRIPLE;
+        mram_read(from, cache, rem_size);
+        mram_write(cache, out, rem_size);
+        from += MAX_TRANSFER_LENGTH_TRIPLE;  // Value may be wrong for the last transfer …
+        out += MAX_TRANSFER_LENGTH_TRIPLE;  // … after which it is not needed anymore, however.
+    } while (from <= reader->until);
+}
+
+/**
  * @brief Flushes the second run in a pair of runs once the tail of the first one is reached.
  * This includes only writing whatever is still in the cache to the MRAM.
  * 
@@ -150,6 +174,7 @@ static void flush_first(struct reader * const reader, T __mram_ptr *out, size_t 
 static void flush_second(struct reader * const reader, T __mram_ptr * const out, size_t i) {
     T * const cache = buffers[me()].cache;
     (void)reader;
+    /* Transfer cache to MRAM. */
 #ifdef UINT32
     if (i & 1) {  // Is there need for alignment?
         // This is easily possible since the non-depleted run must have at least one more item.
@@ -234,8 +259,7 @@ static void merge_half_space(struct reader readers[2], T __mram_ptr *out) {
             MERGE_WITH_CACHE_FLUSH({}, {});
         }
         if (was_last_item_read(&readers[0])) {
-            flush_second(&readers[1], out, i);
-            return;
+            return;  // Only a `return` since `MERGE_WITH_CACHE_FLUSH` already ended with a flush.
         }
         while (true) {
             MERGE_WITH_CACHE_FLUSH(
@@ -248,7 +272,7 @@ static void merge_half_space(struct reader readers[2], T __mram_ptr *out) {
             MERGE_WITH_CACHE_FLUSH({}, {});
         }
         if (was_last_item_read(&readers[1])) {
-            flush_first(&readers[0], out, i);
+            flush_first_emptied_cache(&readers[0], out);
             return;
         }
         while (true) {
