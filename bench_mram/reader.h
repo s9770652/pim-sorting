@@ -7,8 +7,8 @@
 #define READER_LENGTH (READER_SIZE >> DIV)
 
 struct reader {
-    T __mram_ptr *mram;
-    T __mram_ptr *mram_end;
+    T __mram_ptr *from;
+    T __mram_ptr *until;
     T * const buffer;
     T * const buffer_end;
     T * const buffer_early_end;
@@ -17,7 +17,8 @@ struct reader {
     T val;
 };
 
-static inline void setup_reader(struct reader * const rdr, uintptr_t const buffer, size_t const buffer_early_end) {
+static inline void setup_reader(struct reader * const rdr, uintptr_t const buffer,
+        size_t const buffer_early_end) {
     memcpy(
         rdr,
         &(struct reader){
@@ -29,11 +30,12 @@ static inline void setup_reader(struct reader * const rdr, uintptr_t const buffe
     );
 }
 
-static inline void reset_reader(struct reader * const rdr, T __mram_ptr *from, T __mram_ptr *until) {
-    rdr->mram = from;
-    rdr->mram_end = until;
-    mram_read(rdr->mram, rdr->buffer, READER_SIZE);
-    rdr->last_elem = rdr->buffer + (rdr->mram_end - rdr->mram);
+static inline void reset_reader(struct reader * const rdr, T __mram_ptr *from,
+        T __mram_ptr *until) {
+    rdr->from = from;
+    rdr->until = until;
+    mram_read(rdr->from, rdr->buffer, READER_SIZE);
+    rdr->last_elem = rdr->buffer + (rdr->until - rdr->from);
     rdr->ptr = rdr->buffer;
     rdr->val = *rdr->ptr;
 }
@@ -51,15 +53,15 @@ static inline void update_reader_fully(struct reader * const rdr) {
         update_reader_partially(rdr);
         return;
     }
-    rdr->mram += READER_LENGTH;
-    mram_read(rdr->mram, rdr->buffer, READER_SIZE);
+    rdr->from += READER_LENGTH;
+    mram_read(rdr->from, rdr->buffer, READER_SIZE);
     rdr->last_elem -= READER_LENGTH;  // gets optimised away if not needed
     rdr->ptr = rdr->buffer;
     rdr->val = *rdr->ptr;
 }
 
 static inline T __mram_ptr *get_reader_mram_address(struct reader * const rdr) {
-    return rdr->mram + (rdr->ptr - rdr->buffer);
+    return rdr->from + (rdr->ptr - rdr->buffer);
 }
 
 static inline ptrdiff_t elems_left_in_reader(struct reader * const rdr) {

@@ -80,7 +80,7 @@ static void flush_first(struct reader * const reader, T __mram_ptr *out, size_t 
     if (i & 1) {  // Is there need for alignment?
         // This is easily ossible since the non-depleted run must have at least one more element.
         cache[i++] = get_reader_value(reader);
-        if (in == reader->mram_end) {
+        if (in == reader->until) {
             mram_write(cache, out, i * sizeof(T));
             return;
         }
@@ -94,14 +94,14 @@ static void flush_first(struct reader * const reader, T __mram_ptr *out, size_t 
     do {
         // Thanks to the dummy values, even for numbers smaller than `DMA_ALIGNMENT` bytes,
         // there is no need to round the size up.
-        size_t const rem_size = (in + MAX_TRANSFER_LENGTH_TRIPLE > reader->mram_end)
-                ? (size_t)reader->mram_end - (size_t)in + sizeof(T)
+        size_t const rem_size = (in + MAX_TRANSFER_LENGTH_TRIPLE > reader->until)
+                ? (size_t)reader->until - (size_t)in + sizeof(T)
                 : MAX_TRANSFER_SIZE_TRIPLE;
         mram_read(in, cache, rem_size);
         mram_write(cache, out, rem_size);
         in += MAX_TRANSFER_LENGTH_TRIPLE;  // Value may be wrong for the last transfer …
         out += MAX_TRANSFER_LENGTH_TRIPLE;  // … after which it is not needed anymore, however.
-    } while (in <= reader->mram_end);
+    } while (in <= reader->until);
 }
 
 static void flush_second(struct reader * const reader, T __mram_ptr * const out, size_t i) {
@@ -160,7 +160,7 @@ out += UNROLLING_CACHE_LENGTH;
 static void merge_half_space(T __mram_ptr *out, struct reader readers[2]) {
     T * const cache = buffers[me()].cache;
     size_t i = 0;
-    if (*readers[0].mram_end <= *readers[1].mram_end) {
+    if (*readers[0].until <= *readers[1].until) {
         while (elems_left_in_reader(&readers[0]) >= UNROLLING_CACHE_LENGTH) {
             MERGE_WITH_CACHE_FLUSH({}, {});
         }
@@ -170,10 +170,7 @@ static void merge_half_space(T __mram_ptr *out, struct reader readers[2]) {
         }
         while (true) {
             MERGE_WITH_CACHE_FLUSH(
-                if (is_ptr_at_last(&readers[0])) {
-                    flush_second(&readers[1], out, i);
-                    return;
-                },
+                if (is_ptr_at_last(&readers[0])) { flush_second(&readers[1], out, i); return; },
                 {}
             );
         }
@@ -188,10 +185,7 @@ static void merge_half_space(T __mram_ptr *out, struct reader readers[2]) {
         while (true) {
             MERGE_WITH_CACHE_FLUSH(
                 {},
-                if (is_ptr_at_last(&readers[1])) {
-                    flush_first(&readers[0], out, i);
-                    return;
-                }
+                if (is_ptr_at_last(&readers[1])) { flush_first(&readers[0], out, i); return; }
             );
         }
     }
@@ -208,9 +202,11 @@ static void merge_sort_half_space(T __mram_ptr * const start, T __mram_ptr * con
     size_t const n = end - start + 1;
     for (size_t run_length = STARTING_RUN_LENGTH; run_length < n; run_length *= 2) {
         // Merge pairs of adjacent runs.
-        for (T __mram_ptr *run_1_end = end - run_length, *run_2_end = end;
-                (intptr_t)run_1_end >= (intptr_t)start;
-                run_1_end -= 2 * run_length, run_2_end -= 2 * run_length) {
+        for (
+            T __mram_ptr *run_1_end = end - run_length, *run_2_end = end;
+            (intptr_t)run_1_end >= (intptr_t)start;
+            run_1_end -= 2 * run_length, run_2_end -= 2 * run_length
+        ) {
             // Copy the current run …
             T __mram_ptr *run_1_start = ((intptr_t)(run_1_end - run_length + 1) > (intptr_t)start)
                     ? run_1_end - run_length + 1
