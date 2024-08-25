@@ -78,8 +78,9 @@ static void flush_first(struct reader * const reader, T __mram_ptr *out, size_t 
     // Transfer cache to MRAM.
 #ifdef UINT32
     if (i & 1) {  // Is there need for alignment?
-        cache[i++] = *reader->ptr;  // Possible since `ptr` must have at least one element.
-        if (in >= reader->mram_end) {
+        // This is easily ossible since the non-depleted run must have at least one more element.
+        cache[i++] = get_reader_value(reader);
+        if (in == reader->mram_end) {
             mram_write(cache, out, i * sizeof(T));
             return;
         }
@@ -108,7 +109,8 @@ static void flush_second(struct reader * const reader, T __mram_ptr * const out,
     (void)reader;
 #ifdef UINT32
     if (i & 1) {  // Is there need for alignment?
-        cache[i++] = *reader->ptr;  // Possible since `ptr` must have at least one element.
+        // This is easily ossible since the non-depleted run must have at least one more element.
+        cache[i++] = get_reader_value(reader);
     }
 #endif
     mram_write(cache, out, i * sizeof(T));
@@ -118,36 +120,35 @@ static void flush_second(struct reader * const reader, T __mram_ptr * const out,
 #define UNROLLING_CACHE_LENGTH (MIN(256, MAX_TRANSFER_LENGTH_CACHE) / UNROLL_BY * UNROLL_BY)
 #define UNROLLING_CACHE_SIZE (UNROLLING_CACHE_LENGTH << DIV)
 
-#define UNROLLED_MERGE(flush_0, flush_1)                          \
-for (size_t j = 0; j < UNROLLING_CACHE_LENGTH / UNROLL_BY; j++) { \
-    if ((readers[0].ptr <= readers[0].buffer_early_end)           \
-            && (readers[1].ptr <= readers[1].buffer_early_end)) { \
-        _Pragma("unroll")                                         \
-        for (size_t k = 0; k < UNROLL_BY; k++) {                  \
-            if (val[0] <= val[1]) {                               \
-                cache[i++] = val[0];                              \
-                flush_0;                                          \
-                val[0] = *update_reader_partially(&readers[0]);   \
-            } else {                                              \
-                cache[i++] = val[1];                              \
-                flush_1;                                          \
-                val[1] = *update_reader_partially(&readers[1]);   \
-            }                                                     \
-        }                                                         \
-    } else {                                                      \
-        _Pragma("unroll")                                         \
-        for (size_t k = 0; k < UNROLL_BY; k++) {                  \
-            if (val[0] <= val[1]) {                               \
-                cache[i++] = val[0];                              \
-                flush_0;                                          \
-                val[0] = *update_reader_fully(&readers[0]);       \
-            } else {                                              \
-                cache[i++] = val[1];                              \
-                flush_1;                                          \
-                val[1] = *update_reader_fully(&readers[1]);       \
-            }                                                     \
-        }                                                         \
-    }                                                             \
+#define UNROLLED_MERGE(flush_0, flush_1)                                                          \
+for (size_t j = 0; j < UNROLLING_CACHE_LENGTH / UNROLL_BY; j++) {                                 \
+    if (!is_early_buffer_end_reached(&readers[0]) && !is_early_buffer_end_reached(&readers[1])) { \
+        _Pragma("unroll")                                                                         \
+        for (size_t k = 0; k < UNROLL_BY; k++) {                                                  \
+            if (get_reader_value(&readers[0]) <= get_reader_value(&readers[1])) {                 \
+                cache[i++] = get_reader_value(&readers[0]);                                       \
+                flush_0;                                                                          \
+                update_reader_partially(&readers[0]);                                             \
+            } else {                                                                              \
+                cache[i++] = get_reader_value(&readers[1]);                                       \
+                flush_1;                                                                          \
+                update_reader_partially(&readers[1]);                                             \
+            }                                                                                     \
+        }                                                                                         \
+    } else {                                                                                      \
+        _Pragma("unroll")                                                                         \
+        for (size_t k = 0; k < UNROLL_BY; k++) {                                                  \
+            if (get_reader_value(&readers[0]) <= get_reader_value(&readers[1])) {                 \
+                cache[i++] = get_reader_value(&readers[0]);                                       \
+                flush_0;                                                                          \
+                update_reader_fully(&readers[0]);                                                 \
+            } else {                                                                              \
+                cache[i++] = get_reader_value(&readers[1]);                                       \
+                flush_1;                                                                          \
+                update_reader_fully(&readers[1]);                                                 \
+            }                                                                                     \
+        }                                                                                         \
+    }                                                                                             \
 }
 
 #define MERGE_WITH_CACHE_FLUSH(flush_0, flush_1) \
@@ -159,7 +160,6 @@ out += UNROLLING_CACHE_LENGTH;
 static void merge_half_space(T __mram_ptr *out, struct reader readers[2]) {
     T * const cache = buffers[me()].cache;
     size_t i = 0;
-    T val[2] = { *readers[0].ptr, *readers[1].ptr };
     if (*readers[0].mram_end <= *readers[1].mram_end) {
         while (elems_left_in_reader(&readers[0]) >= UNROLLING_CACHE_LENGTH) {
             MERGE_WITH_CACHE_FLUSH({}, {});
