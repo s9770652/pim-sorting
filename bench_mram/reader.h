@@ -11,15 +11,17 @@ struct reader {
     T __mram_ptr *mram_end;
     T * const buffer;
     T * const buffer_end;
+    T * const buffer_early_end;
     T *last_elem;
 };
 
-static inline void setup_reader(struct reader * const rdr, uintptr_t const buffer) {
+static inline void setup_reader(struct reader * const rdr, uintptr_t const buffer, size_t const buffer_early_end) {
     memcpy(
         rdr,
         &(struct reader){
             .buffer = (T *)buffer,
-            .buffer_end = (T *)(buffer + READER_SIZE) - 1
+            .buffer_end = (T *)(buffer + READER_SIZE) - 1,
+            .buffer_early_end = (T *)(buffer + READER_SIZE) - 1 - buffer_early_end,
         },
         sizeof(struct reader)
     );

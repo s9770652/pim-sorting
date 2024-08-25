@@ -119,7 +119,7 @@ static void flush_second(T __mram_ptr * const out, __attribute__((unused)) T * c
 
 #define UNROLLED_MERGE(ptr_0, ptr_1, get_0, get_1, elems_0, elems_1, flush_0, flush_1)      \
 for (size_t j = 0; j < UNROLLING_CACHE_LENGTH / UNROLL_BY; j++) {                           \
-    if ((ptr[0] + UNROLL_BY <= sr_mids[0]) && (ptr[1] + UNROLL_BY <= sr_mids[1])) {         \
+    if ((ptr[0] <= sr_early_mids[0]) && (ptr[1] <= sr_early_mids[1])) {                     \
         _Pragma("unroll")                                                                   \
         for (size_t k = 0; k < UNROLL_BY; k++) {                                            \
             if (val[0] <= val[1]) {                                                         \
@@ -168,7 +168,7 @@ i = 0;                                                                          
 out += UNROLLING_CACHE_LENGTH;
 
 static void merge_half_space(T __mram_ptr *out, T __mram_ptr * const ends[2], seqreader_t sr[2],
-        T *ptr[2], size_t elems_left[2], T const * const sr_mids[2]) {
+        T *ptr[2], size_t elems_left[2], T const * const sr_mids[2], T const * const sr_early_mids[2]) {
     T * const cache = buffers[me()].cache;
     size_t i = 0;
     T val[2] = { *ptr[0], *ptr[1] };
@@ -223,6 +223,10 @@ static void merge_sort_half_space(T __mram_ptr * const start, T __mram_ptr * con
         (T *)(buffers[me()].seq_1 + SEQREAD_CACHE_SIZE) - 1,
         (T *)(buffers[me()].seq_2 + SEQREAD_CACHE_SIZE) - 1,
     };
+    T const * const sr_early_mids[2] = {
+        (T *)(buffers[me()].seq_1 + SEQREAD_CACHE_SIZE) - 1 - UNROLL_BY,
+        (T *)(buffers[me()].seq_2 + SEQREAD_CACHE_SIZE) - 1 - UNROLL_BY,
+    };
     size_t const n = end - start + 1;
     for (size_t run_length = STARTING_RUN_LENGTH; run_length < n; run_length *= 2) {
         // Merge pairs of adjacent runs.
@@ -247,7 +251,8 @@ static void merge_sort_half_space(T __mram_ptr * const start, T __mram_ptr * con
                 sr,
                 ptr,
                 elems_left,
-                sr_mids
+                sr_mids,
+                sr_early_mids
             );
         }
     }

@@ -123,8 +123,8 @@ static void flush_second(T __mram_ptr * const out, __attribute__((unused)) T * c
 
 #define UNROLLED_MERGE(ptr_0, ptr_1, get_0, get_1, flush_0, flush_1) \
 for (size_t j = 0; j < UNROLLING_CACHE_LENGTH / UNROLL_BY; j++) {    \
-    if ((ptr[0] + UNROLL_BY <= readers[0].buffer_end)                \
-            && (ptr[1] + UNROLL_BY <= readers[1].buffer_end)) {      \
+    if ((ptr[0] <= readers[0].buffer_early_end)                      \
+            && (ptr[1] <= readers[1].buffer_early_end)) {            \
         _Pragma("unroll")                                            \
         for (size_t k = 0; k < UNROLL_BY; k++) {                     \
             if (val[0] <= val[1]) {                                  \
@@ -214,8 +214,8 @@ static void merge_sort_half_space(T __mram_ptr * const start, T __mram_ptr * con
 
     /* Merging. */
     struct reader readers[2];
-    setup_reader(&readers[0], buffers[me()].seq_1);
-    setup_reader(&readers[1], buffers[me()].seq_2);
+    setup_reader(&readers[0], buffers[me()].seq_1, UNROLL_BY);
+    setup_reader(&readers[1], buffers[me()].seq_2, UNROLL_BY);
     size_t const n = end - start + 1;
     for (size_t run_length = STARTING_RUN_LENGTH; run_length < n; run_length *= 2) {
         // Merge pairs of adjacent runs.
