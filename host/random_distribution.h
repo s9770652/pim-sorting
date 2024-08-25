@@ -1,3 +1,8 @@
+/**
+ * @file
+ * @brief Populating arrays with randomly drawn numbers through a CPU.
+**/
+
 #ifndef _RANDOM_DISTRIBUTION_H_
 #define _RANDOM_DISTRIBUTION_H_
 

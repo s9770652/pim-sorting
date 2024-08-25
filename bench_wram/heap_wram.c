@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Measures runtimes of HeapSorts (sequential, WRAM).
+ * @brief Measuring runtimes of HeapSorts (sequential, WRAM).
 **/
 
 #include <assert.h>

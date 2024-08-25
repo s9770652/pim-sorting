@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Populating arrays with randomly drawn numbers.
+ * @brief Populating arrays with randomly drawn numbers through a DPU.
 **/
 
 #ifndef _RANDOM_DISTRIBUTION_H_

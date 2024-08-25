@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Measures runtimes of InsertionSorts, ShellSorts, BubbleSorts, and SelectionSort
+ * @brief Measuring runtimes of InsertionSorts, ShellSorts, BubbleSorts, and SelectionSort
  * (sequential, WRAM).
 **/
 

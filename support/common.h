@@ -1,3 +1,8 @@
+/**
+ * @file
+ * @brief Shared data type for sorting, swap function, and CLI font colour.
+**/
+
 #ifndef _COMMON_H_
 #define _COMMON_H_
 

@@ -16,7 +16,7 @@
 
 /**
  * @brief Start (inclusive) and end (exclusive) of the range
- * traversed by a tasklet in `LOOP_ON_MRAM`.
+ * traversed by a tasklet in `LOOP_ON_MRAM` & Co.
 **/
 typedef struct mram_range {
     /// @brief The index at which to start.
@@ -25,19 +25,24 @@ typedef struct mram_range {
     size_t end;
 } mram_range;
 
+/**
+ * @brief Start (inclusive) and end (exclusive) of the range
+ * traversed by a tasklet in `LOOP_ON_MRAM` & Co.
+**/
 typedef struct mram_range_ptr {
-    /// @brief The pointer at which to start.
+    /// @brief The address at which to start.
     T __mram_ptr *start;
-    /// @brief The pointer where to stop (inclusive).
+    /// @brief The address where to stop (exclusive).
     T __mram_ptr *end;
 } mram_range_ptr;
 
 /**
  * @brief Blockwise iterator over the MRAM indices in the range as defined by `range`.
+ * Blocks have the length `MAX_TRANSFER_LENGTH_TRIPLE`.
  * 
- * @param i Current index, i. e. the start of the current block.
- * @param curr_length Length of the current block as number of elements.
- * @param curr_size Size of the current block, properly aligned for DMAs.
+ * @param i Set to the current index or pointer, i. e. the start of the current block.
+ * @param curr_length Set to the length of the current block as number of elements.
+ * @param curr_size Set to the size of the current block, properly aligned for DMAs.
  * @param range Start and end of the tasklet’s range.
 **/
 #define LOOP_ON_MRAM(i, curr_length, curr_size, range)         \
@@ -61,6 +66,15 @@ for (                                                          \
             : MAX_TRANSFER_SIZE_TRIPLE                         \
 )
 
+/**
+ * @brief Blockwise iterator over the MRAM indices in the range as defined by `range`.
+ * 
+ * @param i Set to the current index or pointer, i. e. the start of the current block.
+ * @param curr_length Set to the length of the current block as number of elements.
+ * @param curr_size Set to the size of the current block, properly aligned for DMAs.
+ * @param range Start and end of the tasklet’s range.
+ * @param block_length Number of elements per block.
+**/
 #define LOOP_ON_MRAM_BL(i, curr_length, curr_size, range, block_length) \
 for (                                                                   \
     i = range.start,                                                    \
@@ -82,6 +96,15 @@ for (                                                                   \
             : (block_length) * sizeof(T)                                \
 )
 
+/**
+ * @brief Reverse blockwise iterator over the MRAM indices in the range as defined by `range`.
+ * 
+ * @param i Set to the current index or pointer, i. e. the start of the current block.
+ * @param curr_length Set to the length of the current block as number of elements.
+ * @param curr_size Set to the size of the current block, properly aligned for DMAs.
+ * @param range Start and end of the tasklet’s range.
+ * @param block_length Number of elements per block.
+**/
 #define LOOP_BACKWARDS_ON_MRAM_BL(i, curr_length, curr_size, range, block_length)   \
 for (                                                                               \
     curr_length = ((intptr_t)(range.end - (block_length)) >= (intptr_t)range.start) \
