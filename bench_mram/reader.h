@@ -33,10 +33,10 @@ static inline T *reset_reader(struct reader * const rdr, T __mram_ptr *from, T _
     return rdr->buffer;
 }
 
-static __noinline T *update_reader(struct reader * const rdr) {
+static inline T *update_reader(struct reader * const rdr) {
     rdr->mram += READER_LENGTH;
     mram_read(rdr->mram, rdr->buffer, READER_SIZE);
-    rdr->last_elem -= READER_LENGTH;
+    rdr->last_elem -= READER_LENGTH;  // gets optimised away if not needed
     return rdr->buffer;
 }
 
