@@ -1,77 +1,177 @@
+/**
+ * @file
+ * @brief Faster sequential reading of items in MRAM.
+**/
+
+#ifndef _READER_H_
+#define _READER_H_
+
+#include <assert.h>
 #include <attributes.h>
 #include <mram.h>
 
 #include "common.h"
 
+/// @brief How many bytes the sequential reader reads at once.
+/// @todo Does reading less if the end is reached improve the performance?
 #define READER_SIZE (2 * SEQREAD_CACHE_SIZE)
+/// @brief How many items the sequential reader reads at once.
 #define READER_LENGTH (READER_SIZE >> DIV)
+static_assert(
+    !(READER_SIZE % sizeof(T)),
+    "Custom reader buffers must be capable of holding a whole multiple of numbers!"
+);
 
+/**
+ * @brief A custom sequential reader which accepts a beginning and an end of an MRAM array.
+ * It also supports cheap reload checks. Uses a WRAM buffer of size `READER_SIZE`.
+**/
 struct reader {
-    T __mram_ptr *from;
-    T __mram_ptr *until;
+    /// @brief The first item of the WRAM buffer.
     T * const buffer;
+    /// @brief The last item of the WRAM buffer.
     T * const buffer_end;
+    /// @brief The item with a distance to the end of the WRAM buffer specified during set-up.
     T * const buffer_early_end;
-    T *last_elem;
+    /// @brief The next MRAM item to load.
+    T __mram_ptr *from;
+    /// @brief The last MRAM item to load.
+    T __mram_ptr *until;
+    /// @brief The address of the current item in the WRAM buffer.
     T *ptr;
+    /// @brief The value of the current item in the WRAM buffer.
     T val;
+    /// @brief The hypothetical WRAM address of the last MRAM item,
+    /// had the whole remainder of the range been loaded.
+    T *last_item;
 };
 
-static inline void setup_reader(struct reader * const rdr, uintptr_t const buffer,
-        size_t const buffer_early_end) {
+/**
+ * @brief Registers the WRAM buffer of a sequential reader. Must only be called once.
+ * @todo Static definition of buffers.
+ * 
+ * @param reader The reader whose buffer to set.
+ * @param buffer The address of the buffer.
+ * @param early_end_distance The distance between the end and the early end of the buffer.
+**/
+static inline void setup_reader(struct reader * const reader, uintptr_t const buffer,
+        size_t const early_end_distance) {
     memcpy(
-        rdr,
+        reader,
         &(struct reader){
             .buffer = (T *)buffer,
             .buffer_end = (T *)(buffer + READER_SIZE) - 1,
-            .buffer_early_end = (T *)(buffer + READER_SIZE) - 1 - buffer_early_end,
+            .buffer_early_end = (T *)(buffer + READER_SIZE) - 1 - early_end_distance,
         },
         sizeof(struct reader)
     );
 }
 
-static inline void reset_reader(struct reader * const rdr, T __mram_ptr *from,
+/**
+ * @brief Specifying a new MRAM array to read.
+ * 
+ * @param reader The reader with which to read from the array.
+ * @param from The first MRAM item to read.
+ * @param until The last MRAM item to read.
+**/
+static inline void reset_reader(struct reader * const reader, T __mram_ptr *from,
         T __mram_ptr *until) {
-    rdr->from = from;
-    rdr->until = until;
-    mram_read(rdr->from, rdr->buffer, READER_SIZE);
-    rdr->last_elem = rdr->buffer + (rdr->until - rdr->from);
-    rdr->ptr = rdr->buffer;
-    rdr->val = *rdr->ptr;
+    reader->from = from;
+    reader->until = until;
+    mram_read(reader->from, reader->buffer, READER_SIZE);
+    reader->ptr = reader->buffer;
+    reader->val = *reader->ptr;
+    reader->last_item = reader->buffer + (reader->until - reader->from);
 }
 
-static inline T get_reader_value(struct reader * const rdr) {
-    return rdr->val;
+/**
+ * @brief The current item in the WRAM buffer.
+ * 
+ * @param reader The reader of the respective buffer.
+ * 
+ * @return The value of the current item.
+**/
+static inline T get_reader_value(struct reader * const reader) {
+    return reader->val;
 }
 
-static inline void update_reader_partially(struct reader * const rdr) {
-    rdr->val = *++rdr->ptr;
+/**
+ * @brief Advancing the pointer on the current item without reloading.
+ * @sa is_early_end_reached
+ * @sa update_reader_fully
+ * 
+ * @param reader The reader of the respective pointer.
+**/
+static inline void update_reader_partially(struct reader * const reader) {
+    reader->val = *++reader->ptr;
 }
 
-static inline void update_reader_fully(struct reader * const rdr) {
-    if (rdr->ptr < rdr->buffer_end) {
-        update_reader_partially(rdr);
+/**
+ * @brief Advancing the pointer on the current item with potential reloading.
+ * @sa is_early_end_reached
+ * @sa update_reader_partially
+ * 
+ * @param reader The reader of the respective pointer.
+**/
+static inline void update_reader_fully(struct reader * const reader) {
+    if (reader->ptr < reader->buffer_end) {
+        update_reader_partially(reader);
         return;
     }
-    rdr->from += READER_LENGTH;
-    mram_read(rdr->from, rdr->buffer, READER_SIZE);
-    rdr->last_elem -= READER_LENGTH;  // gets optimised away if not needed
-    rdr->ptr = rdr->buffer;
-    rdr->val = *rdr->ptr;
+    reader->from += READER_LENGTH;
+    mram_read(reader->from, reader->buffer, READER_SIZE);
+    reader->ptr = reader->buffer;
+    reader->val = *reader->ptr;
+    reader->last_item -= READER_LENGTH;  // optimised away if not needed
 }
 
-static inline T __mram_ptr *get_reader_mram_address(struct reader * const rdr) {
-    return rdr->from + (rdr->ptr - rdr->buffer);
+/**
+ * @brief The MRAM address of the current item in the WRAM buffer.
+ * 
+ * @param reader The reader of the respective buffer.
+ * 
+ * @return The MRAM address.
+**/
+static inline T __mram_ptr *get_reader_mram_address(struct reader * const reader) {
+    return reader->from + (reader->ptr - reader->buffer);
 }
 
-static inline ptrdiff_t elems_left_in_reader(struct reader * const rdr) {
-    return rdr->last_elem - rdr->ptr + 1;
+/**
+ * @brief Calculating how many items must still be read,
+ * including all remaining items in the MRAM array, the current item in the buffer,
+ * and the items behind the current item.
+ * 
+ * @param reader The reader of the respective array.
+ * 
+ * @return The number of unread items.
+**/
+static inline ptrdiff_t items_left_in_reader(struct reader * const reader) {
+    return reader->last_item - reader->ptr + 1;  // `+1` optimised away
 }
 
-static inline bool is_ptr_at_last(struct reader * const rdr) {
-    return (intptr_t)rdr->last_elem <= (intptr_t)rdr->ptr;
+/**
+ * @brief Checks whether the current item is the last item or even beyond that.
+ * 
+ * @param reader The reader of the respective items.
+ * 
+ * @return `true` if the last item is or was the current item, otherwise `false`.
+**/
+static inline bool was_last_item_read(struct reader * const reader) {
+    return (intptr_t)reader->last_item <= (intptr_t)reader->ptr;
 }
 
-static inline bool is_early_buffer_end_reached(struct reader * const rdr) {
-    return rdr->ptr > rdr->buffer_early_end;
+/**
+ * @brief Checks whether the current item is beyond the early end of its buffer.
+ * If so, `update_reader_fully` should be used, otherwise `update_reader_partially` is fine.
+ * @sa update_reader_partially
+ * @sa update_reader_fully
+ * 
+ * @param reader The reader of the respective buffer.
+ * 
+ * @return `true` if the current item has surpassed the early end, otherwise `false`.
+**/
+static inline bool is_early_end_reached(struct reader * const reader) {
+    return reader->ptr > reader->buffer_early_end;
 }
+
+#endif  // _READER_H_

@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Measures runtimes of MergeSorts (sequential, WRAM).
+ * @brief Measuring runtimes of MergeSorts (sequential, WRAM).
 **/
 
 #include <assert.h>
@@ -35,11 +35,11 @@ static bool flipped[NR_TASKLETS];  // Whether a write-back from the auxiliary ar
 #define FLUSH_BATCH_LENGTH (24)  // The number of elements flushed at once if possible.
 
 #if (MERGE_THRESHOLD > 48)
-#define FIRST_STEP (12)
+#define FIRST_STEP (12)  // The first step size of three-pass ShellSort.
 #elif (MERGE_THRESHOLD > 16)
-#define FIRST_STEP (6)
+#define FIRST_STEP (6)  // The first step size of two-pass ShellSort.
 #else
-#define FIRST_STEP (1)
+#define FIRST_STEP (1)  // The first step size of one-pass ShellSort, that is InsertionSort.
 #endif
 
 /**
@@ -106,7 +106,7 @@ static __attribute__((unused)) void shell_sort(T * const start, T * const end) {
 }
 
 /**
- * Creating the starting runs for MergeSort.
+ * @brief Creating the starting runs for MergeSort.
  * The runs are formed from right to left, such that the first run may be smaller.
 **/
 #define FORM_STARTING_RUNS_RIGHT2LEFT()                                        \
@@ -158,13 +158,13 @@ static inline void flush_batch(T *in, T *until, T *out) {
  * The copying is done using batches of length `MERGE_THRESHOLD`:
  * If there are at least `MERGE_THRESHOLD` many elements to copy, they are copied at once.
  * This way, the loop overhead is cut by about a `MERGE_THRESHOLD`th in good cases.
- * @sa flush_full_starting_run
+ * @sa copy_full_run
  * 
  * @param in The first element to copy.
  * @param until The last element to copy.
  * @param out Whither to place the first element to copy.
 **/
-static inline void flush_starting_run(T *in, T *until, T *out) {
+static inline void copy_run(T *in, T *until, T *out) {
     while (in + MERGE_THRESHOLD - 1 <= until) {
         #pragma unroll
         for (size_t k = 0; k < MERGE_THRESHOLD; k++)
@@ -182,13 +182,13 @@ static inline void flush_starting_run(T *in, T *until, T *out) {
  * The copying is done using *only* batches of length `MERGE_THRESHOLD`:
  * If there are at least `MERGE_THRESHOLD` many elements to copy, they are copied at once.
  * For this reason, the length of the buffer must be a multiple of `MERGE_THRESHOLD`.
- * @sa flush_starting_run
+ * @sa copy_run
  * 
  * @param in The first element to copy.
  * @param until The last element to copy.
  * @param out Whither to place the first element to copy.
 **/
-static inline void flush_full_starting_run(T *in, T *until, T *out) {
+static inline void copy_full_run(T *in, T *until, T *out) {
     while (in + MERGE_THRESHOLD - 1 <= until) {
         #pragma unroll
         for (size_t k = 0; k < MERGE_THRESHOLD; k++)
@@ -202,7 +202,7 @@ static inline void flush_full_starting_run(T *in, T *until, T *out) {
  * @brief How many iterations in the mergers are unrolled.
  * @note This value is capped at 16, as otherwise the IRAM is in danger of overflowing.
 **/
-#define UNROLL_BY (MIN(MERGE_THRESHOLD, 16))
+#define UNROLL_FACTOR (MIN(MERGE_THRESHOLD, 16))
 
 /**
  * @brief Merges the two runs within the merger functions in unrolled loops.
@@ -211,34 +211,34 @@ static inline void flush_full_starting_run(T *in, T *until, T *out) {
  * @param end The address of said last element.
  * @param on_depletion An if-block for when and what to do if said run is fully merged.
 **/
-#define UNROLLED_MERGER(ptr, end, on_depletion)  \
-while (ptr <= end - UNROLL_BY + 1) {             \
-    _Pragma("unroll")                            \
-    for (size_t k = 0; k < UNROLL_BY; k++) {     \
-        if (val_i <= val_j) {                    \
-            *(out + k) = val_i;                  \
-            val_i = *++i;                        \
-        } else {                                 \
-            *(out + k) = val_j;                  \
-            val_j = *++j;                        \
-        }                                        \
-    }                                            \
-    out += UNROLL_BY;                            \
-};                                               \
-on_depletion                                     \
-while (ptr <= end - (UNROLL_BY / 2) + 1) {       \
-    _Pragma("unroll")                            \
-    for (size_t k = 0; k < UNROLL_BY / 2; k++) { \
-        if (val_i <= val_j) {                    \
-            *(out + k) = val_i;                  \
-            val_i = *++i;                        \
-        } else {                                 \
-            *(out + k) = val_j;                  \
-            val_j = *++j;                        \
-        }                                        \
-    }                                            \
-    out += UNROLL_BY / 2;                        \
-}                                                \
+#define UNROLLED_MERGER(ptr, end, on_depletion)      \
+while (ptr <= end - UNROLL_FACTOR + 1) {             \
+    _Pragma("unroll")                                \
+    for (size_t k = 0; k < UNROLL_FACTOR; k++) {     \
+        if (val_i <= val_j) {                        \
+            *(out + k) = val_i;                      \
+            val_i = *++i;                            \
+        } else {                                     \
+            *(out + k) = val_j;                      \
+            val_j = *++j;                            \
+        }                                            \
+    }                                                \
+    out += UNROLL_FACTOR;                            \
+};                                                   \
+on_depletion                                         \
+while (ptr <= end - (UNROLL_FACTOR / 2) + 1) {       \
+    _Pragma("unroll")                                \
+    for (size_t k = 0; k < UNROLL_FACTOR / 2; k++) { \
+        if (val_i <= val_j) {                        \
+            *(out + k) = val_i;                      \
+            val_i = *++i;                            \
+        } else {                                     \
+            *(out + k) = val_j;                      \
+            val_j = *++j;                            \
+        }                                            \
+    }                                                \
+    out += UNROLL_FACTOR / 2;                        \
+}                                                    \
 on_depletion
 
 /**
@@ -300,6 +300,7 @@ static inline void merge(T * const start_1, T * const start_2, T * const end_2, 
 static inline void merge_sort_no_write_back(T * const start, T * const end) {
     /* Starting runs. */
     FORM_STARTING_RUNS_RIGHT2LEFT();
+
     /* Merging. */
     T *in, *until, *out;  // Runs from `in` to `until` are merged and stored in front of `out`.
     bool flip = false;  // Used to determine the initial positions of `in`, `out`, and `until`.
@@ -315,7 +316,7 @@ static inline void merge_sort_no_write_back(T * const start, T * const end) {
             until = end + n;
             out = end + 1;
         }
-        // Merge pairs of adjacent runs which are all of the same length.
+        // Merge pairs of neighboured runs which are all of the same length.
         T *run_1_end = until - run_length;
         for (; (intptr_t)run_1_end >= (intptr_t)(in + run_length - 1); run_1_end -= 2*run_length) {
             out -= 2*run_length;
@@ -329,7 +330,7 @@ static inline void merge_sort_no_write_back(T * const start, T * const end) {
         // Flush single run at the beginning straight away
         } else if ((intptr_t)(run_1_end + run_length) >= (intptr_t)in) {
             out = (flip) ? end + 1 : start;
-            flush_starting_run(in, run_1_end + run_length, out);
+            copy_run(in, run_1_end + run_length, out);
         }
     }
     flipped[me()] = flip;
@@ -349,7 +350,7 @@ static void merge_sort_write_back(T * const start, T * const end) {
     if (!flipped[me()])
         return;
     T *in = end + 1, *until = end + (end - start) + 1, *out = start;
-    flush_starting_run(in, until, out);
+    copy_run(in, until, out);
 }
 
 /**
@@ -410,10 +411,10 @@ static inline void merge_right_flush_only(T * const start_1, T * const end_1, T 
 static void merge_sort_half_space(T * const start, T * const end) {
     /* Starting runs. */
     FORM_STARTING_RUNS_RIGHT2LEFT();
-    /* Merging. */
+
+    /* Merging pairs of neighboured runs. */
     size_t const n = end - start + 1;
     for (size_t run_length = MERGE_THRESHOLD; run_length < n; run_length *= 2) {
-        // Merge pairs of adjacent runs.
         for (T *run_1_end = end - run_length; (intptr_t)run_1_end >= (intptr_t)start;
                 run_1_end -= 2 * run_length) {
             // Copy the current run …
@@ -422,11 +423,11 @@ static void merge_sort_half_space(T * const start, T * const end) {
             if ((intptr_t)(run_1_end - run_length + 1) >= (intptr_t)start) {
                 run_1_start = run_1_end - run_length + 1;
                 run_1_length = run_length;
-                flush_full_starting_run(run_1_start, run_1_end, end + 1);
+                copy_full_run(run_1_start, run_1_end, end + 1);
             } else {
                 run_1_start = start;
                 run_1_length = run_1_end - run_1_start + 1;
-                flush_starting_run(run_1_start, run_1_end, end + 1);
+                copy_run(run_1_start, run_1_end, end + 1);
             }
             // … and merge the copy with the next run.
             merge_right_flush_only(
