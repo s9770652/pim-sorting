@@ -72,14 +72,15 @@ static void flush_starting_run(T __mram_ptr *in, T __mram_ptr *until, T __mram_p
     }
 }
 
-static void flush_first(T __mram_ptr *in, T __mram_ptr *out, __attribute__((unused)) T * const ptr,
-        size_t i, T __mram_ptr const *end) {
+static void flush_first(struct reader * const reader, T __mram_ptr *out,
+        __attribute__((unused)) T * const ptr, size_t i) {
     T * const cache = buffers[me()].cache;
+    T __mram_ptr *in = get_reader_mram_address(reader, ptr);
     // Transfer cache to MRAM.
 #ifdef UINT32
     if (i & 1) {  // Is there need for alignment?
         cache[i++] = *ptr;  // Possible since `ptr` must have at least one element.
-        if (in >= end) {
+        if (in >= reader->mram_end) {
             mram_write(cache, out, i * sizeof(T));
             return;
         }
@@ -95,15 +96,15 @@ static void flush_first(T __mram_ptr *in, T __mram_ptr *out, __attribute__((unus
     do {
         // Thanks to the dummy values, even for numbers smaller than `DMA_ALIGNMENT` bytes,
         // there is no need to round the size up.
-        size_t const rem_size = (in + MAX_TRANSFER_LENGTH_TRIPLE > end)
-                ? (size_t)end - (size_t)in + sizeof(T)
+        size_t const rem_size = (in + MAX_TRANSFER_LENGTH_TRIPLE > reader->mram_end)
+                ? (size_t)reader->mram_end - (size_t)in + sizeof(T)
                 : MAX_TRANSFER_SIZE_TRIPLE;
         mram_read(in, cache, rem_size);
         mram_write(cache, out, rem_size);
         // for (int k = -2; k < 4; k++) printf("%u ", in[k]); printf("\n");
         in += MAX_TRANSFER_LENGTH_TRIPLE;  // Value may be wrong for the last transfer …
         out += MAX_TRANSFER_LENGTH_TRIPLE;  // … after which it is not needed anymore, however.
-    } while (in <= end);
+    } while (in <= reader->mram_end);
 }
 
 static void flush_second(T __mram_ptr * const out, __attribute__((unused)) T * const ptr,
@@ -166,12 +167,11 @@ mram_write(cache, out, UNROLLING_CACHE_SIZE);                                   
 i = 0;                                                                                   \
 out += UNROLLING_CACHE_LENGTH;
 
-static void merge_half_space(T __mram_ptr *out, T __mram_ptr * const ends[2],
-        T *ptr[2], struct reader readers[2]) {
+static void merge_half_space(T __mram_ptr *out, T *ptr[2], struct reader readers[2]) {
     T * const cache = buffers[me()].cache;
     size_t i = 0;
     T val[2] = { *ptr[0], *ptr[1] };
-    if (*ends[0] <= *ends[1]) {
+    if (*readers[0].mram_end <= *readers[1].mram_end) {
         while (elems_left_in_reader(&readers[0], ptr[0]) >= UNROLLING_CACHE_LENGTH) {
             MERGE_WITH_CACHE_FLUSH({}, {});
         }
@@ -193,14 +193,14 @@ static void merge_half_space(T __mram_ptr *out, T __mram_ptr * const ends[2],
             MERGE_WITH_CACHE_FLUSH({}, {});
         }
         if (is_ptr_at_last(&readers[1], ptr[1])) {
-            flush_first(get_reader_mram_address(&readers[0], ptr[0]), out, ptr[0], i, ends[0]);
+            flush_first(&readers[0], out, ptr[0], i);
             return;
         }
         while (true) {
             MERGE_WITH_CACHE_FLUSH(
                 {},
                 if (is_ptr_at_last(&readers[1], ptr[1])) {
-                    flush_first(get_reader_mram_address(&readers[0], ptr[0]), out, ptr[0], i, ends[0]);
+                    flush_first(&readers[0], out, ptr[0], i);
                     return;
                 }
             );
@@ -228,14 +228,12 @@ static void merge_sort_half_space(T __mram_ptr * const start, T __mram_ptr * con
                     : start;
             flush_starting_run(run_1_start, run_1_end, output);
             // … and merge the copy with the next run.
-            T __mram_ptr * const ends[2] = { output + (run_1_end - run_1_start), run_2_end };
             T *ptr[2] = {
-                reset_reader(&readers[0], output, ends[0]),
-                reset_reader(&readers[1], run_1_end + 1, ends[1]),
+                reset_reader(&readers[0], output, output + (run_1_end - run_1_start)),
+                reset_reader(&readers[1], run_1_end + 1, run_2_end),
             };
             merge_half_space(
                 run_1_start,
-                ends,
                 ptr,
                 readers
             );
