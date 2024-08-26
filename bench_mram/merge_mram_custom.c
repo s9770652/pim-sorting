@@ -305,6 +305,7 @@ static void merge_sort_half_space(T __mram_ptr * const start, T __mram_ptr * con
     setup_reader(&readers[0], buffers[me()].seq_1, UNROLL_FACTOR);
     setup_reader(&readers[1], buffers[me()].seq_2, UNROLL_FACTOR);
     size_t const n = end - start + 1;
+    T __mram_ptr * const out = (T __mram_ptr *)((uintptr_t)output + (uintptr_t)start);
     for (size_t run_length = STARTING_RUN_LENGTH; run_length < n; run_length *= 2) {
         for (
             T __mram_ptr *run_1_end = end - run_length, *run_2_end = end;
@@ -315,9 +316,9 @@ static void merge_sort_half_space(T __mram_ptr * const start, T __mram_ptr * con
             T __mram_ptr *run_1_start = ((intptr_t)(run_1_end - run_length + 1) > (intptr_t)start)
                     ? run_1_end - run_length + 1
                     : start;
-            copy_run(run_1_start, run_1_end, output);
+            copy_run(run_1_start, run_1_end, out);
             // … and merge the copy with the next run.
-            reset_reader(&readers[0], output, output + (run_1_end - run_1_start));
+            reset_reader(&readers[0], out, out + (run_1_end - run_1_start));
             reset_reader(&readers[1], run_1_end + 1, run_2_end);
             merge_half_space(readers, run_1_start);
         }

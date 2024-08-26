@@ -149,6 +149,7 @@ static void flush_first(T const * const ptr, T __mram_ptr *from, T __mram_ptr co
 **/
 static void flush_second(T * const ptr, T __mram_ptr * const out, size_t i) {
     T * const cache = buffers[me()].cache;
+    (void)ptr;
 #ifdef UINT32
     if (i & 1) {  // Is there need for alignment?
         // This is easily possible since the non-depleted run must have at least one more item.
@@ -241,7 +242,7 @@ out += UNROLLING_CACHE_LENGTH;
  * @param ptr The current buffer items of the runs.
  * @param ends The last items of the two runs.
  * @param items_left How many items are left in both runs.
- * @param out Wither to merge.
+ * @param out Whither the merged runs are written.
 **/
 static void merge_half_space(seqreader_t sr[2], T const * const sr_mids[2],
         T const * const sr_early_mids[2], T *ptr[2], T __mram_ptr * const ends[2],
@@ -317,6 +318,7 @@ static void merge_sort_half_space(T __mram_ptr * const start, T __mram_ptr * con
         (T *)(buffers[me()].seq_2 + SEQREAD_CACHE_SIZE) - 1 - UNROLL_FACTOR,
     };
     size_t const n = end - start + 1;
+    T __mram_ptr * const out = (T __mram_ptr *)((uintptr_t)output + (uintptr_t)start);
     for (size_t run_length = STARTING_RUN_LENGTH; run_length < n; run_length *= 2) {
         for (
             T __mram_ptr *run_1_end = end - run_length, *run_2_end = end;
@@ -327,11 +329,11 @@ static void merge_sort_half_space(T __mram_ptr * const start, T __mram_ptr * con
             T __mram_ptr *run_1_start = ((intptr_t)(run_1_end - run_length + 1) > (intptr_t)start)
                     ? run_1_end - run_length + 1
                     : start;
-            copy_run(run_1_start, run_1_end, output);
+            copy_run(run_1_start, run_1_end, out);
             // … and merge the copy with the next run.
-            T __mram_ptr * const ends[2] = { output + (run_1_end - run_1_start), run_2_end };
+            T __mram_ptr * const ends[2] = { out + (run_1_end - run_1_start), run_2_end };
             T *ptr[2] = {
-                seqread_init(buffers[me()].seq_1, output, &sr[0]),
+                seqread_init(buffers[me()].seq_1, out, &sr[0]),
                 seqread_init(buffers[me()].seq_2, run_1_end + 1, &sr[1]),
             };
             size_t items_left[2] = { run_1_end - run_1_start + 1, run_length };
