@@ -80,12 +80,12 @@ static void form_starting_runs_half_space(T __mram_ptr * const start, T __mram_p
  * @brief Copies a sorted MRAM array to another MRAM location.
  * 
  * @param from The first item of the MRAM array to copy.
- * @param until The last item of said array.
+ * @param to The last item of said array.
  * @param out The new location of the first item to copy.
 **/
-static void copy_run(T __mram_ptr *from, T __mram_ptr *until, T __mram_ptr *out) {
+static void copy_run(T __mram_ptr *from, T __mram_ptr *to, T __mram_ptr *out) {
     T * const cache = buffers[me()].cache;
-    mram_range_ptr range = { from, until + 1 };
+    mram_range_ptr range = { from, to + 1 };
     T __mram_ptr *i;
     size_t curr_length, curr_size;
     LOOP_ON_MRAM_BL(i, curr_length, curr_size, range, MAX_TRANSFER_LENGTH_TRIPLE) {
@@ -102,11 +102,11 @@ static void copy_run(T __mram_ptr *from, T __mram_ptr *until, T __mram_ptr *out)
  * 
  * @param ptr The current buffer item of the first run.
  * @param from The MRAM address of the current item of the first run.
- * @param until The MRAM address of the last item of the first run.
+ * @param to The MRAM address of the last item of the first run.
  * @param out Whither to flush.
  * @param i The number of items currently in the cache.
 **/
-static void flush_first(T const * const ptr, T __mram_ptr *from, T __mram_ptr const *until,
+static void flush_first(T const * const ptr, T __mram_ptr *from, T __mram_ptr const *to,
         T __mram_ptr *out, size_t i) {
     T * const cache = buffers[me()].cache;
     (void)ptr;
@@ -115,7 +115,7 @@ static void flush_first(T const * const ptr, T __mram_ptr *from, T __mram_ptr co
     if (i & 1) {  // Is there need for alignment?
         // This is easily possible since the non-depleted run must have at least one more item.
         cache[i++] = *ptr;
-        if (from >= until) {
+        if (from >= to) {
             mram_write(cache, out, i * sizeof(T));
             return;
         }
@@ -129,14 +129,14 @@ static void flush_first(T const * const ptr, T __mram_ptr *from, T __mram_ptr co
     do {
         // Thanks to the dummy values, even for numbers smaller than `DMA_ALIGNMENT` bytes,
         // there is no need to round the size up.
-        size_t const rem_size = (from + MAX_TRANSFER_LENGTH_TRIPLE > until)
-                ? (size_t)until - (size_t)from + sizeof(T)
+        size_t const rem_size = (from + MAX_TRANSFER_LENGTH_TRIPLE > to)
+                ? (size_t)to - (size_t)from + sizeof(T)
                 : MAX_TRANSFER_SIZE_TRIPLE;
         mram_read(from, cache, rem_size);
         mram_write(cache, out, rem_size);
         from += MAX_TRANSFER_LENGTH_TRIPLE;  // Value may be wrong for the last transfer …
         out += MAX_TRANSFER_LENGTH_TRIPLE;  // … after which it is not needed anymore, however.
-    } while (from <= until);
+    } while (from <= to);
 }
 
 /**

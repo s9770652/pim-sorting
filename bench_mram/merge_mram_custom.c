@@ -82,12 +82,12 @@ static void form_starting_runs_half_space(T __mram_ptr * const start, T __mram_p
  * @brief Copies a sorted MRAM array to another MRAM location.
  * 
  * @param from The first item of the MRAM array to copy.
- * @param until The last item of said array.
+ * @param to The last item of said array.
  * @param out The new location of the first item to copy.
 **/
-static void copy_run(T __mram_ptr *from, T __mram_ptr *until, T __mram_ptr *out) {
+static void copy_run(T __mram_ptr *from, T __mram_ptr *to, T __mram_ptr *out) {
     T * const cache = buffers[me()].cache;
-    mram_range_ptr range = { from, until + 1 };
+    mram_range_ptr range = { from, to + 1 };
     T __mram_ptr *i;
     size_t curr_length, curr_size;
     LOOP_ON_MRAM_BL(i, curr_length, curr_size, range, MAX_TRANSFER_LENGTH_TRIPLE) {
@@ -115,7 +115,7 @@ static void flush_first(struct reader * const reader, T __mram_ptr *out, size_t 
     if (i & 1) {  // Is there need for alignment?
         // This is easily possible since the non-depleted run must have at least one more item.
         cache[i++] = get_reader_value(reader);
-        if (from == reader->until) {
+        if (from == reader->to) {
             mram_write(cache, out, i * sizeof(T));
             return;
         }
@@ -129,14 +129,14 @@ static void flush_first(struct reader * const reader, T __mram_ptr *out, size_t 
     do {
         // Thanks to the dummy values, even for numbers smaller than `DMA_ALIGNMENT` bytes,
         // there is no need to round the size up.
-        size_t const rem_size = (from + MAX_TRANSFER_LENGTH_TRIPLE > reader->until)
-                ? (size_t)reader->until - (size_t)from + sizeof(T)
+        size_t const rem_size = (from + MAX_TRANSFER_LENGTH_TRIPLE > reader->to)
+                ? (size_t)reader->to - (size_t)from + sizeof(T)
                 : MAX_TRANSFER_SIZE_TRIPLE;
         mram_read(from, cache, rem_size);
         mram_write(cache, out, rem_size);
         from += MAX_TRANSFER_LENGTH_TRIPLE;  // Value may be wrong for the last transfer …
         out += MAX_TRANSFER_LENGTH_TRIPLE;  // … after which it is not needed anymore, however.
-    } while (from <= reader->until);
+    } while (from <= reader->to);
 }
 
 /**
@@ -153,14 +153,14 @@ static void flush_first_emptied_cache(struct reader * const reader, T __mram_ptr
     do {
         // Thanks to the dummy values, even for numbers smaller than `DMA_ALIGNMENT` bytes,
         // there is no need to round the size up.
-        size_t const rem_size = (from + MAX_TRANSFER_LENGTH_TRIPLE > reader->until)
-                ? (size_t)reader->until - (size_t)from + sizeof(T)
+        size_t const rem_size = (from + MAX_TRANSFER_LENGTH_TRIPLE > reader->to)
+                ? (size_t)reader->to - (size_t)from + sizeof(T)
                 : MAX_TRANSFER_SIZE_TRIPLE;
         mram_read(from, cache, rem_size);
         mram_write(cache, out, rem_size);
         from += MAX_TRANSFER_LENGTH_TRIPLE;  // Value may be wrong for the last transfer …
         out += MAX_TRANSFER_LENGTH_TRIPLE;  // … after which it is not needed anymore, however.
-    } while (from <= reader->until);
+    } while (from <= reader->to);
 }
 
 /**
@@ -254,7 +254,7 @@ out += UNROLLING_CACHE_LENGTH;
 static void merge_half_space(struct reader readers[2], T __mram_ptr *out) {
     T * const cache = buffers[me()].cache;
     size_t i = 0;
-    if (*readers[0].until <= *readers[1].until) {
+    if (*readers[0].to <= *readers[1].to) {
         while (items_left_in_reader(&readers[0]) >= UNROLLING_CACHE_LENGTH) {
             MERGE_WITH_CACHE_FLUSH({}, {});
         }

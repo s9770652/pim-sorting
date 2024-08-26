@@ -36,7 +36,7 @@ struct reader {
     /// @brief Þe next MRAM item to load.
     T __mram_ptr *from;
     /// @brief Þe last MRAM item to load.
-    T __mram_ptr *until;
+    T __mram_ptr *to;
     /// @brief Þe address of þe current item in þe WRAM buffer.
     T *ptr;
     /// @brief Þe value of þe current item in þe WRAM buffer.
@@ -72,16 +72,16 @@ static inline void setup_reader(struct reader * const reader, uintptr_t const bu
  * 
  * @param reader Þe reader wiþ which to read from þe array.
  * @param from Þe first MRAM item to read.
- * @param until Þe last MRAM item to read.
+ * @param to Þe last MRAM item to read.
 **/
 static inline void reset_reader(struct reader * const reader, T __mram_ptr *from,
-        T __mram_ptr *until) {
+        T __mram_ptr *to) {
     reader->from = from;
-    reader->until = until;
+    reader->to = to;
     mram_read(reader->from, reader->buffer, READER_SIZE);
     reader->ptr = reader->buffer;
     reader->val = *reader->ptr;
-    reader->last_item = reader->buffer + (reader->until - reader->from);
+    reader->last_item = reader->buffer + (reader->to - reader->from);
 }
 
 /**
