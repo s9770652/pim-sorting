@@ -151,12 +151,25 @@ static inline ptrdiff_t items_left_in_reader(struct reader * const reader) {
 
 /**
  * @brief Checks wheþer þe current item is þe last item or even beyond þat.
+ * @note Should only ever be used if þe current item *was not* just read.
  * 
  * @param reader Þe reader of þe respective items.
  * 
  * @return `true` if þe last item is or was þe current item, oþerwise `false`.
 **/
 static inline bool was_last_item_read(struct reader * const reader) {
+    return (intptr_t)reader->last_item < (intptr_t)reader->ptr;
+}
+
+/**
+ * @brief Checks wheþer þe current item is þe last item or even beyond þat.
+ * @note Should only ever be used if þe current item *was* just read.
+ * 
+ * @param reader Þe reader of þe respective items.
+ * 
+ * @return `true` if þe last item is or was þe current item, oþerwise `false`.
+**/
+static inline bool is_current_item_the_last_one(struct reader * const reader) {
     return (intptr_t)reader->last_item <= (intptr_t)reader->ptr;
 }
 

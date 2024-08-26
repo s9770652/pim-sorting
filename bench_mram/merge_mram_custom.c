@@ -263,7 +263,10 @@ static void merge_half_space(struct reader readers[2], T __mram_ptr *out) {
         }
         while (true) {
             MERGE_WITH_CACHE_FLUSH(
-                if (was_last_item_read(&readers[0])) { flush_second(&readers[1], out, i); return; },
+                if (is_current_item_the_last_one(&readers[0])) {
+                    flush_second(&readers[1], out, i);
+                    return;
+                },
                 {}
             );
         }
@@ -278,7 +281,10 @@ static void merge_half_space(struct reader readers[2], T __mram_ptr *out) {
         while (true) {
             MERGE_WITH_CACHE_FLUSH(
                 {},
-                if (was_last_item_read(&readers[1])) { flush_first(&readers[0], out, i); return; }
+                if (is_current_item_the_last_one(&readers[1])) {
+                    flush_first(&readers[0], out, i);
+                    return;
+                }
             );
         }
     }
