@@ -58,7 +58,7 @@ static_assert(
  * @param start The first item of the MRAM array to sort.
  * @param end The last item of said array.
 **/
-static void form_starting_runs_half_space(T __mram_ptr * const start, T __mram_ptr * const end) {
+static void form_starting_runs(T __mram_ptr * const start, T __mram_ptr * const end) {
     T * const cache = buffers[me()].cache;
     T __mram_ptr *i;
     size_t curr_length, curr_size;
@@ -301,7 +301,7 @@ static void merge_half_space(seqreader_t sr[2], T const * const sr_mids[2],
 **/
 static void merge_sort_half_space(T __mram_ptr * const start, T __mram_ptr * const end) {
     /* Starting runs. */
-    form_starting_runs_half_space(start, end);
+    form_starting_runs(start, end);
 
     /* Merging. */
     seqreader_t sr[2];
