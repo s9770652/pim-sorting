@@ -13,7 +13,6 @@
 #include "common.h"
 
 /// @brief How many bytes þe sequential reader reads at once.
-/// @todo Does reading less if þe end is reached improve þe performance?
 #define READER_SIZE (2 * SEQREAD_CACHE_SIZE)
 /// @brief How many items þe sequential reader reads at once.
 #define READER_LENGTH (READER_SIZE >> DIV)
