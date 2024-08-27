@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Measuring runtimes of a MergeSort (sequential, MRAM, custom readers).
+ * @brief Measuring runtimes of a half-space MergeSort (sequential, MRAM, regular readers).
 **/
 
 #include <assert.h>
@@ -20,8 +20,6 @@
 #include "random_distribution.h"
 #include "random_generator.h"
 #include "wram_sorts.h"
-
-#include "reader.h"
 
 struct dpu_arguments __host host_to_dpu;
 struct dpu_results __host dpu_to_host;
@@ -48,8 +46,8 @@ static_assert(
 /// @brief How many items are merged in an unrolled fashion.
 #define UNROLL_FACTOR (8)
 /// @brief How many items the cache holds before they are written to the MRAM.
-/// @internal Due to the unrolling, medium sizes are better than the maximum size.
-#define UNROLLING_CACHE_LENGTH (MIN(256, MAX_TRANSFER_LENGTH_CACHE) / UNROLL_FACTOR * UNROLL_FACTOR)
+/// @internal Despite the unrolling, medium sizes are worse than the maximum size.
+#define UNROLLING_CACHE_LENGTH (MAX_TRANSFER_LENGTH_CACHE / UNROLL_FACTOR * UNROLL_FACTOR)
 /// @brief How many bytes the items the cache holds before they are written to the MRAM have.
 #define UNROLLING_CACHE_SIZE (UNROLLING_CACHE_LENGTH << DIV)
 
@@ -100,22 +98,24 @@ static void copy_run(T __mram_ptr *from, T __mram_ptr *to, T __mram_ptr *out) {
 /**
  * @brief Flushes the first run in a pair of runs once the tail of the second one is reached.
  * This includes writing whatever is still in the cache to the MRAM
- * and copying whatever is still in the copy of the first run back to the input.
- * @todo Flush whatever is in the reader?
+ * and copying whatever is still in the copy of the first run back to the input array.
  * 
- * @param reader A reader on the first run.
+ * @param ptr The current buffer item of the first run.
+ * @param from The MRAM address of the current item of the first run.
+ * @param to The MRAM address of the last item of the first run.
  * @param out Whither to flush.
  * @param i The number of items currently in the cache.
 **/
-static void flush_first(struct reader * const reader, T __mram_ptr *out, size_t i) {
+static void flush_first(T const * const ptr, T __mram_ptr *from, T __mram_ptr const *to,
+        T __mram_ptr *out, size_t i) {
     T * const cache = buffers[me()].cache;
-    T __mram_ptr *from = get_reader_mram_address(reader);
+    (void)ptr;
     /* Transfer cache to MRAM. */
 #ifdef UINT32
     if (i & 1) {  // Is there need for alignment?
         // This is easily possible since the non-depleted run must have at least one more item.
-        cache[i++] = get_reader_value(reader);
-        if (from == reader->to) {
+        cache[i++] = *ptr;
+        if (from >= to) {
             mram_write(cache, out, i * sizeof(T));
             return;
         }
@@ -129,56 +129,31 @@ static void flush_first(struct reader * const reader, T __mram_ptr *out, size_t 
     do {
         // Thanks to the dummy values, even for numbers smaller than `DMA_ALIGNMENT` bytes,
         // there is no need to round the size up.
-        size_t const rem_size = (from + MAX_TRANSFER_LENGTH_TRIPLE > reader->to)
-                ? (size_t)reader->to - (size_t)from + sizeof(T)
+        size_t const rem_size = (from + MAX_TRANSFER_LENGTH_TRIPLE > to)
+                ? (size_t)to - (size_t)from + sizeof(T)
                 : MAX_TRANSFER_SIZE_TRIPLE;
         mram_read(from, cache, rem_size);
         mram_write(cache, out, rem_size);
         from += MAX_TRANSFER_LENGTH_TRIPLE;  // Value may be wrong for the last transfer …
         out += MAX_TRANSFER_LENGTH_TRIPLE;  // … after which it is not needed anymore, however.
-    } while (from <= reader->to);
-}
-
-/**
- * @brief Flushes the first run in a pair of runs once the tail of the second one is reached.
- * This includes only copying whatever is still in the copy of the first run back to the input.
- * 
- * @param reader A reader on the first run.
- * @param out Whither to flush.
-**/
-static void flush_first_emptied_cache(struct reader * const reader, T __mram_ptr *out) {
-    T * const cache = buffers[me()].cache;
-    T __mram_ptr *from = get_reader_mram_address(reader);
-    /* Transfer from MRAM to MRAM. */
-    do {
-        // Thanks to the dummy values, even for numbers smaller than `DMA_ALIGNMENT` bytes,
-        // there is no need to round the size up.
-        size_t const rem_size = (from + MAX_TRANSFER_LENGTH_TRIPLE > reader->to)
-                ? (size_t)reader->to - (size_t)from + sizeof(T)
-                : MAX_TRANSFER_SIZE_TRIPLE;
-        mram_read(from, cache, rem_size);
-        mram_write(cache, out, rem_size);
-        from += MAX_TRANSFER_LENGTH_TRIPLE;  // Value may be wrong for the last transfer …
-        out += MAX_TRANSFER_LENGTH_TRIPLE;  // … after which it is not needed anymore, however.
-    } while (from <= reader->to);
+    } while (from <= to);
 }
 
 /**
  * @brief Flushes the second run in a pair of runs once the tail of the first one is reached.
  * This includes only writing whatever is still in the cache to the MRAM.
  * 
- * @param reader A reader on the second run.
+ * @param ptr The current buffer item of the first second.
  * @param out Whither to flush.
  * @param i The number of items currently in the cache.
 **/
-static void flush_second(struct reader * const reader, T __mram_ptr * const out, size_t i) {
+static void flush_second(T * const ptr, T __mram_ptr * const out, size_t i) {
     T * const cache = buffers[me()].cache;
-    (void)reader;
-    /* Transfer cache to MRAM. */
+    (void)ptr;
 #ifdef UINT32
     if (i & 1) {  // Is there need for alignment?
         // This is easily possible since the non-depleted run must have at least one more item.
-        cache[i++] = get_reader_value(reader);
+        cache[i++] = *ptr;
     }
 #endif
     mram_write(cache, out, i * sizeof(T));
@@ -190,6 +165,8 @@ static void flush_second(struct reader * const reader, T __mram_ptr * const out,
  * bounds checks on both runs occur with each itemal merge. The reason is that
  * the unrolling everywhere makes the executable too big if the check is more fine-grained.
  * 
+ * @param items_0 Statement updating the count of items remaining in the first run.
+ * @param items_1 Statement updating the count of items remaining in the second run.
  * @param flush_0 An if block checking whether the tail of the first run is reached
  * and calling the appropriate flushing function. May be an empty block
  * if it is known that the tail cannot be reached.
@@ -197,41 +174,51 @@ static void flush_second(struct reader * const reader, T __mram_ptr * const out,
  * and calling the appropriate flushing function. May be an empty block
  * if it is known that the tail cannot be reached.
 **/
-#define UNROLLED_MERGE(flush_0, flush_1)                                            \
-for (size_t j = 0; j < UNROLLING_CACHE_LENGTH / UNROLL_FACTOR; j++) {               \
-    if (!is_early_end_reached(&readers[0]) && !is_early_end_reached(&readers[1])) { \
-        _Pragma("unroll")                                                           \
-        for (size_t k = 0; k < UNROLL_FACTOR; k++) {                                \
-            if (get_reader_value(&readers[0]) <= get_reader_value(&readers[1])) {   \
-                cache[i++] = get_reader_value(&readers[0]);                         \
-                flush_0;                                                            \
-                update_reader_partially(&readers[0]);                               \
-            } else {                                                                \
-                cache[i++] = get_reader_value(&readers[1]);                         \
-                flush_1;                                                            \
-                update_reader_partially(&readers[1]);                               \
-            }                                                                       \
-        }                                                                           \
-    } else {                                                                        \
-        _Pragma("unroll")                                                           \
-        for (size_t k = 0; k < UNROLL_FACTOR; k++) {                                \
-            if (get_reader_value(&readers[0]) <= get_reader_value(&readers[1])) {   \
-                cache[i++] = get_reader_value(&readers[0]);                         \
-                flush_0;                                                            \
-                update_reader_fully(&readers[0]);                                   \
-            } else {                                                                \
-                cache[i++] = get_reader_value(&readers[1]);                         \
-                flush_1;                                                            \
-                update_reader_fully(&readers[1]);                                   \
-            }                                                                       \
-        }                                                                           \
-    }                                                                               \
+#define UNROLLED_MERGE(items_0, items_1, flush_0, flush_1)              \
+for (size_t j = 0; j < UNROLLING_CACHE_LENGTH / UNROLL_FACTOR; j++) {   \
+    if ((ptr[0] <= sr_early_mids[0]) && (ptr[1] <= sr_early_mids[1])) { \
+        _Pragma("unroll")                                               \
+        for (size_t k = 0; k < UNROLL_FACTOR; k++) {                    \
+            if (val[0] <= val[1]) {                                     \
+                cache[i++] = val[0];                                    \
+                items_0;                                                \
+                flush_0;                                                \
+                val[0] = *++ptr[0];                                     \
+            } else {                                                    \
+                cache[i++] = val[1];                                    \
+                items_1;                                                \
+                flush_1;                                                \
+                val[1] = *++ptr[1];                                     \
+            }                                                           \
+        }                                                               \
+    } else {                                                            \
+        _Pragma("unroll")                                               \
+        for (size_t k = 0; k < UNROLL_FACTOR; k++) {                    \
+            if (val[0] <= val[1]) {                                     \
+                cache[i++] = val[0];                                    \
+                items_0;                                                \
+                flush_0;                                                \
+                val[0] = *(ptr[0] = (ptr[0] < sr_mids[0])               \
+                        ? ++ptr[0]                                      \
+                        : seqread_get(ptr[0], sizeof(T), &sr[0]));      \
+            } else {                                                    \
+                cache[i++] = val[1];                                    \
+                items_1;                                                \
+                flush_1;                                                \
+                val[1] = *(ptr[1] = (ptr[1] < sr_mids[1])               \
+                        ? ++ptr[1]                                      \
+                        : seqread_get(ptr[1], sizeof(T), &sr[1]));      \
+            }                                                           \
+        }                                                               \
+    }                                                                   \
 }
 
 /**
  * @brief Merges the `UNROLLING_CACHE_LENGTH` least items in the current pair of runs and
  * writes them to the MRAM.
  * 
+ * @param items_0 Statement updating the count of items remaining in the first run.
+ * @param items_1 Statement updating the count of items remaining in the second run.
  * @param flush_0 An if block checking whether the tail of the first run is reached
  * and calling the appropriate flushing function. May be an empty block
  * if it is known that the tail cannot be reached.
@@ -239,50 +226,67 @@ for (size_t j = 0; j < UNROLLING_CACHE_LENGTH / UNROLL_FACTOR; j++) {           
  * and calling the appropriate flushing function. May be an empty block
  * if it is known that the tail cannot be reached.
 **/
-#define MERGE_WITH_CACHE_FLUSH(flush_0, flush_1) \
-UNROLLED_MERGE(flush_0, flush_1);                \
-mram_write(cache, out, UNROLLING_CACHE_SIZE);    \
-i = 0;                                           \
+#define MERGE_WITH_CACHE_FLUSH(items_0, items_1, flush_0, flush_1) \
+UNROLLED_MERGE(items_0, items_1, flush_0, flush_1);                \
+mram_write(cache, out, UNROLLING_CACHE_SIZE);                      \
+i = 0;                                                             \
 out += UNROLLING_CACHE_LENGTH;
 
 /**
  * @brief Merges two MRAM runs. If the second run is depleted, the first one will not be flushed.
- *
- * @param readers A pair of readers on the runs
+ * 
+ * @param sr Two regular UPMEM readers on the two runs.
+ * @param sr_mids The last items of the front buffers of the readers.
+ * @param sr_early_mids The last items of the front buffers of the readers
+ * where the pointer can safely be advanced without flushing.
+ * @param ptr The current buffer items of the runs.
+ * @param ends The last items of the two runs.
+ * @param items_left How many items are left in both runs.
  * @param out Whither the merged runs are written.
 **/
-static void merge_half_space(struct reader readers[2], T __mram_ptr *out) {
+static void merge_half_space(seqreader_t sr[2], T const * const sr_mids[2],
+        T const * const sr_early_mids[2], T *ptr[2], T __mram_ptr * const ends[2],
+        size_t items_left[2], T __mram_ptr *out) {
     T * const cache = buffers[me()].cache;
     size_t i = 0;
-    if (*readers[0].to <= *readers[1].to) {
-        while (items_left_in_reader(&readers[0]) >= UNROLLING_CACHE_LENGTH) {
-            MERGE_WITH_CACHE_FLUSH({}, {});
+    T val[2] = { *ptr[0], *ptr[1] };
+    if (*ends[0] <= *ends[1]) {
+        while (items_left[0] > UNROLLING_CACHE_LENGTH) {
+            MERGE_WITH_CACHE_FLUSH(--items_left[0], {}, {}, {});
         }
-        if (was_last_item_read(&readers[0])) {
-            return;  // Only a `return` since `MERGE_WITH_CACHE_FLUSH` already ended with a flush.
+        if (items_left[0] == 0) {
+            // I have no idea why this flush does not only works
+            // but is even more performant than a simple return.
+            flush_second(ptr[1], out, i);
+            return;
         }
         while (true) {
             MERGE_WITH_CACHE_FLUSH(
-                if (is_current_item_the_last_one(&readers[0])) {
-                    flush_second(&readers[1], out, i);
+                --items_left[0],
+                {},
+                if (items_left[0] == 0) {
+                    flush_second(ptr[1], out, i);
                     return;
                 },
                 {}
             );
         }
     } else {
-        while (items_left_in_reader(&readers[1]) >= UNROLLING_CACHE_LENGTH) {
-            MERGE_WITH_CACHE_FLUSH({}, {});
+        while (items_left[1] > UNROLLING_CACHE_LENGTH) {
+            MERGE_WITH_CACHE_FLUSH({}, --items_left[1], {}, {});
         }
-        if (was_last_item_read(&readers[1])) {
-            flush_first_emptied_cache(&readers[0], out);
+        if (items_left[1] == 0) {
+            // Ditto.
+            flush_first(ptr[0], seqread_tell(ptr[0], &sr[0]), ends[0], out, i);
             return;
         }
         while (true) {
             MERGE_WITH_CACHE_FLUSH(
                 {},
-                if (is_current_item_the_last_one(&readers[1])) {
-                    flush_first(&readers[0], out, i);
+                --items_left[1],
+                {},
+                if (items_left[1] == 0) {
+                    flush_first(ptr[0], seqread_tell(ptr[0], &sr[0]), ends[0], out, i);
                     return;
                 }
             );
@@ -301,9 +305,18 @@ static void merge_sort_half_space(T __mram_ptr * const start, T __mram_ptr * con
     form_starting_runs(start, end);
 
     /* Merging. */
-    struct reader readers[2];
-    setup_reader(&readers[0], buffers[me()].seq_1, UNROLL_FACTOR);
-    setup_reader(&readers[1], buffers[me()].seq_2, UNROLL_FACTOR);
+    seqreader_t sr[2];
+    // The last items of the front buffers of the readers.
+    T const * const sr_mids[2] = {
+        (T *)(buffers[me()].seq_1 + SEQREAD_CACHE_SIZE) - 1,
+        (T *)(buffers[me()].seq_2 + SEQREAD_CACHE_SIZE) - 1,
+    };
+    // The last items of the front buffers of the readers
+    // where the pointer can safely be advanced without flushing.
+    T const * const sr_early_mids[2] = {
+        (T *)(buffers[me()].seq_1 + SEQREAD_CACHE_SIZE) - 1 - UNROLL_FACTOR,
+        (T *)(buffers[me()].seq_2 + SEQREAD_CACHE_SIZE) - 1 - UNROLL_FACTOR,
+    };
     size_t const n = end - start + 1;
     T __mram_ptr * const out = (T __mram_ptr *)((uintptr_t)output + (uintptr_t)start);
     for (size_t run_length = STARTING_RUN_LENGTH; run_length < n; run_length *= 2) {
@@ -318,15 +331,19 @@ static void merge_sort_half_space(T __mram_ptr * const start, T __mram_ptr * con
                     : start;
             copy_run(run_1_start, run_1_end, out);
             // … and merge the copy with the next run.
-            reset_reader(&readers[0], out, out + (run_1_end - run_1_start));
-            reset_reader(&readers[1], run_1_end + 1, run_2_end);
-            merge_half_space(readers, run_1_start);
+            T __mram_ptr * const ends[2] = { out + (run_1_end - run_1_start), run_2_end };
+            T *ptr[2] = {
+                seqread_init(buffers[me()].seq_1, out, &sr[0]),
+                seqread_init(buffers[me()].seq_2, run_1_end + 1, &sr[1]),
+            };
+            size_t items_left[2] = { run_1_end - run_1_start + 1, run_length };
+            merge_half_space(sr, sr_mids, sr_early_mids, ptr, ends, items_left, run_1_start);
         }
     }
 }
 
 union algo_to_test __host algos[] = {
-    {{ "MergeHSCustom", { .mram = merge_sort_half_space } }},
+    {{ "MergeHSRegular", { .mram = merge_sort_half_space } }},
 };
 size_t __host num_of_algos = sizeof algos / sizeof algos[0];
 
