@@ -34,7 +34,7 @@ void allocate_triple_buffer(triple_buffers *buffers) {
     // Initialise a local cache to store one MRAM block.
     // In front of the cache is a sentinel value, useful for sorting and checking the order.
     size_t const sentinel_size = DMA_ALIGNED(sizeof(T));
-    T *cache_pointer = mem_alloc(BLOCK_SIZE + sentinel_size) + sentinel_size;
+    T *cache_pointer = mem_alloc(CACHE_SIZE + sentinel_size) + sentinel_size;
     // Initialise the buffers for the two sequential readers.
     buffers->seq_1 = seqread_alloc();
     buffers->seq_2 = seqread_alloc();
@@ -52,7 +52,7 @@ void allocate_triple_buffer(triple_buffers *buffers) {
     // Initialise a local cache to store one MRAM block.
     // In front of the cache is a sentinel value, useful for sorting and checking the order.
     size_t const sentinel_size = DMA_ALIGNED(sizeof(T));
-    T *cache_pointer = mem_alloc_nolock(BLOCK_SIZE + sentinel_size) + sentinel_size;
+    T *cache_pointer = mem_alloc_nolock(CACHE_SIZE + sentinel_size) + sentinel_size;
     *(cache_pointer-1) = T_MIN;
 
     // Initialise the buffers for the two sequential readers.

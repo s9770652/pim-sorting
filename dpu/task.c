@@ -49,7 +49,7 @@ int main(void) {
 #include <stdio.h>
         printf("input length: %d\n", DPU_INPUT_ARGUMENTS.length);
         printf("diff to max length: %d\n", LOAD_INTO_MRAM - DPU_INPUT_ARGUMENTS.length);
-        printf("BLOCK_SIZE: %d\n", BLOCK_SIZE);
+        printf("CACHE_SIZE: %d\n", CACHE_SIZE);
         // printf("HEAPPOINTER: %p\n", DPU_MRAM_HEAP_POINTER);
         // printf("T in MRAM: %d\n", 2 * LOAD_INTO_MRAM);
         // printf("free in MRAM: %d\n", 1024*1024*64 - (uint32_t)DPU_MRAM_HEAP_POINTER);

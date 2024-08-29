@@ -1,7 +1,7 @@
 #!/bin/bash
 
 NR_TASKLETS=1
-BLOCK_SIZE=57368
+CACHE_SIZE=57368
 SEQREAD_CACHE_SIZE=1024
 
 b=3
@@ -24,14 +24,14 @@ get_n() {
 for type in 32 64
 do
     make clean
-    NR_TASKLETS=${NR_TASKLETS} BLOCK_SIZE=${BLOCK_SIZE} SEQREAD_CACHE_SIZE=${SEQREAD_CACHE_SIZE} TYPE=UINT${type} make all
+    NR_TASKLETS=${NR_TASKLETS} CACHE_SIZE=${CACHE_SIZE} SEQREAD_CACHE_SIZE=${SEQREAD_CACHE_SIZE} TYPE=UINT${type} make all
     for threshold in 12 13 14 15 16 24 32 48 64 96
     do
         folder=${main_folder}/threshold=${threshold}/uint${type}
         mkdir -p ${folder}
 
         rm obj/bench_*/merge_wram.o bin/merge_wram obj/host/app.o
-        NR_TASKLETS=${NR_TASKLETS} BLOCK_SIZE=${BLOCK_SIZE} SEQREAD_CACHE_SIZE=${SEQREAD_CACHE_SIZE} TYPE=UINT${type} MERGE_THRESHOLD=${threshold} make all
+        NR_TASKLETS=${NR_TASKLETS} CACHE_SIZE=${CACHE_SIZE} SEQREAD_CACHE_SIZE=${SEQREAD_CACHE_SIZE} TYPE=UINT${type} MERGE_THRESHOLD=${threshold} make all
 
         get_n ${threshold}
 

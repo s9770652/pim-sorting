@@ -1,7 +1,7 @@
 #!/bin/bash
 
 NR_TASKLETS=1
-BLOCK_SIZE=16512
+CACHE_SIZE=16512
 SEQREAD_CACHE_SIZE=1024
 
 b=4
@@ -14,7 +14,7 @@ mkdir -p ${main_folder}
 for type in 32 64
 do
     make clean
-    NR_TASKLETS=${NR_TASKLETS} BLOCK_SIZE=${BLOCK_SIZE} SEQREAD_CACHE_SIZE=${SEQREAD_CACHE_SIZE} TYPE=UINT${type} make all
+    NR_TASKLETS=${NR_TASKLETS} CACHE_SIZE=${CACHE_SIZE} SEQREAD_CACHE_SIZE=${SEQREAD_CACHE_SIZE} TYPE=UINT${type} make all
 
     folder=${main_folder}/uint${type}
     mkdir -p ${folder}

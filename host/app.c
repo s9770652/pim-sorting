@@ -12,11 +12,11 @@
 #include "random_distribution.h"
 
 // Sanity Checks
-#if (BLOCK_SIZE % DMA_ALIGNMENT)
-#error `BLOCK_SIZE` is not divisble by `DMA_ALIGNMENT`!
+#if (CACHE_SIZE % DMA_ALIGNMENT)
+#error `CACHE_SIZE` is not divisble by `DMA_ALIGNMENT`!
 #endif
-#if (BLOCK_SIZE < DMA_ALIGNMENT)
-#error `BLOCK_SIZE` too small! The cache must be capable of holding at least `DMA_ALIGNMENT` bytes.
+#if (CACHE_SIZE < DMA_ALIGNMENT)
+#error `CACHE_SIZE` too small! The cache must be capable of holding at least `DMA_ALIGNMENT` bytes.
 #endif
 #if (NR_DPUS != 1)
 #error Only one DPU can be used!
@@ -154,13 +154,13 @@ static time get_std_of_time(time const zeroth, time const first, time second) {
 static void print_header(union algo_to_test const algos[], size_t const num_of_algos,
         struct Params *params) {
     printf(
-        "# reps=%u, dist name=%s, dist param=%"T_QUALIFIER", TYPE=%s, BLOCK_SIZE=%d, "
+        "# reps=%u, dist name=%s, dist param=%"T_QUALIFIER", TYPE=%s, CACHE_SIZE=%d, "
         "SEQREAD_CACHE_SIZE=%d, NR_TASKLETS=%d, CALL_OVERHEAD=%u\n# %s\n",
         params->n_reps,
         get_dist_name(params->dist_type),
         params->dist_param,
         TYPE_NAME,
-        BLOCK_SIZE,
+        CACHE_SIZE,
         SEQREAD_CACHE_SIZE,
         NR_TASKLETS,
         CALL_OVERHEAD,

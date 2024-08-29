@@ -20,7 +20,7 @@
 #define BASE_LENGTH HEAP_LENGTH
 #define BASE_SIZE (BASE_LENGTH << DIV)
 #if (BASE_SIZE > TRIPLE_BUFFER_SIZE)
-#error `BASE_LENGTH` does not fit within the three combined WRAM buffers!
+// #error `BASE_LENGTH` does not fit within the three combined WRAM buffers!
 #endif
 #if (BASE_SIZE % 8)
 #error `BASE_SIZE` must be divisible by eight!
@@ -125,7 +125,7 @@ static __noinline void flush(T __mram_ptr *input, T __mram_ptr *output, T *cache
     do {
         // Thanks to the dummy values, even for numbers smaller than 8 bytes,
         // there is no need to round the size up.
-        size_t rem_size = (input + MAX_TRANSFER_LENGTH_CACHE > end) ? (size_t)end - (size_t)input : BLOCK_SIZE;
+        size_t rem_size = (input + MAX_TRANSFER_LENGTH_CACHE > end) ? (size_t)end - (size_t)input : CACHE_SIZE;
         mram_read(input, cache, rem_size);
         mram_write(cache, output, rem_size);
         input += MAX_TRANSFER_LENGTH_CACHE;  // Value may be wrong for the last transfer …

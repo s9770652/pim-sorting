@@ -9,7 +9,7 @@ __dirs := ${shell mkdir -p ${BUILD_DIR} ${OBJ_DIR}/${HOST_DIR} ${OBJ_DIR}/${BENC
 
 # Compilation constants.
 TYPE ?= UINT32
-BLOCK_SIZE ?= 2048
+CACHE_SIZE ?= 2048
 SEQREAD_CACHE_SIZE ?= 256
 NR_DPUS ?= 1
 NR_TASKLETS ?= 1
@@ -24,9 +24,9 @@ MERGE_THRESHOLD ?= 14
 
 # A file whose name reflects the set constants.
 define conf_filename
-	${BUILD_DIR}/.NR_DPUS_${1}_NR_TASKLETS_${2}_TYPE_${3}_BLOCK_SIZE_${4}_SEQREAD_CACHE_SIZE_${5}.conf
+	${BUILD_DIR}/.NR_DPUS_${1}_NR_TASKLETS_${2}_TYPE_${3}_CACHE_SIZE_${4}_SEQREAD_CACHE_SIZE_${5}.conf
 endef
-CONF := ${call conf_filename,${NR_DPUS},${NR_TASKLETS},${TYPE},${BLOCK_SIZE},${SEQREAD_CACHE_SIZE}}
+CONF := ${call conf_filename,${NR_DPUS},${NR_TASKLETS},${TYPE},${CACHE_SIZE},${SEQREAD_CACHE_SIZE}}
 
 # The list (as string) of all binaries created. Needed by the host.
 comma := ,
@@ -59,7 +59,7 @@ COMMON_FLAGS := -Wall -Wextra -g -I${COMMON_INCLUDES}
 HOST_FLAGS := ${COMMON_FLAGS} -std=c11 -lm -O3 `dpu-pkg-config --cflags --libs dpu` \
 	-DNR_TASKLETS=${NR_TASKLETS} \
 	-DNR_DPUS=${NR_DPUS} \
-	-DBLOCK_SIZE=${BLOCK_SIZE} \
+	-DCACHE_SIZE=${CACHE_SIZE} \
 	-D${TYPE} \
 	-DSEQREAD_CACHE_SIZE=${SEQREAD_CACHE_SIZE} \
 	-DBINARIES=\"${BINARIES}\" \
@@ -70,7 +70,7 @@ HOST_FLAGS := ${COMMON_FLAGS} -std=c11 -lm -O3 `dpu-pkg-config --cflags --libs d
 	MERGE_THRESHOLD=${MERGE_THRESHOLD}\"
 DPU_FLAGS := ${COMMON_FLAGS} -O3 \
 	-DNR_TASKLETS=${NR_TASKLETS} \
-	-DBLOCK_SIZE=${BLOCK_SIZE} \
+	-DCACHE_SIZE=${CACHE_SIZE} \
 	-D${TYPE} \
 	-DSEQREAD_CACHE_SIZE=${SEQREAD_CACHE_SIZE} \
 	-D${PIVOT} \
