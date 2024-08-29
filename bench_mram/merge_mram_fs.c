@@ -93,8 +93,8 @@ static void copy_run(T __mram_ptr *from, T __mram_ptr *to, T __mram_ptr *out) {
     T __mram_ptr *i;
     size_t curr_length, curr_size;
     LOOP_ON_MRAM_BL(i, curr_length, curr_size, range, MAX_TRANSFER_LENGTH_TRIPLE) {
-        mram_read_triple(i, cache, curr_size);
-        mram_write_triple(cache, out, curr_size);
+        mram_read(i, cache, curr_size);
+        mram_write(cache, out, curr_size);
         out += curr_length;
     }
 }
