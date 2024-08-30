@@ -97,6 +97,6 @@ union algo_to_test {
 };
 
 /// @brief The experimentally determined overhead of calling a sorting function.
-#define CALL_OVERHEAD (128)
+#define CALL_OVERHEAD (144)
 
 #endif  // _COMMUNICATION_H_
