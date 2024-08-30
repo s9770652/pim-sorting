@@ -115,7 +115,7 @@ for (                                                                           
             : DMA_ALIGNED(curr_length * sizeof(T)),                                 \
     i = ((intptr_t)(range.end - (block_length)) >= (intptr_t)range.start)           \
             ? range.end - (block_length)                                            \
-            : start                                                                 \
+            : range.start                                                           \
     ;                                                                               \
     (intptr_t)curr_length > 0                                                       \
     ;                                                                               \
