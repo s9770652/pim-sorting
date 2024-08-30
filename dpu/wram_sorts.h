@@ -6,6 +6,8 @@
 #ifndef _BASE_SORT_H_
 #define _BASE_SORT_H_
 
+#include <stdbool.h>
+
 #include "common.h"
 #include "pivot.h"
 

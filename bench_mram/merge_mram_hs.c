@@ -19,8 +19,8 @@
 #include "communication.h"
 #include "random_distribution.h"
 #include "random_generator.h"
-#include "wram_sorts.h"
 
+#include "merge_mram.h"
 #include "reader.h"
 
 struct dpu_arguments __host host_to_dpu;
@@ -32,19 +32,6 @@ triple_buffers buffers[NR_TASKLETS];
 struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input (in debug mode)
 struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the pivot
 
-/// @brief The number of items in the starting runs.
-#define STARTING_RUN_LENGTH (TRIPLE_BUFFER_LENGTH)
-/// @brief The number of bytes a starting run takes.
-#define STARTING_RUN_SIZE (STARTING_RUN_LENGTH << DIV)
-static_assert(
-    STARTING_RUN_SIZE == DMA_ALIGNED(STARTING_RUN_SIZE),
-    "The size of starting runs must be properly aligned for DMAs!"
-);
-static_assert(
-    STARTING_RUN_SIZE <= TRIPLE_BUFFER_SIZE,
-    "The starting runs are sorted entirely in WRAM and, thus, must fit in there!"
-);
-
 /// @brief How many items are merged in an unrolled fashion.
 #define UNROLL_FACTOR (8)
 /// @brief How many items the cache holds before they are written to the MRAM.
@@ -52,50 +39,6 @@ static_assert(
 #define UNROLLING_CACHE_LENGTH (MIN(256, MAX_TRANSFER_LENGTH_CACHE) / UNROLL_FACTOR * UNROLL_FACTOR)
 /// @brief How many bytes the items the cache holds before they are written to the MRAM have.
 #define UNROLLING_CACHE_SIZE (UNROLLING_CACHE_LENGTH << DIV)
-
-/**
- * @brief Scans an MRAM array backwards in blocks of length `STARTING_RUN_LENGTH`,
- * sorts those in WRAM, and writes them back.
- * 
- * @param start The first item of the MRAM array to sort.
- * @param end The last item of said array.
-**/
-static void form_starting_runs(T __mram_ptr * const start, T __mram_ptr * const end) {
-    T * const cache = buffers[me()].cache;
-    T __mram_ptr *i;
-    size_t curr_length, curr_size;
-    mram_range_ptr range = { start, end + 1 };
-    LOOP_BACKWARDS_ON_MRAM_BL(i, curr_length, curr_size, range, STARTING_RUN_LENGTH) {
-#if (STARTING_RUN_SIZE > 2048)
-        mram_read_triple(i, cache, curr_size);
-        quick_sort_wram(cache, cache + curr_length - 1);
-        mram_write_triple(cache, i, curr_size);
-#else
-        mram_read(i, cache, curr_size);
-        quick_sort_wram(cache, cache + curr_length - 1);
-        mram_write(cache, i, curr_size);
-#endif
-    }
-}
-
-/**
- * @brief Copies a sorted MRAM array to another MRAM location.
- * 
- * @param from The first item of the MRAM array to copy.
- * @param to The last item of said array.
- * @param out The new location of the first item to copy.
-**/
-static void copy_run(T __mram_ptr *from, T __mram_ptr *to, T __mram_ptr *out) {
-    T * const cache = buffers[me()].cache;
-    mram_range_ptr range = { from, to + 1 };
-    T __mram_ptr *i;
-    size_t curr_length, curr_size;
-    LOOP_ON_MRAM_BL(i, curr_length, curr_size, range, MAX_TRANSFER_LENGTH_TRIPLE) {
-        mram_read(i, cache, curr_size);
-        mram_write(cache, out, curr_size);
-        out += curr_length;
-    }
-}
 
 /**
  * @brief Flushes the first run in a pair of runs once the tail of the second one is reached.

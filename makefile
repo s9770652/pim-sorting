@@ -46,7 +46,7 @@ COMMON_INCLUDES := support
 HOST_SRC := ${wildcard ${HOST_DIR}/*.c}
 DPU_SRC := ${filter-out %/task.c, ${wildcard ${DPU_DIR}/*.c}}
 SORTING_SRC := ${DPU_DIR}/task.c
-BENCHMARK_SRC :=
+BENCHMARK_SRC := ${BENCHMARK_DIR}/merge_mram.c
 
 # The object files build from each of the source files.
 HOST_OBJ := ${patsubst ${HOST_DIR}/%.c,${OBJ_DIR}/${HOST_DIR}/%.o,${HOST_SRC}}
