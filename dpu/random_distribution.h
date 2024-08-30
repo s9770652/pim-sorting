@@ -41,8 +41,9 @@ void generate_uniform_distribution_mram(T __mram_ptr *array, T *cache, mram_rang
  * 
  * @param start The first element of the array where to store the random data.
  * @param end The last element of said array.
+ * @param offset The distance of the first element to `T_MIN`.
 **/
-void generate_sorted_distribution_wram(T *start, T *end);
+void generate_sorted_distribution_wram(T *start, T *end, T offset);
 
 /**
  * @brief Generates a range of ascending numbers, starting from `T_MIN`.
@@ -60,8 +61,9 @@ void generate_sorted_distribution_mram(T __mram_ptr *array, T *cache, mram_range
  * 
  * @param start The first element of the array where to store the random data.
  * @param end The last element of said array.
+ * @param offset The distance of the last element to `T_MIN`.
 **/
-void generate_reverse_sorted_distribution_wram(T *start, T *end);
+void generate_reverse_sorted_distribution_wram(T *start, T *end, T offset);
 
 /**
  * @brief Generates a range of descending numbers, ending at `T_MIN`.

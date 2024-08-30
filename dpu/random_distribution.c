@@ -31,12 +31,12 @@ void generate_uniform_distribution_mram(T __mram_ptr *array, T * const cache,
     size_t i, curr_length, curr_size;
     LOOP_ON_MRAM(i, curr_length, curr_size, (*range)) {
         generate_uniform_distribution_wram(cache, &cache[curr_length-1], upper_bound);
-        mram_write_triple(cache, &array[i], curr_size);
+        mram_write(cache, &array[i], curr_size);
     }
 }
 
-void generate_sorted_distribution_wram(T * const start, T * const end) {
-    T counter = T_MIN;
+void generate_sorted_distribution_wram(T * const start, T * const end, T offset) {
+    T counter = T_MIN + offset;
     for (T *t = start; t <= end; t++) {
         *t = counter++;
     }
@@ -46,13 +46,13 @@ void generate_sorted_distribution_mram(T __mram_ptr *array, T * const cache,
         mram_range const * const range) {
     size_t i, curr_length, curr_size;
     LOOP_ON_MRAM(i, curr_length, curr_size, (*range)) {
-        generate_sorted_distribution_wram(cache, &cache[curr_length-1]);
-        mram_write_triple(cache, &array[i], curr_size);
+        generate_sorted_distribution_wram(cache, &cache[curr_length-1], i);
+        mram_write(cache, &array[i], curr_size);
     }
 }
 
-void generate_reverse_sorted_distribution_wram(T * const start, T * const end) {
-    T counter = T_MIN;
+void generate_reverse_sorted_distribution_wram(T * const start, T * const end, T offset) {
+    T counter = T_MIN + offset;
     for (T *t = end; t >= start; t--) {
         *t = counter++;
     }
@@ -61,14 +61,16 @@ void generate_reverse_sorted_distribution_wram(T * const start, T * const end) {
 void generate_reverse_sorted_distribution_mram(T __mram_ptr *array, T * const cache,
         mram_range const * const range) {
     size_t i, curr_length, curr_size;
-    LOOP_ON_MRAM(i, curr_length, curr_size, (*range)) {
-        generate_reverse_sorted_distribution_wram(cache, &cache[curr_length-1]);
-        mram_write_triple(cache, &array[i], curr_size);
+    T offset = 0;
+    LOOP_BACKWARDS_ON_MRAM_BL(i, curr_length, curr_size, (*range), MAX_TRANSFER_LENGTH_TRIPLE) {
+        generate_reverse_sorted_distribution_wram(cache, &cache[curr_length-1], offset);
+        mram_write(cache, &array[i], curr_size);
+        offset += MAX_TRANSFER_LENGTH_TRIPLE;
     }
 }
 
 void generate_almost_sorted_distribution_wram(T * const start, T * const end, size_t swaps) {
-    generate_sorted_distribution_wram(start, end);
+    generate_sorted_distribution_wram(start, end, 0);
     size_t const n = end - start + 1;
     swaps = (swaps) ? : sqroot_on_dpu(n);
     for (size_t s = 0; s < swaps; s++) {
