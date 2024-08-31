@@ -35,12 +35,18 @@ struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the p
 static bool flipped[NR_TASKLETS];  // Whether a write-back from the auxiliary array is (not) needed.
 
 /// @brief How many items are merged in an unrolled fashion.
-#define UNROLL_FACTOR (4)
+#define UNROLL_FACTOR (6)
 /// @brief How many items the cache holds before they are written to the MRAM.
 /// @internal Due to the unrolling, medium sizes are better than the maximum size.
 #define UNROLLING_CACHE_LENGTH (MIN(384, MAX_TRANSFER_LENGTH_CACHE) / UNROLL_FACTOR * UNROLL_FACTOR)
 /// @brief How many bytes the items the cache holds before they are written to the MRAM have.
 #define UNROLLING_CACHE_SIZE (UNROLLING_CACHE_LENGTH << DIV)
+
+static_assert(
+    UNROLL_FACTOR * sizeof(T) == DMA_ALIGNED(UNROLL_FACTOR * sizeof(T)),
+    "`UNROLL_FACTOR * sizeof(T)` must be DMA-aligned "
+    "as, otherwise, the quick cache flush after the first tier is not possible."
+);
 
 /**
  * @brief Write whatever is still in the cache to the MRAM.

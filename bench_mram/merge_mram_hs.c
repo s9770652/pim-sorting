@@ -40,6 +40,12 @@ struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the p
 /// @brief How many bytes the items the cache holds before they are written to the MRAM have.
 #define UNROLLING_CACHE_SIZE (UNROLLING_CACHE_LENGTH << DIV)
 
+static_assert(
+    UNROLL_FACTOR * sizeof(T) == DMA_ALIGNED(UNROLL_FACTOR * sizeof(T)),
+    "`UNROLL_FACTOR * sizeof(T)` must be DMA-aligned "
+    "as, otherwise, the quick cache flush after the first tier is not possible."
+);
+
 /**
  * @brief Write whatever is still in the cache to the MRAM.
  * If the given run is not depleted, copy its remainder from the MRAM to the output.
