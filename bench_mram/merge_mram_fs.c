@@ -43,16 +43,15 @@ static bool flipped[NR_TASKLETS];  // Whether a write-back from the auxiliary ar
 #define UNROLLING_CACHE_SIZE (UNROLLING_CACHE_LENGTH << DIV)
 
 /**
- * @brief Flushes the first run in a pair of runs once the tail of the second one is reached.
- * This includes writing whatever is still in the cache to the MRAM
- * and copying whatever is still in the copy of the first run back to the input.
+ * @brief Write whatever is still in the cache to the MRAM.
+ * If the given run is not depleted, copy its remainder from the MRAM to the output.
  * @todo Flush whatever is in the reader?
  * 
  * @param reader A reader on the first run.
  * @param out Whither to flush.
  * @param i The number of items currently in the cache.
 **/
-static void flush_first(struct reader * const reader, T __mram_ptr *out, size_t i) {
+static void flush_cache_and_run(struct reader * const reader, T __mram_ptr *out, size_t i) {
     T * const cache = buffers[me()].cache;
     T __mram_ptr *from = get_reader_mram_address(reader);
     /* Transfer cache to MRAM. */
@@ -85,13 +84,12 @@ static void flush_first(struct reader * const reader, T __mram_ptr *out, size_t 
 }
 
 /**
- * @brief Flushes the first run in a pair of runs once the tail of the second one is reached.
- * This includes only copying whatever is still in the copy of the first run back to the input.
+ * @brief Copy the remainder of a run from the MRAM to the output.
  * 
  * @param reader A reader on the first run.
  * @param out Whither to flush.
 **/
-static void flush_first_emptied_cache(struct reader * const reader, T __mram_ptr *out) {
+static void flush_run(struct reader * const reader, T __mram_ptr *out) {
     T * const cache = buffers[me()].cache;
     T __mram_ptr *from = get_reader_mram_address(reader);
     /* Transfer from MRAM to MRAM. */
@@ -189,13 +187,13 @@ static void merge_full_space(struct reader readers[2], T __mram_ptr *out) {
                 mram_write(cache, out, i * sizeof(T));
                 out += i;
             }
-            flush_first_emptied_cache(&readers[1], out);
+            flush_run(&readers[1], out);
             return;
         }
         while (true) {
             MERGE_WITH_CACHE_FLUSH(
                 if (is_current_item_the_last_one(&readers[0])) {
-                    flush_first(&readers[1], out, i);
+                    flush_cache_and_run(&readers[1], out, i);
                     return;
                 },
                 {}
@@ -210,14 +208,14 @@ static void merge_full_space(struct reader readers[2], T __mram_ptr *out) {
                 mram_write(cache, out, i * sizeof(T));
                 out += i;
             }
-            flush_first_emptied_cache(&readers[0], out);
+            flush_run(&readers[0], out);
             return;
         }
         while (true) {
             MERGE_WITH_CACHE_FLUSH(
                 {},
                 if (is_current_item_the_last_one(&readers[1])) {
-                    flush_first(&readers[0], out, i);
+                    flush_cache_and_run(&readers[0], out, i);
                     return;
                 }
             );

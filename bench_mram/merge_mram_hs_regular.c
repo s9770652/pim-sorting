@@ -43,17 +43,16 @@ seqreader_t sr[NR_TASKLETS][2];  // sequential readers used to read runs
 #define UNROLLING_CACHE_SIZE (UNROLLING_CACHE_LENGTH << DIV)
 
 /**
- * @brief Flushes the first run in a pair of runs once the tail of the second one is reached.
- * This includes writing whatever is still in the cache to the MRAM
- * and copying whatever is still in the copy of the first run back to the input array.
+ * @brief Write whatever is still in the cache to the MRAM.
+ * If the given run is not depleted, copy its remainder from the MRAM to the output.
  * 
- * @param ptr The current buffer item of the first run.
- * @param from The MRAM address of the current item of the first run.
- * @param to The MRAM address of the last item of the first run.
+ * @param ptr The current buffer item of the run.
+ * @param from The MRAM address of the current item of the run.
+ * @param to The MRAM address of the last item of the run.
  * @param out Whither to flush.
  * @param i The number of items currently in the cache.
 **/
-static void flush_first(T const * const ptr, T __mram_ptr *from, T __mram_ptr const *to,
+static void flush_cache_and_run(T const * const ptr, T __mram_ptr *from, T __mram_ptr const *to,
         T __mram_ptr *out, size_t i) {
     T * const cache = buffers[me()].cache;
     (void)ptr;
@@ -86,8 +85,14 @@ static void flush_first(T const * const ptr, T __mram_ptr *from, T __mram_ptr co
     } while (from <= to);
 }
 
-static void flush_first_emptied_cache(T const * const ptr, T __mram_ptr *from,
-        T __mram_ptr const *to, T __mram_ptr *out) {
+/**
+ * @brief Copy the remainder of a run from the MRAM to the output.
+ * 
+ * @param from The MRAM address of the current item of the run.
+ * @param to The MRAM address of the last item of the run.
+ * @param out Whither to flush.
+**/
+static void flush_run(T __mram_ptr *from, T __mram_ptr const *to, T __mram_ptr *out) {
     T * const cache = buffers[me()].cache;
     /* Transfer from MRAM to MRAM. */
     do {
@@ -104,14 +109,13 @@ static void flush_first_emptied_cache(T const * const ptr, T __mram_ptr *from,
 }
 
 /**
- * @brief Flushes the second run in a pair of runs once the tail of the first one is reached.
- * This includes only writing whatever is still in the cache to the MRAM.
+ * @brief Write whatever is still in the cache to the MRAM.
  * 
- * @param ptr The current buffer item of the first second.
+ * @param ptr The current buffer item of the second.
  * @param out Whither to flush.
  * @param i The number of items currently in the cache.
 **/
-static void flush_second(T * const ptr, T __mram_ptr * const out, size_t i) {
+static void flush_cache(T * const ptr, T __mram_ptr * const out, size_t i) {
     T * const cache = buffers[me()].cache;
     (void)ptr;
 #ifdef UINT32
@@ -199,7 +203,7 @@ static void merge_half_space(T *ptr[2], T __mram_ptr * const ends[2], T __mram_p
         while (true) {
             MERGE_WITH_CACHE_FLUSH(
                 if (seqread_tell_straight(ptr[0], mram[0]) >= ends[0]) {
-                    flush_second(ptr[1], out, i);
+                    flush_cache(ptr[1], out, i);
                     return;
                 },
                 {}
@@ -215,14 +219,14 @@ static void merge_half_space(T *ptr[2], T __mram_ptr * const ends[2], T __mram_p
                 mram_write(cache, out, i * sizeof(T));
                 out += i;
             }
-            flush_first_emptied_cache(ptr[0], seqread_tell_straight(ptr[0], mram[0]), ends[0], out);
+            flush_run(seqread_tell_straight(ptr[0], mram[0]), ends[0], out);
             return;
         }
         while (true) {
             MERGE_WITH_CACHE_FLUSH(
                 {},
                 if (seqread_tell_straight(ptr[1], mram[1]) >= ends[1]) {
-                    flush_first(ptr[0], seqread_tell_straight(ptr[0], mram[0]), ends[0], out, i);
+                    flush_cache_and_run(ptr[0], seqread_tell_straight(ptr[0], mram[0]), ends[0], out, i);
                     return;
                 }
             );
