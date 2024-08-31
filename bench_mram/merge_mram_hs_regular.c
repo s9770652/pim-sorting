@@ -86,6 +86,23 @@ static void flush_first(T const * const ptr, T __mram_ptr *from, T __mram_ptr co
     } while (from <= to);
 }
 
+static void flush_first_emptied_cache(T const * const ptr, T __mram_ptr *from,
+        T __mram_ptr const *to, T __mram_ptr *out) {
+    T * const cache = buffers[me()].cache;
+    /* Transfer from MRAM to MRAM. */
+    do {
+        // Thanks to the dummy values, even for numbers smaller than `DMA_ALIGNMENT` bytes,
+        // there is no need to round the size up.
+        size_t const rem_size = (from + MAX_TRANSFER_LENGTH_TRIPLE > to)
+                ? (size_t)to - (size_t)from + sizeof(T)
+                : MAX_TRANSFER_SIZE_TRIPLE;
+        mram_read(from, cache, rem_size);
+        mram_write(cache, out, rem_size);
+        from += MAX_TRANSFER_LENGTH_TRIPLE;  // Value may be wrong for the last transfer …
+        out += MAX_TRANSFER_LENGTH_TRIPLE;  // … after which it is not needed anymore, however.
+    } while (from <= to);
+}
+
 /**
  * @brief Flushes the second run in a pair of runs once the tail of the first one is reached.
  * This includes only writing whatever is still in the cache to the MRAM.
@@ -119,22 +136,20 @@ static void flush_second(T * const ptr, T __mram_ptr * const out, size_t i) {
  * and calling the appropriate flushing function. May be an empty block
  * if it is known that the tail cannot be reached.
 **/
-#define UNROLLED_MERGE(flush_0, flush_1)                              \
-for (size_t j = 0; j < UNROLLING_CACHE_LENGTH / UNROLL_FACTOR; j++) { \
-    _Pragma("unroll")                                                 \
-    for (size_t k = 0; k < UNROLL_FACTOR; k++) {                      \
-        if (val[0] <= val[1]) {                                       \
-            cache[i++] = val[0];                                      \
-            flush_0;                                                  \
-            SEQREAD_GET_STRAIGHT(ptr[0], mram[0], wram[0]);           \
-            val[0] = *ptr[0];                                         \
-        } else {                                                      \
-            cache[i++] = val[1];                                      \
-            flush_1;                                                  \
-            SEQREAD_GET_STRAIGHT(ptr[1], mram[1], wram[1]);           \
-            val[1] = *ptr[1];                                         \
-        }                                                             \
-    }                                                                 \
+#define UNROLLED_MERGE(flush_0, flush_1)                \
+_Pragma("unroll")                                       \
+for (size_t k = 0; k < UNROLL_FACTOR; k++) {            \
+    if (val[0] <= val[1]) {                             \
+        cache[i++] = val[0];                            \
+        flush_0;                                        \
+        SEQREAD_GET_STRAIGHT(ptr[0], mram[0], wram[0]); \
+        val[0] = *ptr[0];                               \
+    } else {                                            \
+        cache[i++] = val[1];                            \
+        flush_1;                                        \
+        SEQREAD_GET_STRAIGHT(ptr[1], mram[1], wram[1]); \
+        val[1] = *ptr[1];                               \
+    }                                                   \
 }
 
 /**
@@ -150,9 +165,10 @@ for (size_t j = 0; j < UNROLLING_CACHE_LENGTH / UNROLL_FACTOR; j++) { \
 **/
 #define MERGE_WITH_CACHE_FLUSH(flush_0, flush_1) \
 UNROLLED_MERGE(flush_0, flush_1);                \
+if (i < UNROLLING_CACHE_LENGTH) continue;        \
 mram_write(cache, out, UNROLLING_CACHE_SIZE);    \
 i = 0;                                           \
-out += UNROLLING_CACHE_LENGTH;
+out += UNROLLING_CACHE_LENGTH
 
 /**
  * @brief Merges two MRAM runs. If the second run is depleted, the first one will not be flushed.
@@ -168,11 +184,16 @@ static void merge_half_space(T *ptr[2], T __mram_ptr * const ends[2], T __mram_p
     T val[2] = { *ptr[0], *ptr[1] };
     uintptr_t mram[2] = { sr[me()][0].mram_addr, sr[me()][1].mram_addr };
     if (*ends[0] <= *ends[1]) {
-        T __mram_ptr * const early_end = ends[0] - UNROLLING_CACHE_LENGTH;
+        T __mram_ptr * const early_end = ends[0] - UNROLL_FACTOR + 1;
         while (seqread_tell_straight(ptr[0], mram[0]) <= early_end) {
             MERGE_WITH_CACHE_FLUSH({}, {});
         }
         if (seqread_tell_straight(ptr[0], mram[0]) > ends[0]) {
+            // The previous loop was executend an even number of times.
+            // Since the first run is emptied and had a DMA-aligned length,
+            // `i * sizeof(T)` must also be DMA-aligned
+            if (i != 0)
+                mram_write(cache, out, i * sizeof(T));
             return;
         }
         while (true) {
@@ -185,13 +206,16 @@ static void merge_half_space(T *ptr[2], T __mram_ptr * const ends[2], T __mram_p
             );
         }
     } else {
-        T __mram_ptr * const early_end = ends[1] - UNROLLING_CACHE_LENGTH;
+        T __mram_ptr * const early_end = ends[1] - UNROLL_FACTOR + 1;
         while (seqread_tell_straight(ptr[1], mram[1]) <= early_end) {
             MERGE_WITH_CACHE_FLUSH({}, {});
         }
         if (seqread_tell_straight(ptr[1], mram[1]) > ends[1]) {
-            // I have no idea why this flush is more performant than its `emptied` variant.
-            flush_first(ptr[0], seqread_tell_straight(ptr[0], mram[0]), ends[0], out, i);
+            if (i != 0) {
+                mram_write(cache, out, i * sizeof(T));
+                out += i;
+            }
+            flush_first_emptied_cache(ptr[0], seqread_tell_straight(ptr[0], mram[0]), ends[0], out);
             return;
         }
         while (true) {
