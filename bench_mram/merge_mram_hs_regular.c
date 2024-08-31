@@ -162,12 +162,11 @@ out += UNROLLING_CACHE_LENGTH;
  * @param ends The last items of the two runs.
  * @param out Whither the merged runs are written.
 **/
-static void merge_half_space(T *ptr[2], T __mram_ptr * const ends[2], T __mram_ptr *out) {
+static void merge_half_space(T *ptr[2], T __mram_ptr * const ends[2], T __mram_ptr *out, seqreader_buffer_t wram[2]) {
     T * const cache = buffers[me()].cache;
     size_t i = 0;
     T val[2] = { *ptr[0], *ptr[1] };
     uintptr_t mram[2] = { sr[me()][0].mram_addr, sr[me()][1].mram_addr };
-    seqreader_buffer_t wram[2] = { sr[me()][0].wram_cache, sr[me()][1].wram_cache };
     if (*ends[0] <= *ends[1]) {
         T __mram_ptr * const early_end = ends[0] - UNROLLING_CACHE_LENGTH;
         while (seqread_tell_straight(ptr[0], mram[0]) <= early_end) {
@@ -218,6 +217,7 @@ static void merge_sort_half_space(T __mram_ptr * const start, T __mram_ptr * con
     form_starting_runs(start, end);
 
     /* Merging. */
+    seqreader_buffer_t wram[2] = { buffers[me()].seq_1, buffers[me()].seq_2 };
     size_t const n = end - start + 1;
     T __mram_ptr * const out = (T __mram_ptr *)((uintptr_t)output + (uintptr_t)start);
     for (size_t run_length = STARTING_RUN_LENGTH; run_length < n; run_length *= 2) {
@@ -237,7 +237,7 @@ static void merge_sort_half_space(T __mram_ptr * const start, T __mram_ptr * con
                 seqread_init_straight(buffers[me()].seq_1, out, &sr[me()][0]),
                 seqread_init_straight(buffers[me()].seq_2, run_1_end + 1, &sr[me()][1]),
             };
-            merge_half_space(ptr, ends, run_1_start);
+            merge_half_space(ptr, ends, run_1_start, wram);
         }
     }
 }

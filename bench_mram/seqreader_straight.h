@@ -49,26 +49,24 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * Since it is never used, it was combined with `seqread_init`.
  * 
  * @param cache The WRAM buffer of the sequential reader.
- * @param mram_addr The first MRAM address to read.
+ * @param mram The first MRAM address to read.
  * @param reader The reader to initialise.
  * 
  * @return The WRAM buffer address of the first MRAM item.
 **/
-T *seqread_init_straight(seqreader_buffer_t cache, void __mram_ptr *mram_addr, seqreader_t *reader) {
-    reader->wram_cache = cache;
+T *seqread_init_straight(seqreader_buffer_t cache, void __mram_ptr *mram, seqreader_t *reader) {
     reader->mram_addr = (uintptr_t)(1 << __DPU_MRAM_SIZE_LOG2);
 
-    uintptr_t target_addr = (uintptr_t)mram_addr;
+    uintptr_t target_addr = (uintptr_t)mram;
     uintptr_t current_addr = (uintptr_t)reader->mram_addr;
-    uintptr_t wram_cache = (uintptr_t)reader->wram_cache;
     uintptr_t mram_offset = target_addr - current_addr;
     if ((mram_offset & PAGE_IDX_MASK) != 0) {
         uintptr_t target_addr_idx_page = target_addr & PAGE_IDX_MASK;
-        mram_read((void __mram_ptr *)(target_addr_idx_page), (void *)(wram_cache), PAGE_SIZE);
+        mram_read((void __mram_ptr *)(target_addr_idx_page), (void *)(cache), PAGE_SIZE);
         mram_offset = target_addr & PAGE_OFF_MASK;
         reader->mram_addr = target_addr_idx_page;
     }
-    return (T *)(mram_offset + wram_cache);
+    return (T *)(mram_offset + cache);
 }
 
 /**
