@@ -50,10 +50,9 @@ static_assert(
 
 /**
  * @brief Write whatever is still in the cache to the MRAM.
- * If the given run is not depleted, copy its remainder from the MRAM to the output.
- * @todo Flush whatever is in the reader?
+ * If the given run is not depleted, copy its remainder to the output.
  * 
- * @param reader A reader on the first run.
+ * @param reader A reader on the run.
  * @param out Whither to flush.
  * @param i The number of items currently in the cache.
 **/
@@ -69,14 +68,22 @@ static void flush_cache_and_run(struct reader * const reader, T __mram_ptr *out,
             mram_write(cache, out, i * sizeof(T));
             return;
         }
+        reader->ptr++;
         from++;
     }
 #endif
     mram_write(cache, out, i * sizeof(T));
     out += i;
 
+    size_t const rem_length = MIN(reader->last_item, reader->buffer_end) - reader->ptr + 1;
+    if (rem_length != 0) {
+        mram_write(reader->ptr, out, rem_length * sizeof(T));
+        from += rem_length;
+        out += rem_length;
+    }
+
     /* Transfer from MRAM to MRAM. */
-    do {
+    while (from <= reader->to) {
         // Thanks to the dummy values, even for numbers smaller than `DMA_ALIGNMENT` bytes,
         // there is no need to round the size up.
         size_t const rem_size = (from + MAX_TRANSFER_LENGTH_TRIPLE > reader->to)
@@ -86,20 +93,28 @@ static void flush_cache_and_run(struct reader * const reader, T __mram_ptr *out,
         mram_write(cache, out, rem_size);
         from += MAX_TRANSFER_LENGTH_TRIPLE;  // Value may be wrong for the last transfer …
         out += MAX_TRANSFER_LENGTH_TRIPLE;  // … after which it is not needed anymore, however.
-    } while (from <= reader->to);
+    };
 }
 
 /**
- * @brief Copy the remainder of a run from the MRAM to the output.
+ * @brief Copy the remainder of a run to the output.
  * 
- * @param reader A reader on the first run.
+ * @param reader A reader on the run.
  * @param out Whither to flush.
 **/
 static void flush_run(struct reader * const reader, T __mram_ptr *out) {
     T * const cache = buffers[me()].cache;
     T __mram_ptr *from = get_reader_mram_address(reader);
+
+    size_t const rem_length = MIN(reader->last_item, reader->buffer_end) - reader->ptr + 1;
+    if (rem_length != 0) {
+        mram_write(reader->ptr, out, rem_length * sizeof(T));
+        from += rem_length;
+        out += rem_length;
+    }
+
     /* Transfer from MRAM to MRAM. */
-    do {
+    while (from <= reader->to) {
         // Thanks to the dummy values, even for numbers smaller than `DMA_ALIGNMENT` bytes,
         // there is no need to round the size up.
         size_t const rem_size = (from + MAX_TRANSFER_LENGTH_TRIPLE > reader->to)
@@ -109,7 +124,7 @@ static void flush_run(struct reader * const reader, T __mram_ptr *out) {
         mram_write(cache, out, rem_size);
         from += MAX_TRANSFER_LENGTH_TRIPLE;  // Value may be wrong for the last transfer …
         out += MAX_TRANSFER_LENGTH_TRIPLE;  // … after which it is not needed anymore, however.
-    } while (from <= reader->to);
+    };
 }
 
 /**
