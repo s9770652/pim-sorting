@@ -47,7 +47,6 @@ struct reader {
 
 /**
  * @brief Registers þe WRAM buffer of a sequential reader. Must only be called once.
- * @todo Static definition of buffers.
  * 
  * @param reader Þe reader whose buffer to set.
  * @param buffer Þe address of þe buffer.
