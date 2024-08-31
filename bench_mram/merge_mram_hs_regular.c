@@ -32,6 +32,8 @@ triple_buffers buffers[NR_TASKLETS];
 struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input (in debug mode)
 struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the pivot
 
+seqreader_t sr[NR_TASKLETS][2];  // sequential readers used to read runs
+
 /// @brief How many items are merged in an unrolled fashion.
 #define UNROLL_FACTOR (16)
 /// @brief How many items the cache holds before they are written to the MRAM.
@@ -104,10 +106,6 @@ static void flush_second(T * const ptr, T __mram_ptr * const out, size_t i) {
     mram_write(cache, out, i * sizeof(T));
 }
 
-__mram_ptr T *seqread_tell_straight_(T *ptr, uintptr_t mram) {
-    return (__mram_ptr T *)(mram + ((uintptr_t)ptr & PAGE_OFF_MASK));
-}
-
 /**
  * @brief Merges the `UNROLLING_CACHE_LENGTH` least items in the current pair of runs.
  * @internal If one of the runs does not contain sufficiently many items anymore,
@@ -121,36 +119,22 @@ __mram_ptr T *seqread_tell_straight_(T *ptr, uintptr_t mram) {
  * and calling the appropriate flushing function. May be an empty block
  * if it is known that the tail cannot be reached.
 **/
-#define UNROLLED_MERGE(flush_0, flush_1)                                          \
-for (size_t j = 0; j < UNROLLING_CACHE_LENGTH / UNROLL_FACTOR; j++) {             \
-    _Pragma("unroll")                                                             \
-    for (size_t k = 0; k < UNROLL_FACTOR; k++) {                                  \
-        if (val[0] <= val[1]) {                                                   \
-            cache[i++] = val[0];                                                  \
-            flush_0;                                                              \
-            __asm__ volatile(                                                                                                \
-                "add %[ptr], %[ptr], 4, nc10, .+4\n"                                                                                     \
-                "add %[mram], %[mram], 1024\n"                                                                              \
-                "ldma %[wram], %[mram], 127\n"                                                                                            \
-                "add %[ptr], %[ptr], -1024"                                                                                    \
-                : "+r"(ptr[0]), "+r"(mram[0])                                                                                      \
-                : [ptr] "r"(ptr[0]), [mram] "r"(mram[0]), [wram] "r"(wram[0])                                                                                      \
-            );                                                                                          \
-            val[0] = *ptr[0]; \
-        } else {                                                                  \
-            cache[i++] = val[1];                                                  \
-            flush_1;                                                              \
-            __asm__ volatile(                                                                                                \
-                "add %[ptr], %[ptr], 4, nc10, .+4\n"                                                                                     \
-                "add %[mram], %[mram], 1024\n"                                                                              \
-                "ldma %[wram], %[mram], 127\n"                                                                                            \
-                "add %[ptr], %[ptr], -1024"                                                                                    \
-                : "+r"(ptr[1]), "+r"(mram[1])                                                                                      \
-                : [ptr] "r"(ptr[1]), [mram] "r"(mram[1]), [wram] "r"(wram[1])                                                                                      \
-            );                                                                                          \
-            val[1] = *ptr[1]; \
-        }                                                                         \
-    }                                                                             \
+#define UNROLLED_MERGE(flush_0, flush_1)                              \
+for (size_t j = 0; j < UNROLLING_CACHE_LENGTH / UNROLL_FACTOR; j++) { \
+    _Pragma("unroll")                                                 \
+    for (size_t k = 0; k < UNROLL_FACTOR; k++) {                      \
+        if (val[0] <= val[1]) {                                       \
+            cache[i++] = val[0];                                      \
+            flush_0;                                                  \
+            SEQREAD_GET_STRAIGHT(ptr[0], mram[0], wram[0]);           \
+            val[0] = *ptr[0];                                         \
+        } else {                                                      \
+            cache[i++] = val[1];                                      \
+            flush_1;                                                  \
+            SEQREAD_GET_STRAIGHT(ptr[1], mram[1], wram[1]);           \
+            val[1] = *ptr[1];                                         \
+        }                                                             \
+    }                                                                 \
 }
 
 /**
@@ -178,24 +162,23 @@ out += UNROLLING_CACHE_LENGTH;
  * @param ends The last items of the two runs.
  * @param out Whither the merged runs are written.
 **/
-static void merge_half_space(seqreader_t sr[2], T *ptr[2], T __mram_ptr * const ends[2],
-        T __mram_ptr *out) {
+static void merge_half_space(T *ptr[2], T __mram_ptr * const ends[2], T __mram_ptr *out) {
     T * const cache = buffers[me()].cache;
     size_t i = 0;
     T val[2] = { *ptr[0], *ptr[1] };
-    uintptr_t mram[2] = { sr[0].mram_addr, sr[1].mram_addr };
-    seqreader_buffer_t wram[2] = { sr[0].wram_cache, sr[1].wram_cache };
+    uintptr_t mram[2] = { sr[me()][0].mram_addr, sr[me()][1].mram_addr };
+    seqreader_buffer_t wram[2] = { sr[me()][0].wram_cache, sr[me()][1].wram_cache };
     if (*ends[0] <= *ends[1]) {
         T __mram_ptr * const early_end = ends[0] - UNROLLING_CACHE_LENGTH;
-        while (seqread_tell_straight_(ptr[0], mram[0]) <= early_end) {
+        while (seqread_tell_straight(ptr[0], mram[0]) <= early_end) {
             MERGE_WITH_CACHE_FLUSH({}, {});
         }
-        if (seqread_tell_straight_(ptr[0], mram[0]) > ends[0]) {
+        if (seqread_tell_straight(ptr[0], mram[0]) > ends[0]) {
             return;
         }
         while (true) {
             MERGE_WITH_CACHE_FLUSH(
-                if (seqread_tell_straight_(ptr[0], mram[0]) >= ends[0]) {
+                if (seqread_tell_straight(ptr[0], mram[0]) >= ends[0]) {
                     flush_second(ptr[1], out, i);
                     return;
                 },
@@ -204,19 +187,19 @@ static void merge_half_space(seqreader_t sr[2], T *ptr[2], T __mram_ptr * const 
         }
     } else {
         T __mram_ptr * const early_end = ends[1] - UNROLLING_CACHE_LENGTH;
-        while (seqread_tell_straight_(ptr[1], mram[1]) <= early_end) {
+        while (seqread_tell_straight(ptr[1], mram[1]) <= early_end) {
             MERGE_WITH_CACHE_FLUSH({}, {});
         }
-        if (seqread_tell_straight_(ptr[1], mram[1]) > ends[1]) {
+        if (seqread_tell_straight(ptr[1], mram[1]) > ends[1]) {
             // I have no idea why this flush is more performant than its `emptied` variant.
-            flush_first(ptr[0], seqread_tell_straight_(ptr[0], mram[0]), ends[0], out, i);
+            flush_first(ptr[0], seqread_tell_straight(ptr[0], mram[0]), ends[0], out, i);
             return;
         }
         while (true) {
             MERGE_WITH_CACHE_FLUSH(
                 {},
-                if (seqread_tell_straight_(ptr[1], mram[1]) >= ends[1]) {
-                    flush_first(ptr[0], seqread_tell_straight_(ptr[0], mram[0]), ends[0], out, i);
+                if (seqread_tell_straight(ptr[1], mram[1]) >= ends[1]) {
+                    flush_first(ptr[0], seqread_tell_straight(ptr[0], mram[0]), ends[0], out, i);
                     return;
                 }
             );
@@ -235,7 +218,6 @@ static void merge_sort_half_space(T __mram_ptr * const start, T __mram_ptr * con
     form_starting_runs(start, end);
 
     /* Merging. */
-    seqreader_t sr[2];
     size_t const n = end - start + 1;
     T __mram_ptr * const out = (T __mram_ptr *)((uintptr_t)output + (uintptr_t)start);
     for (size_t run_length = STARTING_RUN_LENGTH; run_length < n; run_length *= 2) {
@@ -252,10 +234,10 @@ static void merge_sort_half_space(T __mram_ptr * const start, T __mram_ptr * con
             // … and merge the copy with the next run.
             T __mram_ptr * const ends[2] = { out + (run_1_end - run_1_start), run_2_end };
             T *ptr[2] = {
-                seqread_init_straight(buffers[me()].seq_1, out, &sr[0]),
-                seqread_init_straight(buffers[me()].seq_2, run_1_end + 1, &sr[1]),
+                seqread_init_straight(buffers[me()].seq_1, out, &sr[me()][0]),
+                seqread_init_straight(buffers[me()].seq_2, run_1_end + 1, &sr[me()][1]),
             };
-            merge_half_space(sr, ptr, ends, run_1_start);
+            merge_half_space(ptr, ends, run_1_start);
         }
     }
 }
