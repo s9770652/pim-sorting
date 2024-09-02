@@ -38,7 +38,7 @@ seqreader_t sr[NR_TASKLETS][2];  // sequential readers used to read runs
 #define UNROLL_FACTOR (16)
 /// @brief How many items the cache holds before they are written to the MRAM.
 /// @internal Despite the unrolling, medium sizes are worse than the maximum size.
-#define UNROLLING_CACHE_LENGTH (MIN(256, MAX_TRANSFER_LENGTH_CACHE) / UNROLL_FACTOR * UNROLL_FACTOR)
+#define UNROLLING_CACHE_LENGTH (MAX_TRANSFER_LENGTH_CACHE / UNROLL_FACTOR * UNROLL_FACTOR)
 /// @brief How many bytes the items the cache holds before they are written to the MRAM have.
 #define UNROLLING_CACHE_SIZE (UNROLLING_CACHE_LENGTH << DIV)
 
