@@ -41,6 +41,21 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define PAGE_SIZE (2 * SEQREAD_CACHE_SIZE)
 #define PAGE_OFF_MASK (PAGE_SIZE - 1)
 #define PAGE_IDX_MASK (~PAGE_OFF_MASK)
+#if (PAGE_SIZE == 2048)
+#define CARRY_FLAG "nc11"
+#elif (PAGE_SIZE == 1024)
+#define CARRY_FLAG "nc10"
+#elif (PAGE_SIZE == 512)
+#define CARRY_FLAG "nc9"
+#elif (PAGE_SIZE == 256)
+#define CARRY_FLAG "nc8"
+#elif (PAGE_SIZE == 128)
+#define CARRY_FLAG "nc7"
+#elif (PAGE_SIZE == 64)
+#define CARRY_FLAG "nc6"
+#elif (PAGE_SIZE == 32)
+#define CARRY_FLAG "nc5"
+#endif
 
 /**
  * @brief Equivalent to `seqread_init`.
@@ -88,17 +103,24 @@ T __mram_ptr *seqread_tell_straight(T *ptr, uintptr_t mram) {
  * @brief Equivalent to `seqreader_get`.
  * Advances the pointer to the current item and reloads if needed.
  * @attention This is a macro, not a function!
+ * @internal
+ * 1. Advance pointer and performs bounds check. If negative, skip over the next three lines.
+ * 2. Increase the MRAM address.
+ * 3. Load the new data.
+ * 4. Reset the pointer.
  * 
  * @param ptr The *identifier* of the pointer to the current item.
  * @param mram The *identifier* of the MRAM address of the respective reader.
  * @param wram The *identifier* of the WRAM address of the respective reader.
 **/
-#define SEQREAD_GET_STRAIGHT(ptr, mram, wram)    \
-__asm__ volatile(                                \
-    "add %[p], %[p], 4, nc10, .+4\n"             \
-    "add %[m], %[m], 1024\n"                     \
-    "ldma %[w], %[m], 127\n"                     \
-    "add %[p], %[p], -1024"                      \
-    : "+r"(ptr), "+r"(mram)                      \
-    : [p] "r"(ptr), [m] "r"(mram), [w] "r"(wram) \
+#define SEQREAD_GET_STRAIGHT(ptr, mram, wram)                \
+__asm__ volatile(                                            \
+    "add %[p], %[p], 1 << "__STR(DIV)", "CARRY_FLAG", .+4\n" \
+    "add %[m], %[m], "__STR(PAGE_SIZE)"\n"                   \
+    "ldma %[w], %[m], "__STR(PAGE_SIZE)"/8 - 1\n"            \
+    "add %[p], %[p], -"__STR(PAGE_SIZE)                      \
+    : "+r"(ptr), "+r"(mram)                                  \
+    : [p] "r"(ptr), [m] "r"(mram), [w] "r"(wram)             \
 )
+
+#undef CARRY_FlAG
