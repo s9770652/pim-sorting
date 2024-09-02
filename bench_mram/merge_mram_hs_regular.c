@@ -190,17 +190,18 @@ out += UNROLLING_CACHE_LENGTH
  * @param ends The last items of the two runs.
  * @param out Whither the merged runs are written.
 **/
-static void merge_half_space(T *ptr[2], T __mram_ptr * const ends[2], T __mram_ptr *out, seqreader_buffer_t wram[2]) {
+static void merge_half_space(T *ptr[2], T __mram_ptr * const ends[2], T __mram_ptr *out,
+        seqreader_buffer_t wram[2]) {
     T * const cache = buffers[me()].cache;
     size_t i = 0;
     T val[2] = { *ptr[0], *ptr[1] };
     uintptr_t mram[2] = { sr[me()][0].mram_addr, sr[me()][1].mram_addr };
     if (*ends[0] <= *ends[1]) {
         T __mram_ptr * const early_end = ends[0] - UNROLL_FACTOR + 1;
-        while (seqread_tell_straight(ptr[0], mram[0]) <= early_end) {
+        while (seqread_tell_straight(ptr[0], mram[0], wram[0]) <= early_end) {
             MERGE_WITH_CACHE_FLUSH({}, {});
         }
-        if (seqread_tell_straight(ptr[0], mram[0]) > ends[0]) {
+        if (seqread_tell_straight(ptr[0], mram[0], wram[0]) > ends[0]) {
             // The previous loop was executend an even number of times.
             // Since the first run is emptied and had a DMA-aligned length,
             // `i * sizeof(T)` must also be DMA-aligned
@@ -210,7 +211,7 @@ static void merge_half_space(T *ptr[2], T __mram_ptr * const ends[2], T __mram_p
         }
         while (true) {
             MERGE_WITH_CACHE_FLUSH(
-                if (seqread_tell_straight(ptr[0], mram[0]) >= ends[0]) {
+                if (seqread_tell_straight(ptr[0], mram[0], wram[0]) >= ends[0]) {
                     flush_cache(ptr[1], out, i);
                     return;
                 },
@@ -219,22 +220,28 @@ static void merge_half_space(T *ptr[2], T __mram_ptr * const ends[2], T __mram_p
         }
     } else {
         T __mram_ptr * const early_end = ends[1] - UNROLL_FACTOR + 1;
-        while (seqread_tell_straight(ptr[1], mram[1]) <= early_end) {
+        while (seqread_tell_straight(ptr[1], mram[1], wram[1]) <= early_end) {
             MERGE_WITH_CACHE_FLUSH({}, {});
         }
-        if (seqread_tell_straight(ptr[1], mram[1]) > ends[1]) {
+        if (seqread_tell_straight(ptr[1], mram[1], wram[1]) > ends[1]) {
             if (i != 0) {
                 mram_write(cache, out, i * sizeof(T));
                 out += i;
             }
-            flush_run(seqread_tell_straight(ptr[0], mram[0]), ends[0], out);
+            flush_run(seqread_tell_straight(ptr[0], mram[0], wram[0]), ends[0], out);
             return;
         }
         while (true) {
             MERGE_WITH_CACHE_FLUSH(
                 {},
-                if (seqread_tell_straight(ptr[1], mram[1]) >= ends[1]) {
-                    flush_cache_and_run(ptr[0], seqread_tell_straight(ptr[0], mram[0]), ends[0], out, i);
+                if (seqread_tell_straight(ptr[1], mram[1], wram[1]) >= ends[1]) {
+                    flush_cache_and_run(
+                        ptr[0],
+                        seqread_tell_straight(ptr[0], mram[0], wram[0]),
+                        ends[0],
+                        out,
+                        i
+                    );
                     return;
                 }
             );
