@@ -81,12 +81,13 @@ static void flush_cache_and_run(struct reader * const reader, T __mram_ptr *out,
     }
 
     /* Transfer from MRAM to MRAM. */
+    size_t rem_size = MAX_TRANSFER_SIZE_TRIPLE;
     while (from <= reader->to) {
         // Thanks to the dummy values, even for numbers smaller than `DMA_ALIGNMENT` bytes,
         // there is no need to round the size up.
-        size_t const rem_size = (from + MAX_TRANSFER_LENGTH_TRIPLE > reader->to)
-                ? (size_t)reader->to - (size_t)from + sizeof(T)
-                : MAX_TRANSFER_SIZE_TRIPLE;
+        if (from + MAX_TRANSFER_LENGTH_TRIPLE > reader->to) {
+            rem_size = (size_t)reader->to - (size_t)from + sizeof(T);
+        }
         mram_read(from, cache, rem_size);
         mram_write(cache, out, rem_size);
         from += MAX_TRANSFER_LENGTH_TRIPLE;  // Value may be wrong for the last transfer …
@@ -112,12 +113,13 @@ static void flush_run(struct reader * const reader, T __mram_ptr *out) {
     }
 
     /* Transfer from MRAM to MRAM. */
+    size_t rem_size = MAX_TRANSFER_SIZE_TRIPLE;
     while (from <= reader->to) {
         // Thanks to the dummy values, even for numbers smaller than `DMA_ALIGNMENT` bytes,
         // there is no need to round the size up.
-        size_t const rem_size = (from + MAX_TRANSFER_LENGTH_TRIPLE > reader->to)
-                ? (size_t)reader->to - (size_t)from + sizeof(T)
-                : MAX_TRANSFER_SIZE_TRIPLE;
+        if (from + MAX_TRANSFER_LENGTH_TRIPLE > reader->to) {
+            rem_size = (size_t)reader->to - (size_t)from + sizeof(T);
+        }
         mram_read(from, cache, rem_size);
         mram_write(cache, out, rem_size);
         from += MAX_TRANSFER_LENGTH_TRIPLE;  // Value may be wrong for the last transfer …
