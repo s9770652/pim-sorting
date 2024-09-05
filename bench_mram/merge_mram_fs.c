@@ -37,7 +37,6 @@ static bool flipped[NR_TASKLETS];  // Whether a write-back from the auxiliary ar
 /// @brief How many items are merged in an unrolled fashion.
 #define UNROLL_FACTOR (6)
 /// @brief How many items the cache holds before they are written to the MRAM.
-/// @internal Due to the unrolling, medium sizes are better than the maximum size.
 #define MAX_FILL_LENGTH (MAX_TRANSFER_LENGTH_CACHE / UNROLL_FACTOR * UNROLL_FACTOR)
 /// @brief How many bytes the items the cache holds before they are written to the MRAM have.
 #define MAX_FILL_SIZE (MAX_FILL_LENGTH << DIV)

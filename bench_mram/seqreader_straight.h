@@ -33,7 +33,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * to get everything straight away without function calls.
 **/
 
-#include <dpuconst.h>
+#ifndef __SEQREADER_STRAIGHT_H_
+#define __SEQREADER_STRAIGHT_H_
+
 #include <seqread.h>
 
 #include "common.h"
@@ -118,3 +120,5 @@ __asm__ volatile(                                            \
 )
 
 #undef CARRY_FlAG
+
+#endif  // __SEQREADER_STRAIGHT_H_
