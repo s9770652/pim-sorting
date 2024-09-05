@@ -40,7 +40,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "common.h"
 
-#if STRAIGHT_READER
+#define READ_OPT 1
+#define READ_STRAIGHT 2
+#define READ_REGULAR 3
+
+#if (STRAIGHT_READER == READ_OPT)
 
 #define PAGE_SIZE (2 * SEQREAD_CACHE_SIZE)
 #define PAGE_OFF_MASK (PAGE_SIZE - 1)
@@ -127,7 +131,47 @@ __asm__ volatile(                                            \
 
 #undef CARRY_FlAG
 
-#else  // STRAIGHT_READER
+#elif (STRAIGHT_READER == READ_STRAIGHT)
+
+#include <mram.h>
+#include <dpuconst.h>
+#include <dpuruntime.h>
+#include <atomic_bit.h>
+#include <stddef.h>
+
+#define PAGE_SIZE (SEQREAD_CACHE_SIZE)
+#define PAGE_ALLOC_SIZE (2 * PAGE_SIZE)
+#define PAGE_OFF_MASK (PAGE_SIZE - 1)
+#define PAGE_IDX_MASK (~PAGE_OFF_MASK)
+
+#define MRAM_READ_PAGE(from, to) mram_read((__mram_ptr void *)(from), (void *)(to), PAGE_ALLOC_SIZE)
+
+T *sr_init(seqreader_buffer_t cache, __mram_ptr void *mram_addr, seqreader_t *reader) {
+    reader->wram_cache = cache;
+    reader->mram_addr = (uintptr_t)(1 << __DPU_MRAM_SIZE_LOG2);
+
+    uintptr_t target_addr = (uintptr_t)mram_addr;
+    uintptr_t current_addr = (uintptr_t)reader->mram_addr;
+    uintptr_t wram_cache = (uintptr_t)reader->wram_cache;
+    uintptr_t mram_offset = target_addr - current_addr;
+    if ((mram_offset & PAGE_IDX_MASK) != 0) {
+        uintptr_t target_addr_idx_page = target_addr & PAGE_IDX_MASK;
+        MRAM_READ_PAGE(target_addr_idx_page, wram_cache);
+        mram_offset = target_addr & PAGE_OFF_MASK;
+        reader->mram_addr = target_addr_idx_page;
+    }
+    return (T *)(mram_offset + wram_cache);
+}
+
+T __mram_ptr *sr_tell(void *ptr, seqreader_t *reader, uintptr_t mram, seqreader_buffer_t wram) {
+    (void)mram, (void)wram;
+    return (__mram_ptr void *)((uintptr_t)reader->mram_addr + ((uintptr_t)ptr & PAGE_OFF_MASK));
+}
+
+#define SR_GET(ptr, reader, mram, wram)                                        \
+ptr = (T *)__builtin_dpu_seqread_get((uintptr_t)ptr, sizeof(T), reader, PAGE_SIZE);
+
+#elif (STRAIGHT_READER == READ_REGULAR)
 
 /**
  * @brief Equivalent to `seqread_init`.
@@ -168,6 +212,6 @@ T __mram_ptr *sr_tell(void *ptr, seqreader_t *reader, uintptr_t mram, seqreader_
 **/
 #define SR_GET(ptr, reader, mram, wram) ptr = seqread_get(ptr, sizeof(T), reader)
 
-#endif  // STRAIGHT_READER
+#endif  // STRAIGHT_READER == READ_REGULAR
 
 #endif  // _READER_STRAIGHT_H_
