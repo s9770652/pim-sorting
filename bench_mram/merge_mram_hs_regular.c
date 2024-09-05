@@ -38,9 +38,9 @@ seqreader_t sr[NR_TASKLETS][2];  // sequential readers used to read runs
 #define UNROLL_FACTOR (16)
 /// @brief How many items the cache holds before they are written to the MRAM.
 /// @internal Despite the unrolling, medium sizes are worse than the maximum size.
-#define UNROLLING_CACHE_LENGTH (MAX_TRANSFER_LENGTH_CACHE / UNROLL_FACTOR * UNROLL_FACTOR)
+#define MAX_FILL_LENGTH (MAX_TRANSFER_LENGTH_CACHE / UNROLL_FACTOR * UNROLL_FACTOR)
 /// @brief How many bytes the items the cache holds before they are written to the MRAM have.
-#define UNROLLING_CACHE_SIZE (UNROLLING_CACHE_LENGTH << DIV)
+#define MAX_FILL_SIZE (MAX_FILL_LENGTH << DIV)
 
 static_assert(
     UNROLL_FACTOR * sizeof(T) == DMA_ALIGNED(UNROLL_FACTOR * sizeof(T)),
@@ -136,7 +136,7 @@ static void flush_cache(T * const ptr, T __mram_ptr * const out, size_t i) {
 }
 
 /**
- * @brief Merges the `UNROLLING_CACHE_LENGTH` least items in the current pair of runs.
+ * @brief Merges the `MAX_FILL_LENGTH` least items in the current pair of runs.
  * @internal If one of the runs does not contain sufficiently many items anymore,
  * bounds checks on both runs occur with each itemal merge. The reason is that
  * the unrolling everywhere makes the executable too big if the check is more fine-grained.
@@ -165,7 +165,7 @@ for (size_t k = 0; k < UNROLL_FACTOR; k++) {            \
 }
 
 /**
- * @brief Merges the `UNROLLING_CACHE_LENGTH` least items in the current pair of runs and
+ * @brief Merges the `MAX_FILL_LENGTH` least items in the current pair of runs and
  * writes them to the MRAM.
  * 
  * @param flush_0 An if block checking whether the tail of the first run is reached
@@ -177,10 +177,10 @@ for (size_t k = 0; k < UNROLL_FACTOR; k++) {            \
 **/
 #define MERGE_WITH_CACHE_FLUSH(flush_0, flush_1) \
 UNROLLED_MERGE(flush_0, flush_1);                \
-if (i < UNROLLING_CACHE_LENGTH) continue;        \
-mram_write(cache, out, UNROLLING_CACHE_SIZE);    \
+if (i < MAX_FILL_LENGTH) continue;               \
+mram_write(cache, out, MAX_FILL_SIZE);           \
 i = 0;                                           \
-out += UNROLLING_CACHE_LENGTH
+out += MAX_FILL_LENGTH
 
 /**
  * @brief Merges two MRAM runs. If the second run is depleted, the first one will not be flushed.
