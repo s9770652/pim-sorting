@@ -153,12 +153,12 @@ for (size_t k = 0; k < UNROLL_FACTOR; k++) {            \
     if (val[0] <= val[1]) {                             \
         cache[i++] = val[0];                            \
         flush_0;                                        \
-        SEQREAD_GET_STRAIGHT(ptr[0], mram[0], wram[0]); \
+        SR_GET(ptr[0], &sr[me()][0], mram[0], wram[0]); \
         val[0] = *ptr[0];                               \
     } else {                                            \
         cache[i++] = val[1];                            \
         flush_1;                                        \
-        SEQREAD_GET_STRAIGHT(ptr[1], mram[1], wram[1]); \
+        SR_GET(ptr[1], &sr[me()][1], mram[1], wram[1]); \
         val[1] = *ptr[1];                               \
     }                                                   \
 }
@@ -197,10 +197,10 @@ static void merge_half_space(T *ptr[2], T __mram_ptr * const ends[2], T __mram_p
     uintptr_t mram[2] = { sr[me()][0].mram_addr, sr[me()][1].mram_addr };
     if (*ends[0] <= *ends[1]) {
         T __mram_ptr * const early_end = ends[0] - UNROLL_FACTOR + 1;
-        while (seqread_tell_straight(ptr[0], mram[0], wram[0]) <= early_end) {
+        while (sr_tell(ptr[0], &sr[me()][0], mram[0], wram[0]) <= early_end) {
             MERGE_WITH_CACHE_FLUSH({}, {});
         }
-        if (seqread_tell_straight(ptr[0], mram[0], wram[0]) > ends[0]) {
+        if (sr_tell(ptr[0], &sr[me()][0], mram[0], wram[0]) > ends[0]) {
             // The previous loop was executend an even number of times.
             // Since the first run is emptied and had a DMA-aligned length,
             // `i * sizeof(T)` must also be DMA-aligned
@@ -210,7 +210,7 @@ static void merge_half_space(T *ptr[2], T __mram_ptr * const ends[2], T __mram_p
         }
         while (true) {
             MERGE_WITH_CACHE_FLUSH(
-                if (seqread_tell_straight(ptr[0], mram[0], wram[0]) >= ends[0]) {
+                if (sr_tell(ptr[0], &sr[me()][0], mram[0], wram[0]) >= ends[0]) {
                     flush_cache(ptr[1], out, i);
                     return;
                 },
@@ -219,24 +219,24 @@ static void merge_half_space(T *ptr[2], T __mram_ptr * const ends[2], T __mram_p
         }
     } else {
         T __mram_ptr * const early_end = ends[1] - UNROLL_FACTOR + 1;
-        while (seqread_tell_straight(ptr[1], mram[1], wram[1]) <= early_end) {
+        while (sr_tell(ptr[1], &sr[me()][1], mram[1], wram[1]) <= early_end) {
             MERGE_WITH_CACHE_FLUSH({}, {});
         }
-        if (seqread_tell_straight(ptr[1], mram[1], wram[1]) > ends[1]) {
+        if (sr_tell(ptr[1], &sr[me()][1], mram[1], wram[1]) > ends[1]) {
             if (i != 0) {
                 mram_write(cache, out, i * sizeof(T));
                 out += i;
             }
-            flush_run(seqread_tell_straight(ptr[0], mram[0], wram[0]), ends[0], out);
+            flush_run(sr_tell(ptr[0], &sr[me()][0], mram[0], wram[0]), ends[0], out);
             return;
         }
         while (true) {
             MERGE_WITH_CACHE_FLUSH(
                 {},
-                if (seqread_tell_straight(ptr[1], mram[1], wram[1]) >= ends[1]) {
+                if (sr_tell(ptr[1], &sr[me()][1], mram[1], wram[1]) >= ends[1]) {
                     flush_cache_and_run(
                         ptr[0],
-                        seqread_tell_straight(ptr[0], mram[0], wram[0]),
+                        sr_tell(ptr[0], &sr[me()][0], mram[0], wram[0]),
                         ends[0],
                         out,
                         i
@@ -276,8 +276,8 @@ static void merge_sort_half_space(T __mram_ptr * const start, T __mram_ptr * con
             // … and merge the copy with the next run.
             T __mram_ptr * const ends[2] = { out + (run_1_end - run_1_start), run_2_end };
             T *ptr[2] = {
-                seqread_init_straight(buffers[me()].seq_1, out, &sr[me()][0]),
-                seqread_init_straight(buffers[me()].seq_2, run_1_end + 1, &sr[me()][1]),
+                sr_init(buffers[me()].seq_1, out, &sr[me()][0]),
+                sr_init(buffers[me()].seq_2, run_1_end + 1, &sr[me()][1]),
             };
             merge_half_space(ptr, ends, run_1_start, wram);
         }

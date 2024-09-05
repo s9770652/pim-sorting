@@ -21,6 +21,7 @@ PIVOT ?= MEDIAN_OF_RANDOM
 PARTITION_PRIO ?= RIGHT
 RECURSIVE ?= false
 MERGE_THRESHOLD ?= 14
+STRAIGHT_READER ?= true
 
 # A file whose name reflects the set constants.
 define conf_filename

@@ -33,12 +33,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * to get everything straight away without function calls.
 **/
 
-#ifndef __SEQREADER_STRAIGHT_H_
-#define __SEQREADER_STRAIGHT_H_
+#ifndef _SEQREADER_STRAIGHT_H_
+#define _SEQREADER_STRAIGHT_H_
 
 #include <seqread.h>
 
 #include "common.h"
+
+#if STRAIGHT_READER
 
 #define PAGE_SIZE (2 * SEQREAD_CACHE_SIZE)
 #define PAGE_OFF_MASK (PAGE_SIZE - 1)
@@ -74,7 +76,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
  * @return The WRAM buffer address of the first MRAM item.
 **/
-T *seqread_init_straight(seqreader_buffer_t cache, void __mram_ptr *mram, seqreader_t *reader) {
+T *sr_init(seqreader_buffer_t cache, void __mram_ptr *mram, seqreader_t *reader) {
     reader->mram_addr = (uintptr_t)mram;
     mram_read((void __mram_ptr *)reader->mram_addr, (void *)cache, PAGE_SIZE);
     return (T *)cache;
@@ -87,11 +89,14 @@ T *seqread_init_straight(seqreader_buffer_t cache, void __mram_ptr *mram, seqrea
  * which now serve only for initialisation purposes.
  * 
  * @param ptr The pointer to the item in the buffer.
+ * @param reader (unused)
  * @param mram The current MRAM address of the reader of the address.
+ * @param wram The beginning of the buffer of the respective reader.
  * 
  * @return The MRAM address of the given item.
 **/
-T __mram_ptr *seqread_tell_straight(T *ptr, uintptr_t mram, seqreader_buffer_t wram) {
+T __mram_ptr *sr_tell(T *ptr, seqreader_t *reader, uintptr_t mram, seqreader_buffer_t wram) {
+    (void)reader;
     return (T __mram_ptr *)(mram + ((uintptr_t)ptr - wram));
 }
 
@@ -106,10 +111,11 @@ T __mram_ptr *seqread_tell_straight(T *ptr, uintptr_t mram, seqreader_buffer_t w
  * 4. Reset the pointer.
  * 
  * @param ptr The *identifier* of the pointer to the current item.
+ * @param reader (unused)
  * @param mram The *identifier* of the MRAM address of the respective reader.
  * @param wram The *identifier* of the WRAM address of the respective reader.
 **/
-#define SEQREAD_GET_STRAIGHT(ptr, mram, wram)                \
+#define SR_GET(ptr, reader, mram, wram)                      \
 __asm__ volatile(                                            \
     "add %[p], %[p], 1 << "__STR(DIV)", "CARRY_FLAG", .+4\n" \
     "add %[m], %[m], "__STR(PAGE_SIZE)"\n"                   \
@@ -121,4 +127,47 @@ __asm__ volatile(                                            \
 
 #undef CARRY_FlAG
 
-#endif  // __SEQREADER_STRAIGHT_H_
+#else  // STRAIGHT_READER
+
+/**
+ * @brief Equivalent to `seqread_init`.
+ * 
+ * @param cache The WRAM buffer of the sequential reader.
+ * @param mram The first MRAM address to read.
+ * @param reader The reader to initialise.
+ * 
+ * @return The WRAM buffer address of the first MRAM item.
+**/
+T *sr_init(seqreader_buffer_t cache, void __mram_ptr *mram, seqreader_t *reader) {
+    return seqread_init(cache, mram, reader);
+}
+
+/**
+ * @brief Equivalent to `seqreader_tell`.
+ * 
+ * @param ptr The pointer to the item in the buffer.
+ * @param reader The reader of the respective item.
+ * @param mram (unused)
+ * @param wram (unused)
+ * 
+ * @return The MRAM address of the given item.
+**/
+T __mram_ptr *sr_tell(void *ptr, seqreader_t *reader, uintptr_t mram, seqreader_buffer_t wram) {
+    (void)mram, (void)wram;
+    return seqread_tell(ptr, reader);
+}
+
+/**
+ * @brief Equivalent to `ptr = seqreader_get(…)`.
+ * @attention This is a macro, not a function!
+ * 
+ * @param ptr The *identifier* of the pointer to the current item.
+ * @param reader The *address* of reader of the respective item.
+ * @param mram (unused)
+ * @param wram (unused)
+**/
+#define SR_GET(ptr, reader, mram, wram) ptr = seqread_get(ptr, sizeof(T), reader)
+
+#endif  // STRAIGHT_READER
+
+#endif  // _SEQREADER_STRAIGHT_H_
