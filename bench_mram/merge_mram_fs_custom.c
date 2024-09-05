@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Measuring runtimes of a half-space MergeSort (sequential, MRAM, custom readers).
+ * @brief Measuring runtimes of a full-space MergeSort (sequential, MRAM, custom readers).
 **/
 
 #include <assert.h>
@@ -21,7 +21,7 @@
 #include "random_generator.h"
 
 #include "merge_mram.h"
-#include "reader.h"
+#include "reader_custom.h"
 
 struct dpu_arguments __host host_to_dpu;
 struct dpu_results __host dpu_to_host;
@@ -32,8 +32,10 @@ triple_buffers buffers[NR_TASKLETS];
 struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input (in debug mode)
 struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the pivot
 
+static bool flipped[NR_TASKLETS];  // Whether a write-back from the auxiliary array is (not) needed.
+
 /// @brief How many items are merged in an unrolled fashion.
-#define UNROLL_FACTOR (8)
+#define UNROLL_FACTOR (6)
 /// @brief How many items the cache holds before they are written to the MRAM.
 #define MAX_FILL_LENGTH (MAX_TRANSFER_LENGTH_CACHE / UNROLL_FACTOR * UNROLL_FACTOR)
 /// @brief How many bytes the items the cache holds before they are written to the MRAM have.
@@ -127,26 +129,6 @@ static void flush_run(struct reader * const reader, T __mram_ptr *out) {
 }
 
 /**
- * @brief Write whatever is still in the cache to the MRAM.
- * 
- * @param reader A reader on the run.
- * @param out Whither to flush.
- * @param i The number of items currently in the cache.
-**/
-static void flush_cache(struct reader * const reader, T __mram_ptr * const out, size_t i) {
-    T * const cache = buffers[me()].cache;
-    (void)reader;
-    /* Transfer cache to MRAM. */
-#ifdef UINT32
-    if (i & 1) {  // Is there need for alignment?
-        // This is easily possible since the non-depleted run must have at least one more item.
-        cache[i++] = get_reader_value(reader);
-    }
-#endif
-    mram_write(cache, out, i * sizeof(T));
-}
-
-/**
  * @brief Merges the `MAX_FILL_LENGTH` least items in the current pair of runs.
  * @internal If one of the runs does not contain sufficiently many items anymore,
  * bounds checks on both runs occur with each itemal merge. The reason is that
@@ -212,7 +194,7 @@ out += MAX_FILL_LENGTH
  * @param readers A pair of readers on the runs
  * @param out Whither the merged runs are written.
 **/
-static void merge_half_space(struct reader readers[2], T __mram_ptr *out) {
+static void merge_full_space(struct reader readers[2], T __mram_ptr *out) {
     T * const cache = buffers[me()].cache;
     size_t i = 0;
     if (*readers[0].to <= *readers[1].to) {
@@ -223,14 +205,17 @@ static void merge_half_space(struct reader readers[2], T __mram_ptr *out) {
             // The previous loop was executend an even number of times.
             // Since the first run is emptied and had a DMA-aligned length,
             // `i * sizeof(T)` must also be DMA-aligned
-            if (i != 0)
+            if (i != 0) {
                 mram_write(cache, out, i * sizeof(T));
+                out += i;
+            }
+            flush_run(&readers[1], out);
             return;
         }
         while (true) {
             MERGE_WITH_CACHE_FLUSH(
                 if (is_current_item_the_last_one(&readers[0])) {
-                    flush_cache(&readers[1], out, i);
+                    flush_cache_and_run(&readers[1], out, i);
                     return;
                 },
                 {}
@@ -266,7 +251,7 @@ static void merge_half_space(struct reader readers[2], T __mram_ptr *out) {
  * @param start The first item of the MRAM array to sort.
  * @param end The last item of said array.
 **/
-static void merge_sort_half_space(T __mram_ptr * const start, T __mram_ptr * const end) {
+static void merge_sort_full_space(T __mram_ptr * const start, T __mram_ptr * const end) {
     /* Starting runs. */
     form_starting_runs(start, end);
 
@@ -274,29 +259,46 @@ static void merge_sort_half_space(T __mram_ptr * const start, T __mram_ptr * con
     struct reader readers[2];
     setup_reader(&readers[0], buffers[me()].seq_1, UNROLL_FACTOR);
     setup_reader(&readers[1], buffers[me()].seq_2, UNROLL_FACTOR);
+    T __mram_ptr *in, *until, *out;  // Runs from `in` to `until` are merged and stored in front of `out`.
+    bool flip = false;  // Used to determine the initial positions of `in`, `out`, and `until`.
     size_t const n = end - start + 1;
-    T __mram_ptr * const out = (T __mram_ptr *)((uintptr_t)output + (uintptr_t)start);
     for (size_t run_length = STARTING_RUN_LENGTH; run_length < n; run_length *= 2) {
-        for (
-            T __mram_ptr *run_1_end = end - run_length, *run_2_end = end;
-            (intptr_t)run_1_end >= (intptr_t)start;
-            run_1_end -= 2 * run_length, run_2_end -= 2 * run_length
-        ) {
-            // Copy the current run …
-            T __mram_ptr *run_1_start = ((intptr_t)(run_1_end - run_length + 1) > (intptr_t)start)
-                    ? run_1_end - run_length + 1
-                    : start;
-            copy_run(run_1_start, run_1_end, out);
-            // … and merge the copy with the next run.
-            reset_reader(&readers[0], out, out + (run_1_end - run_1_start));
-            reset_reader(&readers[1], run_1_end + 1, run_2_end);
-            merge_half_space(readers, run_1_start);
+        // Set the positions to read from and write to.
+        if ((flip = !flip)) {
+            in = start;
+            until = end;
+            out = (T __mram_ptr *)((uintptr_t)start + (uintptr_t)output) + n;
+        } else {
+            in = (T __mram_ptr *)((uintptr_t)start + (uintptr_t)output);
+            until = (T __mram_ptr *)((uintptr_t)start + (uintptr_t)output) + n - 1;
+            out = end + 1;
+        }
+        // Merge pairs of neighboured runs which are all of the same length.
+        T __mram_ptr *run_1_end = until - run_length;
+        for (; (intptr_t)run_1_end >= (intptr_t)(in + run_length - 1); run_1_end -= 2*run_length) {
+            out -= 2*run_length;
+            reset_reader(&readers[0], run_1_end + 1 - run_length, run_1_end);
+            reset_reader(&readers[1], run_1_end + 1, run_1_end + run_length);
+            merge_full_space(readers, out);
+        }
+        // Merge pair at the beginning where the first run is shorter.
+        if ((intptr_t)run_1_end >= (intptr_t)in) {
+            size_t const run_1_length = run_1_end + 1 - in;
+            out -= run_length + run_1_length;
+            reset_reader(&readers[0], in, run_1_end);
+            reset_reader(&readers[1], run_1_end + 1, run_1_end + run_length);
+            merge_full_space(readers, out);
+        // Flush single run at the beginning straight away
+        } else if ((intptr_t)(run_1_end + run_length) >= (intptr_t)in) {
+            out = (flip) ? (T __mram_ptr *)((uintptr_t)start + (uintptr_t)output) : start;
+            copy_run(in, run_1_end + run_length, out);
         }
     }
+    flipped[me()] = flip;
 }
 
 union algo_to_test __host algos[] = {
-    {{ "MergeHSCustom", { .mram = merge_sort_half_space } }},
+    {{ "MergeFSCustom", { .mram = merge_sort_full_space } }},
 };
 size_t __host num_of_algos = sizeof algos / sizeof algos[0];
 
@@ -340,7 +342,9 @@ int main(void) {
         dpu_to_host.seconds += new_time * new_time;
 
         array_stats stats_after;
-        get_stats_sorted(input, cache, range, false, &stats_after);
+        T __mram_ptr *sorted_array = (flipped[me()]) ? output : input;
+        flipped[me()] = false;  // Following sorting algorithms may not reset this value.
+        get_stats_sorted(sorted_array, cache, range, false, &stats_after);
         if (compare_stats(&stats_before, &stats_after, false) == EXIT_FAILURE) {
             abort();
         }

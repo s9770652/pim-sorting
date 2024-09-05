@@ -73,8 +73,8 @@ static void show_modes(void) {
         "\n     2   QuickSorts (WRAM)"
         "\n     3   MergeSorts (WRAM)"
         "\n     4   HeapSorts (WRAM)"
-        "\n     5   MergeSort (MRAM, half-space, custom reader)"
-        "\n     6   MergeSort (MRAM, half-space, regular reader)"
+        "\n     5   MergeSort (MRAM, half-space, straight reader)"
+        "\n     6   MergeSort (MRAM, half-space, custom reader)"
         "\n     7   MergeSort (MRAM, full-space, custom reader)"
         "\n"
     );

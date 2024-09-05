@@ -3,8 +3,8 @@
  * @brief Faster sequential reading of items in MRAM.
 **/
 
-#ifndef _READER_H_
-#define _READER_H_
+#ifndef _READER_CUSTOM_H_
+#define _READER_CUSTOM_H_
 
 #include <assert.h>
 #include <attributes.h>
@@ -185,4 +185,4 @@ static inline bool is_early_end_reached(struct reader * const reader) {
     return reader->ptr > reader->buffer_early_end;
 }
 
-#endif  // _READER_H_
+#endif  // _READER_CUSTOM_H_
