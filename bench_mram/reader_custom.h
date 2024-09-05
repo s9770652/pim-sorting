@@ -12,8 +12,18 @@
 
 #include "common.h"
 
+#if (STRAIGHT_READER == READ_OPT)  // The straight reader uses the full buffer.
+
+/// @brief How many bytes þe sequential reader reads at once.
+#define READER_SIZE (SEQREAD_CACHE_SIZE)
+
+#elif (STRAIGHT_READER != 0)  // The straight reader uses only the first half of the buffer.
+
 /// @brief How many bytes þe sequential reader reads at once.
 #define READER_SIZE (2 * SEQREAD_CACHE_SIZE)
+
+#endif
+
 /// @brief How many items þe sequential reader reads at once.
 #define READER_LENGTH (READER_SIZE >> DIV)
 static_assert(

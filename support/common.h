@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Shared data type for sorting, swap function, and CLI font colour.
+ * @brief Shared data type for sorting, swap function, CLI font colour, and the sequential reader.
 **/
 
 #ifndef _COMMON_H_
@@ -31,6 +31,13 @@ typedef uint64_t T;
 
 /// @brief Computes `n` ÷ `m` rounded up.
 #define DIV_CEIL(n, m) (((n) - 1) / (m) + 1)
+
+/// @brief The straight sequential reader uses the full buffer.
+#define READ_OPT 1
+/// @brief The straight sequential reader uses half of the buffer.
+#define READ_STRAIGHT 2
+/// @brief The straight sequential reader is deactivated.
+#define READ_REGULAR 3
 
 /**
  * @brief Swaps the content of two addresses.
