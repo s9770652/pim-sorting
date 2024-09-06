@@ -334,11 +334,15 @@ int main(void) {
         get_stats_unsorted(input, cache, range, false, &stats_before);
 
         perfcounter_config(COUNT_CYCLES, true);
-        time new_time = perfcounter_get();
+        time new_time;
+        if (me() == 0)
+            new_time = perfcounter_get();
         algo(&input[range.start], &input[range.end - 1]);
-        new_time = perfcounter_get() - new_time - CALL_OVERHEAD;
-        dpu_to_host.firsts += new_time;
-        dpu_to_host.seconds += new_time * new_time;
+        if (me() == 0) {
+            new_time = perfcounter_get() - new_time - CALL_OVERHEAD;
+            dpu_to_host.firsts += new_time;
+            dpu_to_host.seconds += new_time * new_time;
+        }
 
         array_stats stats_after;
         get_stats_sorted(input, cache, range, false, &stats_after);
