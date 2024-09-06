@@ -91,19 +91,18 @@ T *sr_init(seqreader_buffer_t cache, void __mram_ptr *mram, seqreader_t *reader)
  * @param ptr The pointer to the item in the buffer.
  * @param reader (unused)
  * @param mram The current MRAM address of the reader of the address.
- * @param wram The beginning of the buffer of the respective reader.
  * 
  * @return The MRAM address of the given item.
 **/
-T __mram_ptr *sr_tell(T *ptr, seqreader_t *reader, uintptr_t mram, seqreader_buffer_t wram) {
+T __mram_ptr *sr_tell(T *ptr, seqreader_t *reader, uintptr_t mram) {
     (void)reader;
-    return (T __mram_ptr *)(mram + ((uintptr_t)ptr - wram));
+    return (T __mram_ptr *)(mram + ((uintptr_t)ptr & PAGE_OFF_MASK));
 }
 
 /**
  * @brief Equivalent to `seqreader_get`.
  * Advances the pointer to the current item and reloads if needed.
- * @attention This is a macro, not a function!
+ * @attention This is a macro, not a function! It updates the pointer on its own.
  * @internal
  * 1. Advance pointer and performs bounds check. If negative, skip over the next three lines.
  * 2. Increase the MRAM address.
@@ -142,6 +141,15 @@ __asm__ volatile(                                            \
 
 #define MRAM_READ_PAGE(from, to) mram_read((__mram_ptr void *)(from), (void *)(to), PAGE_ALLOC_SIZE)
 
+/**
+ * @brief Equivalent to `seqread_init`.
+ * 
+ * @param cache The WRAM buffer of the sequential reader.
+ * @param mram The first MRAM address to read.
+ * @param reader The reader to initialise.
+ * 
+ * @return The WRAM buffer address of the first MRAM item.
+**/
 T *sr_init(seqreader_buffer_t cache, __mram_ptr void *mram_addr, seqreader_t *reader) {
     reader->wram_cache = cache;
     reader->mram_addr = (uintptr_t)(1 << __DPU_MRAM_SIZE_LOG2);
@@ -159,11 +167,29 @@ T *sr_init(seqreader_buffer_t cache, __mram_ptr void *mram_addr, seqreader_t *re
     return (T *)(mram_offset + wram_cache);
 }
 
-T __mram_ptr *sr_tell(void *ptr, seqreader_t *reader, uintptr_t mram, seqreader_buffer_t wram) {
-    (void)mram, (void)wram;
+/**
+ * @brief Equivalent to `seqreader_tell`.
+ * 
+ * @param ptr The pointer to the item in the buffer.
+ * @param reader The reader of the respective item.
+ * @param mram (unused)
+ * 
+ * @return The MRAM address of the given item.
+**/
+T __mram_ptr *sr_tell(void *ptr, seqreader_t *reader, uintptr_t mram) {
+    (void)mram;
     return (__mram_ptr void *)((uintptr_t)reader->mram_addr + ((uintptr_t)ptr & PAGE_OFF_MASK));
 }
 
+/**
+ * @brief Equivalent to `ptr = seqreader_get(…)`.
+ * @attention This is a macro, not a function! It updates the pointer on its own.
+ * 
+ * @param ptr The *identifier* of the pointer to the current item.
+ * @param reader The *address* of reader of the respective item.
+ * @param mram (unused)
+ * @param wram (unused)
+**/
 #define SR_GET(ptr, reader, mram, wram)                                        \
 ptr = (T *)__builtin_dpu_seqread_get((uintptr_t)ptr, sizeof(T), reader, PAGE_SIZE);
 
@@ -188,18 +214,17 @@ T *sr_init(seqreader_buffer_t cache, void __mram_ptr *mram, seqreader_t *reader)
  * @param ptr The pointer to the item in the buffer.
  * @param reader The reader of the respective item.
  * @param mram (unused)
- * @param wram (unused)
  * 
  * @return The MRAM address of the given item.
 **/
-T __mram_ptr *sr_tell(void *ptr, seqreader_t *reader, uintptr_t mram, seqreader_buffer_t wram) {
-    (void)mram, (void)wram;
+T __mram_ptr *sr_tell(void *ptr, seqreader_t *reader, uintptr_t mram) {
+    (void)mram;
     return seqread_tell(ptr, reader);
 }
 
 /**
  * @brief Equivalent to `ptr = seqreader_get(…)`.
- * @attention This is a macro, not a function!
+ * @attention This is a macro, not a function! It updates the pointer on its own.
  * 
  * @param ptr The *identifier* of the pointer to the current item.
  * @param reader The *address* of reader of the respective item.

@@ -12,12 +12,12 @@
 
 #include "common.h"
 
-#if (STRAIGHT_READER == READ_OPT)  // The straight reader uses the full buffer.
+#if (STRAIGHT_READER == READ_OPT)  // Þe straight reader uses þe full buffer.
 
 /// @brief How many bytes þe sequential reader reads at once.
 #define READER_SIZE (SEQREAD_CACHE_SIZE)
 
-#elif (STRAIGHT_READER != 0)  // The straight reader uses only the first half of the buffer.
+#elif (STRAIGHT_READER != 0)  // Þe straight reader uses only þe first half of þe buffer.
 
 /// @brief How many bytes þe sequential reader reads at once.
 #define READER_SIZE (2 * SEQREAD_CACHE_SIZE)
