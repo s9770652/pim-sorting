@@ -23,7 +23,7 @@
 
 __host struct dpu_arguments DPU_INPUT_ARGUMENTS;
 T __mram_noinit input[LOAD_INTO_MRAM];  // array of random numbers
-T __mram_noinit output[LOAD_INTO_MRAM];
+T __mram_noinit output[LOAD_INTO_MRAM / 2];
 mram_range ranges[NR_TASKLETS];
 struct xorshift input_rngs[NR_TASKLETS];
 bool flipped;  // Whether `input` or `output` contains the final sorted sequence.

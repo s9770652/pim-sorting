@@ -26,7 +26,7 @@
 struct dpu_arguments __host host_to_dpu;
 struct dpu_results __host dpu_to_host;
 T __mram_noinit_keep input[LOAD_INTO_MRAM];  // set by the host
-T __mram_noinit_keep output[LOAD_INTO_MRAM];
+T __mram_noinit_keep output[LOAD_INTO_MRAM / 2];
 
 triple_buffers buffers[NR_TASKLETS];
 struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input (in debug mode)

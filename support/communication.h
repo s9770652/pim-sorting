@@ -33,7 +33,7 @@
 
 /// @brief The maximum number of elements loaded into MRAM.
 /// Their size must be divisible by `DMA_ALIGNMENT`.
-#define LOAD_INTO_MRAM ((1024 * 1024 * 25) >> DIV)
+#define LOAD_INTO_MRAM ((1024 * 1024 * 42) >> DIV)
 
 #if ((LOAD_INTO_MRAM << DIV) != DMA_ALIGNED(LOAD_INTO_MRAM << DIV))
 #error The size of elements to load into MRAM must be divisible by `DMA_ALIGNMENT`.
@@ -46,8 +46,7 @@ typedef void sort_algo_wram(T *, T *);
 typedef void sort_algo_mram(T __mram_ptr *, T __mram_ptr *);
 
 /// @brief A general sorting function.
-union sort_algo
-{
+union sort_algo {
     sort_algo_wram *wram;
     sort_algo_mram *mram;
 };
