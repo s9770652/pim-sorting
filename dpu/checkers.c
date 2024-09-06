@@ -36,7 +36,7 @@ void print_array(T __mram_ptr *array, T *cache, size_t const length, char *label
 void print_single_line(T *cache, size_t length) {
     char colours[8][9] = {
         "\x1b[0;100m", "\x1b[0;101m", "\x1b[0;102m", "\x1b[0;103m",
-        "\x1b[0;104m", "\x1b[0;105m", "\x1b[0;106m", "\x1b[0;107m"
+        "\x1b[0;104m", "\x1b[0;105m", "\x1b[0;106m", "\x1b[0;107m",
     };
     char *colour;
     mutex_lock(printing_mutex);
@@ -60,17 +60,17 @@ static void accumulate_stats(bool dummy, array_stats *result) {
     if (me() != 0) return;
     // Gather statistics.
     for (size_t t = 1; t < NR_TASKLETS; t++) {
-        sums[me()] += sums[t];
+        sums[0] += sums[t];
         for (size_t j = 0; j < NR_COUNTS; j++) {
-            counts[me()][j] += counts[t][j];
+            counts[0][j] += counts[t][j];
         }
-        unsorted[me()] |= unsorted[t];
+        unsorted[0] |= unsorted[t];
     }
     // Write statistics onto the appropriate memory address.
-    result->sum = sums[me()];
+    result->sum = sums[0];
     result->sum -= (dummy) ? UINT32_MAX : 0;  // The dummy value is at the end of the last range.
-    memcpy(&result->counts, counts[me()], NR_COUNTS * sizeof(size_t));
-    result->unsorted = unsorted[me()];
+    memcpy(&result->counts, counts[0], NR_COUNTS * sizeof(counts[0][0]));
+    result->unsorted = unsorted[0];
 }
 
 void get_stats_unsorted(T __mram_ptr const * const array, T * const cache, mram_range const range,
@@ -86,7 +86,7 @@ void get_stats_unsorted(T __mram_ptr const * const array, T * const cache, mram_
         mram_read(&array[i], cache, curr_size);
         for (size_t j = 0; j < curr_length; j++) {
             sums[me()] += cache[j];
-            if (cache[j] < 8) {
+            if (cache[j] < NR_COUNTS) {
                 counts[me()][cache[j]]++;
             }
         }
@@ -111,7 +111,7 @@ void get_stats_sorted(T __mram_ptr const * const array, T * const cache, mram_ra
         unsorted[me()] |= prev > cache[0];
         for (size_t j = 0; j < curr_length; j++) {
             sums[me()] += cache[j];
-            if (cache[j] < 8) {
+            if (cache[j] < NR_COUNTS) {
                 counts[me()][cache[j]]++;
             }
             unsorted[me()] |= cache[j-1] > cache[j];  // `j-1` possible due to the sentinel value
@@ -131,7 +131,7 @@ void get_stats_unsorted_wram(T const array[], size_t const length, array_stats *
     // Calculate statistics.
     for (size_t j = 0; j < length; j++) {
         sums[me()] += array[j];
-        if (array[j] < 8) {
+        if (array[j] < NR_COUNTS) {
             counts[me()][array[j]]++;
         }
     }
@@ -148,7 +148,7 @@ void get_stats_sorted_wram(T const array[], size_t const length, array_stats *re
     // Calculate statistics and check order.
     for (size_t j = 0; j < length; j++) {
         sums[me()] += array[j];
-        if (array[j] < 8) {
+        if (array[j] < NR_COUNTS) {
             counts[me()][array[j]]++;
         }
         unsorted[me()] |= array[j-1] > array[j];  // `j-1` possible due to the sentinel value
@@ -160,7 +160,7 @@ bool compare_stats(array_stats const * const stats_1, array_stats const * const 
         bool const print_on_success) {
     if (me() != 0) return EXIT_SUCCESS;
     bool same_elements = stats_1->sum == stats_2->sum;
-    same_elements &= memcmp(stats_1->counts, stats_2->counts, NR_COUNTS * sizeof(size_t)) == 0;
+    same_elements &= memcmp(stats_1->counts, stats_2->counts, NR_COUNTS * sizeof(counts[0][0])) == 0;
     if (!same_elements) {
         printf("[" ANSI_COLOR_RED "ERROR" ANSI_COLOR_RESET "] Elements have changed.\n");
         printf("\nSums: %lu ↔ %lu\nCounts: ", stats_1->sum, stats_2->sum);
@@ -172,36 +172,11 @@ bool compare_stats(array_stats const * const stats_1, array_stats const * const 
     if (stats_2->unsorted) {
         printf("[" ANSI_COLOR_RED "ERROR" ANSI_COLOR_RESET "] Elements are not sorted.\n");
     }
-    if (same_elements && !stats_2->unsorted) {
-        if (print_on_success)
-            printf("[" ANSI_COLOR_GREEN "OK" ANSI_COLOR_RESET "] Elements are correctly sorted.\n");
-        return EXIT_SUCCESS;
-    } else {
+    if (!same_elements || stats_2->unsorted)
         return EXIT_FAILURE;
-    }
+    if (print_on_success)
+        printf("[" ANSI_COLOR_GREEN "OK" ANSI_COLOR_RESET "] Elements are correctly sorted.\n");
+    return EXIT_SUCCESS;
 }
 
 #endif  // CHECK_SANITY
-
-bool is_uniform(T *array, size_t length, T upper_bound) {
-    T *count = mem_alloc(upper_bound * sizeof(T *));
-    for (T i = 0; i < upper_bound; i++) {
-        count[i] = 0;
-    }
-    int64_t sum = 0;
-    for (size_t i = 0; i < length; i++) {
-        count[array[i]]++;
-        sum += array[i];
-    }
-    float mean = (double)sum / length;
-    float variance = 0;
-    for (size_t i = 0; i < upper_bound; i++) {
-        variance += ((float)i - mean) * ((float)i - mean) * count[i];
-    }
-    variance /= (length - 1);
-    // printf("is_uniform: ");
-    // print_array(count, upper_bound);
-    // printf("Mean: %f (%f)\n", mean, (upper_bound-1) / 2.);
-    // printf("Variance: %f (%f)\n", variance, 1/12. * (upper_bound * upper_bound - 1));
-    return (0.9 <= mean/((upper_bound-1) / 2.) <= 1.1 && 0.9 <= variance/(1/12. * (upper_bound * upper_bound - 1)) <= 1.1);
-}

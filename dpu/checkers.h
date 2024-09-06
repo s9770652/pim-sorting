@@ -147,18 +147,4 @@ bool compare_stats(array_stats const *stats_unsorted, array_stats const *stats_s
 #endif  // !CHECK_SANITY
 ;
 
-/**
- * @brief Checks the mean and variance of an array of integers
- * and compares them with an ideal uniform distribution.
- * @note Currently sequentially implemented.
- * @warning This function allocates `upper_bound` × `sizeof(T *)` bytes.
- * 
- * @param array The array of integers to check.
- * @param length Up to which element to check the mean and variance.
- * @param upper_bound The upper bound (exclusive) of the range whence the random numbers are drawn.
- * 
- * @returns `true` if the mean and variance deviate at most 10 % from the ideal, elsewise `false`.
-**/
-bool is_uniform(T *array, size_t length, T upper_bound);
-
 #endif  // _CHECKERS_H_
