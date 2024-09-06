@@ -226,6 +226,10 @@ int main(int argc, char **argv) {
         host_to_dpu.offset = offset;
         host_to_dpu.part_length = DMA_ALIGNED(DIV_CEIL(len, NR_TASKLETS) * sizeof(T)) / sizeof(T);
         uint32_t const reps_per_launch = LOAD_INTO_MRAM / len;
+        if (len > LOAD_INTO_MRAM) {
+            printf("The input length %u is too big! The maximum is %u.\n", len, LOAD_INTO_MRAM);
+            abort();
+        }
 
         memset(dpu_to_host, 0, sizeof(struct dpu_results[num_of_algos]));
         for (uint32_t rep = 0; rep < p.n_reps; rep += reps_per_launch) {
