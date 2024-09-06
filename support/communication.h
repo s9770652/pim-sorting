@@ -61,6 +61,8 @@ struct dpu_arguments {
     /// @brief The distance between the input data of the different tests.
     /// @note This value times `sizeof(T)` is aligned for DMAs.
     uint32_t offset;
+    /// @brief The number of elements to sort by one tasklet in the sequential phase.
+    uint32_t part_length;
     /// @brief The seed used by all tasklets, which then offset with their own Id.
     uint32_t basic_seed;
     /// @brief The index of the sorting algorithm to run.

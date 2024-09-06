@@ -303,8 +303,6 @@ union algo_to_test __host algos[] = {
 size_t __host num_of_algos = sizeof algos / sizeof algos[0];
 
 int main(void) {
-    if (me() != 0) return EXIT_SUCCESS;
-
     /* Set up buffers. */
     if (buffers[me()].cache == NULL) {  // Only allocate on the first launch.
         allocate_triple_buffer(&buffers[me()]);
@@ -324,7 +322,10 @@ int main(void) {
     }
 
     /* Perform test. */
-    mram_range range = { 0, host_to_dpu.length };
+    mram_range range = {
+        me() * host_to_dpu.part_length,
+        (me() == NR_TASKLETS - 1) ? host_to_dpu.offset : (me() + 1) * host_to_dpu.part_length,
+    };
     sort_algo_mram * const algo = algos[host_to_dpu.algo_index].data.fct.mram;
     memset(&dpu_to_host, 0, sizeof dpu_to_host);
 

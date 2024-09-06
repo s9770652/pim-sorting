@@ -224,6 +224,7 @@ int main(int argc, char **argv) {
         uint32_t const len = lengths[li], offset = DMA_ALIGNED(len * sizeof(T)) / sizeof(T);
         host_to_dpu.length = len;
         host_to_dpu.offset = offset;
+        host_to_dpu.part_length = DMA_ALIGNED(DIV_CEIL(len, NR_TASKLETS) * sizeof(T)) / sizeof(T);
         uint32_t const reps_per_launch = LOAD_INTO_MRAM / len;
 
         memset(dpu_to_host, 0, sizeof(struct dpu_results[num_of_algos]));
