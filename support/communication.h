@@ -15,7 +15,9 @@
 #ifndef DMA_ALIGNMENT  // Define missing DMA constants for the host.
 
 #define DMA_ALIGNMENT (8)
-#define DMA_ALIGNED(x) (((x) + (DMA_ALIGNMENT - 1)) & ~(DMA_ALIGNMENT - 1))
+#define ALIGN_MASK(x, mask) (((x) + (mask)) & ~(mask))
+#define ALIGN(x, a) ALIGN_MASK((x), (a)-1)
+#define DMA_ALIGNED(x) ALIGN(x, DMA_ALIGNMENT)
 
 #else  // Check if the constants have changed.
 

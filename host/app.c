@@ -222,16 +222,17 @@ int main(int argc, char **argv) {
     print_header(algos, num_of_algos, &p);
     for (uint32_t li = 0; li < num_of_lengths; li++) {
         uint32_t const len = lengths[li], offset = DMA_ALIGNED(len * sizeof(T)) / sizeof(T);
-        host_to_dpu.length = len;
-        host_to_dpu.offset = offset;
-        host_to_dpu.part_length = DMA_ALIGNED(DIV_CEIL(len, NR_TASKLETS) * sizeof(T)) / sizeof(T);
-        uint32_t const reps_per_launch = LOAD_INTO_MRAM / len;
         if (len > LOAD_INTO_MRAM) {
             printf("The input length %u is too big! The maximum is %u.\n", len, LOAD_INTO_MRAM);
             abort();
         }
+        host_to_dpu.length = len;
+        host_to_dpu.offset = offset;
+        // 16 = 8 * 2 → halving this number gives max. size of first runs (half-space MergeSorts)
+        host_to_dpu.part_length = ALIGN(DIV_CEIL(len, NR_TASKLETS) * sizeof(T), 16) / sizeof(T);
 
         memset(dpu_to_host, 0, sizeof(struct dpu_results[num_of_algos]));
+        uint32_t const reps_per_launch = LOAD_INTO_MRAM / len;
         for (uint32_t rep = 0; rep < p.n_reps; rep += reps_per_launch) {
             host_to_dpu.reps = (reps_per_launch > p.n_reps - rep) ? p.n_reps - rep : reps_per_launch;
 

@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include <alloc.h>
+#include <barrier.h>
 #include <defs.h>
 #include <memmram_utils.h>
 #include <perfcounter.h>
@@ -31,6 +32,8 @@ T __mram_noinit_keep output[LOAD_INTO_MRAM / 2];
 triple_buffers buffers[NR_TASKLETS];
 struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input (in debug mode)
 struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the pivot
+
+BARRIER_INIT(omni_barrier, NR_TASKLETS);
 
 /// @brief How many items are merged in an unrolled fashion.
 #define UNROLL_FACTOR (8)
@@ -222,7 +225,7 @@ static void merge_half_space(struct reader readers[2], T __mram_ptr *out) {
         if (was_last_item_read(&readers[0])) {
             // The previous loop was executend an even number of times.
             // Since the first run is emptied and had a DMA-aligned length,
-            // `i * sizeof(T)` must also be DMA-aligned
+            // `i * sizeof(T)` must also be DMA-aligned.
             if (i != 0)
                 mram_write(cache, out, i * sizeof(T));
             return;
@@ -275,7 +278,7 @@ static void merge_sort_half_space(T __mram_ptr * const start, T __mram_ptr * con
     setup_reader(&readers[0], buffers[me()].seq_1, UNROLL_FACTOR);
     setup_reader(&readers[1], buffers[me()].seq_2, UNROLL_FACTOR);
     size_t const n = end - start + 1;
-    T __mram_ptr * const out = (T __mram_ptr *)((uintptr_t)output + (uintptr_t)start);
+    T __mram_ptr * const out = (T __mram_ptr *)((uintptr_t)output + (uintptr_t)start / 2);
     for (size_t run_length = STARTING_RUN_LENGTH; run_length < n; run_length *= 2) {
         for (
             T __mram_ptr *run_1_end = end - run_length, *run_2_end = end;
@@ -312,6 +315,10 @@ int main(void) {
         host_to_dpu.reps = 1;
         host_to_dpu.length = 0x1000;
         host_to_dpu.offset = DMA_ALIGNED(host_to_dpu.length * sizeof(T)) / sizeof(T);
+        host_to_dpu.part_length = ALIGN(
+            DIV_CEIL(host_to_dpu.length, NR_TASKLETS) * sizeof(T),
+            16
+        ) / sizeof(T);
         host_to_dpu.basic_seed = 0b1011100111010;
         host_to_dpu.algo_index = 0;
         input_rngs[me()] = seed_xs(host_to_dpu.basic_seed + me());
@@ -333,6 +340,7 @@ int main(void) {
         array_stats stats_before;
         get_stats_unsorted(input, cache, range, false, &stats_before);
 
+        barrier_wait(&omni_barrier);
         perfcounter_config(COUNT_CYCLES, true);
         time new_time;
         if (me() == 0)
@@ -343,6 +351,7 @@ int main(void) {
             dpu_to_host.firsts += new_time;
             dpu_to_host.seconds += new_time * new_time;
         }
+        barrier_wait(&omni_barrier);
 
         array_stats stats_after;
         get_stats_sorted(input, cache, range, false, &stats_after);
