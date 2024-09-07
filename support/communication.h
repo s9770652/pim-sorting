@@ -33,9 +33,15 @@
 
 /* Defining elements common to both the host and the DPUs. */
 
+#if CHECK_SANITY  // Checkers print so the available MRAM is smaller.
 /// @brief The maximum number of elements loaded into MRAM.
 /// Their size must be divisible by `DMA_ALIGNMENT`.
-#define LOAD_INTO_MRAM ((1024 * 1024 * 42) >> DIV)
+#define LOAD_INTO_MRAM ((1024 * 1024 * 31) >> DIV)
+#else
+/// @brief The maximum number of elements loaded into MRAM.
+/// Their size must be divisible by `DMA_ALIGNMENT`.
+#define LOAD_INTO_MRAM ((1024 * 1024 * 32) >> DIV)
+#endif
 
 #if ((LOAD_INTO_MRAM << DIV) != DMA_ALIGNED(LOAD_INTO_MRAM << DIV))
 #error The size of elements to load into MRAM must be divisible by `DMA_ALIGNMENT`.
