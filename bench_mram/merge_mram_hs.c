@@ -69,7 +69,7 @@ static void merge_sort_half_space(T __mram_ptr * const start, T __mram_ptr * con
 }
 
 union algo_to_test __host algos[] = {
-    {{ "MergeHSStraight", { .mram = merge_sort_half_space } }},
+    {{ "MergeHS", { .mram = merge_sort_half_space } }},
 };
 size_t __host num_of_algos = sizeof algos / sizeof algos[0];
 

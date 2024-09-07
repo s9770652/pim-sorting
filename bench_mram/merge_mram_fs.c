@@ -87,7 +87,7 @@ static void merge_sort_full_space(T __mram_ptr * const start, T __mram_ptr * con
 }
 
 union algo_to_test __host algos[] = {
-    {{ "MergeFSStraight", { .mram = merge_sort_full_space } }},
+    {{ "MergeFS", { .mram = merge_sort_full_space } }},
 };
 size_t __host num_of_algos = sizeof algos / sizeof algos[0];
 
