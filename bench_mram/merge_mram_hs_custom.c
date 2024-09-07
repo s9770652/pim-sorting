@@ -3,31 +3,26 @@
  * @brief Measuring runtimes of a half-space MergeSort (sequential, MRAM, custom readers).
 **/
 
-#include <assert.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <alloc.h>
 #include <barrier.h>
 #include <defs.h>
 #include <memmram_utils.h>
 #include <perfcounter.h>
 
-#include "buffers.h"
 #include "checkers.h"
-#include "common.h"
 #include "communication.h"
 #include "random_distribution.h"
-#include "random_generator.h"
-
 #include "starting_runs.h"
+
 #include "reader_custom.h"
 
 struct dpu_arguments __host host_to_dpu;
 struct dpu_results __host dpu_to_host;
 T __mram_noinit_keep input[LOAD_INTO_MRAM];  // set by the host
-T __mram_noinit_keep output[LOAD_INTO_MRAM / 2];
+T __mram_noinit_keep output[LOAD_INTO_MRAM];
 
 triple_buffers buffers[NR_TASKLETS];
 struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input (in debug mode)

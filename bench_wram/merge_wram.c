@@ -19,7 +19,6 @@
 #include "communication.h"
 #include "pivot.h"
 #include "random_distribution.h"
-#include "random_generator.h"
 
 struct dpu_arguments __host host_to_dpu;
 struct dpu_results __host dpu_to_host;
