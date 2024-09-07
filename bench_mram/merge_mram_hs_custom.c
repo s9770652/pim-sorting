@@ -21,7 +21,7 @@
 #include "random_distribution.h"
 #include "random_generator.h"
 
-#include "merge_mram.h"
+#include "starting_runs.h"
 #include "reader_custom.h"
 
 struct dpu_arguments __host host_to_dpu;

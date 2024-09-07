@@ -1,4 +1,4 @@
-#include "merge_mram.h"
+#include "starting_runs.h"
 #include "wram_sorts.h"
 
 void form_starting_runs(T __mram_ptr * const start, T __mram_ptr * const end) {

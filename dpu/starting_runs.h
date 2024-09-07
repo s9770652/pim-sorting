@@ -3,8 +3,8 @@
  * @brief Starting run formation and run copying for MRAM MergeSorts.
 **/
 
-#ifndef _MERGE_MRAM_H_
-#define _MERGE_MRAM_H_
+#ifndef _STARTING_RUNS_H_
+#define _STARTING_RUNS_H_
 
 #include <assert.h>
 #include <defs.h>
@@ -56,4 +56,4 @@ static inline void copy_run(T __mram_ptr *from, T __mram_ptr *to, T __mram_ptr *
     }
 }
 
-#endif  // _MERGE_MRAM_H_
+#endif  // _STARTING_RUNS_H_

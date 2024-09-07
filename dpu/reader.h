@@ -33,8 +33,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * to get everything straight away without function calls.
 **/
 
-#ifndef _READER_STRAIGHT_H_
-#define _READER_STRAIGHT_H_
+#ifndef _READER_H_
+#define _READER_H_
 
 #include <seqread.h>
 
@@ -235,4 +235,4 @@ T __mram_ptr *sr_tell(void *ptr, seqreader_t *reader, uintptr_t mram) {
 
 #endif  // STRAIGHT_READER == READ_REGULAR
 
-#endif  // _READER_STRAIGHT_H_
+#endif  // _READER_H_
