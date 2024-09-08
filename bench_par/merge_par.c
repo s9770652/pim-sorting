@@ -22,6 +22,7 @@ T __mram_noinit_keep output[LOAD_INTO_MRAM];
 triple_buffers buffers[NR_TASKLETS];
 struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input (in debug mode)
 struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the pivot
+array_stats stats_before, stats_after;
 
 BARRIER_INIT(omni_barrier, NR_TASKLETS);
 
@@ -96,10 +97,10 @@ static void merge_par(size_t l, size_t r) {
         printf("Gesamtlänge: %u (%u + %u)\n", ends[0] - &in[cut_at] + 1 + ends[1] - &in[pivot + 1] + 1, ends[0] - &in[cut_at] + 1, ends[1] - &in[pivot + 1] + 1);
 
         merge_mram(ptr, ends, &out[border + 1], wram);
-        flipped[me()] = !flipped[me()];
     } else {
         handshake_notify();
     }
+    flipped[me()] = !flipped[me()];
 
     print_array(out, buffers[me()].cache, host_to_dpu.length, "Sorted");
 }
@@ -125,7 +126,7 @@ int main(void) {
     T * const cache = buffers[me()].cache;
 
     /* Set up dummy values if called via debugger. */
-    if (host_to_dpu.length == 0) {
+    if (me() == 0 && host_to_dpu.length == 0) {
         host_to_dpu.reps = 1;
         host_to_dpu.length = 0x100;
         host_to_dpu.offset = DMA_ALIGNED(host_to_dpu.length * sizeof(T)) / sizeof(T);
@@ -139,6 +140,7 @@ int main(void) {
         mram_range range = { 0, host_to_dpu.length * host_to_dpu.reps };
         generate_uniform_distribution_mram(input, cache, &range, 8);
     }
+    barrier_wait(&omni_barrier);
 
     /* Perform test. */
     mram_range range = {
@@ -152,7 +154,6 @@ int main(void) {
     for (uint32_t rep = 0; rep < host_to_dpu.reps; rep++) {
         pivot_rngs[me()] = seed_xs_offset(host_to_dpu.basic_seed + me());
 
-        array_stats stats_before;
         get_stats_unsorted(input, cache, range, false, &stats_before);
 
         barrier_wait(&omni_barrier);
@@ -168,7 +169,6 @@ int main(void) {
         }
         barrier_wait(&omni_barrier);
 
-        array_stats stats_after;
         T __mram_ptr *sorted_array = (flipped[me()]) ? output : input;
         flipped[me()] = false;  // Following sorting algorithms may not reset this value.
         get_stats_sorted(sorted_array, cache, range, false, &stats_after);
