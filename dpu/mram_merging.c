@@ -17,23 +17,10 @@
 #include "buffers.h"
 #include "common.h"
 #include "reader.h"
-
-#define FULL_SPACE (1)
-#define HALF_SPACE (2)
-#if (MRAM_MERGE == FULL_SPACE)
-
-#define FLUSH_AFTER_TIER_1() flush_run(sr_tell(ptr[1], &sr[me()][1], mram[1]), ends[1], out)
-#define FLUSH_IN_TIER_2() flush_cache_and_run(ptr[1], sr_tell(ptr[1], &sr[me()][1], mram[1]), ends[1], out, i)
-
-#elif (MRAM_MERGE == HALF_SPACE)
-
-#define FLUSH_AFTER_TIER_1()
-#define FLUSH_IN_TIER_2() flush_cache(ptr[1], out, i)
-
-#endif  // MRAM_MERGE == HALF_SPACE
+#include "starting_runs.h"
 
 /// @brief How many items are merged in an unrolled fashion.
-#define UNROLL_FACTOR (8)
+#define UNROLL_FACTOR (4)
 /// @brief How many items the cache holds before they are written to the MRAM.
 #define MAX_FILL_LENGTH (MAX_TRANSFER_LENGTH_CACHE / UNROLL_FACTOR * UNROLL_FACTOR)
 /// @brief How many bytes the items the cache holds before they are written to the MRAM have.
@@ -48,6 +35,8 @@ static_assert(
 extern triple_buffers buffers[NR_TASKLETS];
 extern seqreader_t sr[NR_TASKLETS][2];  // sequential readers used to read runs
 
+#if UINT32
+
 /**
  * @brief Write whatever is still in the cache to the MRAM.
  * If the given run is not depleted, copy its remainder to the output.
@@ -58,8 +47,8 @@ extern seqreader_t sr[NR_TASKLETS][2];  // sequential readers used to read runs
  * @param out Whither to flush.
  * @param i The number of items currently in the cache.
 **/
-static inline void flush_cache_and_run(T const * const ptr, T __mram_ptr *from,
-        T __mram_ptr const * const to, T __mram_ptr *out, size_t i) {
+static __noinline void flush_cache_and_run_(T const * const ptr, T __mram_ptr *from,
+        T __mram_ptr const *to, T __mram_ptr *out, size_t i) {
     T * const cache = buffers[me()].cache;
     (void)ptr;
     /* Transfer cache to MRAM. */
@@ -72,16 +61,90 @@ static inline void flush_cache_and_run(T const * const ptr, T __mram_ptr *from,
             return;
         }
         from++;
+        printf("Gepaddet!\n");
     }
 #endif
+    mram_write(cache, out, i * sizeof(T));
+    out += i;
+    printf("cache:\n");
+    print_single_line(cache, i);
+
+    /* Transfer from MRAM to MRAM. */
+    // The last element which can be read via `mram_read`.
+    T __mram_ptr const * const to_aligned = ((uintptr_t)to & DMA_OFF_MASK) ? to : to - 1;
+    printf("to %p  to_aligned %p\n", to, to_aligned);
+    size_t rem_size = MAX_TRANSFER_SIZE_TRIPLE;  // size of what is loaded
+    size_t rem_length = MAX_TRANSFER_LENGTH_TRIPLE;  // length of what is loaded
+    if ((uintptr_t)from & DMA_OFF_MASK) {
+        size_t rem_size_shifted = rem_size - 2 * sizeof(T);  // size of what is stored
+        size_t rem_length_shifted = rem_size_shifted / sizeof(T);  // length of what is stored
+        from--;
+        while (from < to_aligned) {
+            if (from + rem_length_shifted > to_aligned) {
+                rem_size = (size_t)to_aligned - (size_t)from + 3 * sizeof(T);
+                rem_length = rem_size / sizeof(T);
+                rem_size_shifted = rem_size - 2 * sizeof(T);
+                rem_length_shifted = rem_size_shifted / sizeof(T);
+            }
+            mram_read(from, cache, rem_size);
+            printf("flushing shifted (from %p, rem_size %u, rem_len %u):\n", from, rem_size, rem_length);
+            print_single_line(cache, rem_length);
+            for (size_t i = 1; i < rem_length; i++) {
+                cache[i - 1] = cache[i];
+            }
+            mram_write(cache, out, rem_size_shifted);
+            printf("becomes (rem_length_shifted %u)\n", rem_length_shifted);
+            print_single_line(cache, rem_length_shifted);
+            from += rem_length_shifted;
+            out += rem_length_shifted;
+        };
+        if (from < to) {  // @todo replace with check on to and to_aligned
+            printf("Schwanz eigenhändisch\n");
+            *out = *to;
+        }
+    } else {
+        while (from < to_aligned) {
+            if (from + MAX_TRANSFER_LENGTH_TRIPLE > to_aligned) {
+                rem_size = (size_t)to_aligned - (size_t)from + sizeof(T);
+                rem_length = rem_size / sizeof(T);
+            }
+            mram_read(from, cache, rem_size);
+            mram_write(cache, out, rem_size);
+            printf("flushing normally (from %p, rem_size %u, rem_len %u):\n", from, rem_size, rem_length);
+            print_single_line(cache, rem_size >> DIV);
+            from += rem_length;
+            out += rem_length;
+        };
+        if (from == to) {
+            printf("Schwanz eigenhändisch\n");
+            *out = *to;
+        }
+    }
+}
+
+#elif UINT64
+
+/**
+ * @brief Write whatever is still in the cache to the MRAM.
+ * If the given run is not depleted, copy its remainder to the output.
+ * 
+ * @param ptr The current buffer item of the run.
+ * @param from The MRAM address of the current item of the run.
+ * @param to The MRAM address of the last item of the run.
+ * @param out Whither to flush.
+ * @param i The number of items currently in the cache.
+**/
+static __noinline void flush_cache_and_run_(T const * const ptr, T __mram_ptr *from,
+        T __mram_ptr const *to, T __mram_ptr *out, size_t i) {
+    T * const cache = buffers[me()].cache;
+    (void)ptr;
+    /* Transfer cache to MRAM. */
     mram_write(cache, out, i * sizeof(T));
     out += i;
 
     /* Transfer from MRAM to MRAM. */
     size_t rem_size = MAX_TRANSFER_SIZE_TRIPLE;
     do {
-        // Thanks to the dummy values, even for numbers smaller than `DMA_ALIGNMENT` bytes,
-        // there is no need to round the size up.
         if (from + MAX_TRANSFER_LENGTH_TRIPLE > to) {
             rem_size = (size_t)to - (size_t)from + sizeof(T);
         }
@@ -91,6 +154,8 @@ static inline void flush_cache_and_run(T const * const ptr, T __mram_ptr *from,
         out += MAX_TRANSFER_LENGTH_TRIPLE;  // … after which it is not needed anymore, however.
     } while (from <= to);
 }
+
+#endif  // UINT64
 
 /**
  * @brief Copy the remainder of a run from the MRAM to the output.
@@ -99,7 +164,7 @@ static inline void flush_cache_and_run(T const * const ptr, T __mram_ptr *from,
  * @param to The MRAM address of the last item of the run.
  * @param out Whither to flush.
 **/
-static inline void flush_run(T __mram_ptr *from, T __mram_ptr const *to, T __mram_ptr *out) {
+static inline void flush_run_(T __mram_ptr *from, T __mram_ptr const *to, T __mram_ptr *out) {  // @todo: Änderungen übertragen
     T * const cache = buffers[me()].cache;
     /* Transfer from MRAM to MRAM. */
     size_t rem_size = MAX_TRANSFER_SIZE_TRIPLE;
@@ -114,25 +179,6 @@ static inline void flush_run(T __mram_ptr *from, T __mram_ptr const *to, T __mra
         from += MAX_TRANSFER_LENGTH_TRIPLE;  // Value may be wrong for the last transfer …
         out += MAX_TRANSFER_LENGTH_TRIPLE;  // … after which it is not needed anymore, however.
     } while (from <= to);
-}
-
-/**
- * @brief Write whatever is still in the cache to the MRAM.
- * 
- * @param ptr The current buffer item of the second.
- * @param out Whither to flush.
- * @param i The number of items currently in the cache.
-**/
-static inline void flush_cache(T * const ptr, T __mram_ptr * const out, size_t i) {
-    T * const cache = buffers[me()].cache;
-    (void)ptr;
-#ifdef UINT32
-    if (i & 1) {  // Is there need for alignment?
-        // This is easily possible since the non-depleted run must have at least one more item.
-        cache[i++] = *ptr;
-    }
-#endif
-    mram_write(cache, out, i * sizeof(T));
 }
 
 /**
@@ -190,13 +236,24 @@ out += MAX_FILL_LENGTH
  * @param ends The last items of the two runs.
  * @param out Whither the merged runs are written.
 **/
-static inline void merge_mram_aligned(T *ptr[2], T __mram_ptr * const ends[2], T __mram_ptr *out,
+void merge_mram(T *ptr[2], T __mram_ptr * const ends[2], T __mram_ptr *out,
         seqreader_buffer_t wram[2]) {
     (void)wram;
     T * const cache = buffers[me()].cache;
     size_t i = 0;
     T val[2] = { *ptr[0], *ptr[1] };
     uintptr_t mram[2] = { sr[me()][0].mram_addr, sr[me()][1].mram_addr };
+#if UINT32  // `out` may not be DMA-aligned, so an item is transferred singularly.
+    if ((uintptr_t)out & DMA_OFF_MASK) {
+        if (val[0] <= val[1]) {
+            *out++ = val[0];
+            SR_GET(ptr[0], &sr[me()][0], mram[0], wram[0]);
+        } else {
+            *out++ = val[1];
+            SR_GET(ptr[1], &sr[me()][1], mram[1], wram[1]);
+        }
+    }
+#endif
     if (*ends[0] <= *ends[1]) {
         T __mram_ptr * const early_end = ends[0] - UNROLL_FACTOR + 1;
         while (sr_tell(ptr[0], &sr[me()][0], mram[0]) <= early_end) {
@@ -210,13 +267,19 @@ static inline void merge_mram_aligned(T *ptr[2], T __mram_ptr * const ends[2], T
                 mram_write(cache, out, i * sizeof(T));
                 out += i;
             }
-            FLUSH_AFTER_TIER_1();
+            flush_run_(sr_tell(ptr[1], &sr[me()][1], mram[1]), ends[1], out);
             return;
         }
         while (true) {
             MERGE_WITH_CACHE_FLUSH(
                 if (sr_tell(ptr[0], &sr[me()][0], mram[0]) >= ends[0]) {
-                    FLUSH_IN_TIER_2();
+                    flush_cache_and_run_(
+                        ptr[1],
+                        sr_tell(ptr[1], &sr[me()][1], mram[1]),
+                        ends[1],
+                        out,
+                        i
+                    );
                     return;
                 },
                 {}
@@ -232,14 +295,14 @@ static inline void merge_mram_aligned(T *ptr[2], T __mram_ptr * const ends[2], T
                 mram_write(cache, out, i * sizeof(T));
                 out += i;
             }
-            flush_run(sr_tell(ptr[0], &sr[me()][0], mram[0]), ends[0], out);
+            flush_run_(sr_tell(ptr[0], &sr[me()][0], mram[0]), ends[0], out);
             return;
         }
         while (true) {
             MERGE_WITH_CACHE_FLUSH(
                 {},
                 if (sr_tell(ptr[1], &sr[me()][1], mram[1]) >= ends[1]) {
-                    flush_cache_and_run(
+                    flush_cache_and_run_(
                         ptr[0],
                         sr_tell(ptr[0], &sr[me()][0], mram[0]),
                         ends[0],

@@ -26,7 +26,7 @@ T __mram_noinit input[LOAD_INTO_MRAM];  // array of random numbers
 T __mram_noinit output[LOAD_INTO_MRAM / 2];
 mram_range ranges[NR_TASKLETS];
 struct xorshift input_rngs[NR_TASKLETS];
-bool flipped;  // Whether `input` or `output` contains the final sorted sequence.
+bool is_flipped;  // Whether `input` or `output` contains the final sorted sequence.
 bool dummy;  // Whether a dummy value was set at the end of the input sequence.
 
 BARRIER_INIT(omni_barrier, NR_TASKLETS);
@@ -134,9 +134,9 @@ int main(void) {
     print_time(cycles, "SORT");
 #endif
 
-    if (me() == 0) flipped = flipped_own;
+    if (me() == 0) is_flipped = flipped_own;
     barrier_wait(&omni_barrier);
-    T __mram_ptr *within = (flipped) ? output : input;
+    T __mram_ptr *within = (is_flipped) ? output : input;
     (void)within;  // Surpresses warning if no sanity checks are done.
 
     /* Validate sorted elements. */

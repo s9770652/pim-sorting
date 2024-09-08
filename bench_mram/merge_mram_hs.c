@@ -3,32 +3,33 @@
  * @brief Measuring runtimes of a half-space MergeSort (sequential, MRAM, regular readers).
 **/
 
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <alloc.h>
 #include <barrier.h>
+#include <defs.h>
 #include <memmram_utils.h>
 #include <perfcounter.h>
 
 #include "checkers.h"
 #include "communication.h"
 #include "random_distribution.h"
-#include "random_generator.h"
-
-#define MRAM_MERGE HALF_SPACE
-#include "mram_merging.h"
+#include "starting_runs.h"
 
 struct dpu_arguments __host host_to_dpu;
 struct dpu_results __host dpu_to_host;
 T __mram_noinit_keep input[LOAD_INTO_MRAM];  // set by the host
-T __mram_noinit_keep output[LOAD_INTO_MRAM / 2];
+T __mram_noinit_keep output[LOAD_INTO_MRAM];
 
 triple_buffers buffers[NR_TASKLETS];
 struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input (in debug mode)
 struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the pivot
 
 BARRIER_INIT(omni_barrier, NR_TASKLETS);
+
+#define MRAM_MERGE HALF_SPACE
+#include "mram_merging_aligned.h"
 
 seqreader_t sr[NR_TASKLETS][2];  // sequential readers used to read runs
 
@@ -63,7 +64,7 @@ static void merge_sort_half_space(T __mram_ptr * const start, T __mram_ptr * con
                 sr_init(buffers[me()].seq_1, out, &sr[me()][0]),
                 sr_init(buffers[me()].seq_2, run_1_end + 1, &sr[me()][1]),
             };
-            merge(ptr, ends, run_1_start, wram);
+            merge_mram_aligned(ptr, ends, run_1_start, wram);
         }
     }
 }

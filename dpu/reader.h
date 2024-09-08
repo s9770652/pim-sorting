@@ -76,10 +76,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
  * @return The WRAM buffer address of the first MRAM item.
 **/
-T *sr_init(seqreader_buffer_t cache, void __mram_ptr *mram, seqreader_t *reader) {
-    reader->mram_addr = (uintptr_t)mram;
+static inline T *sr_init(seqreader_buffer_t cache, void __mram_ptr *mram, seqreader_t *reader) {
+    reader->mram_addr = (uintptr_t)mram & ~DMA_OFF_MASK;
     mram_read((void __mram_ptr *)reader->mram_addr, (void *)cache, PAGE_SIZE);
-    return (T *)cache;
+    return (T *)(cache + ((uintptr_t)mram & DMA_OFF_MASK));
 }
 
 /**
@@ -94,7 +94,7 @@ T *sr_init(seqreader_buffer_t cache, void __mram_ptr *mram, seqreader_t *reader)
  * 
  * @return The MRAM address of the given item.
 **/
-T __mram_ptr *sr_tell(T *ptr, seqreader_t *reader, uintptr_t mram) {
+static inline T __mram_ptr *sr_tell(T *ptr, seqreader_t *reader, uintptr_t mram) {
     (void)reader;
     return (T __mram_ptr *)(mram + ((uintptr_t)ptr & PAGE_OFF_MASK));
 }
@@ -150,11 +150,11 @@ __asm__ volatile(                                            \
  * 
  * @return The WRAM buffer address of the first MRAM item.
 **/
-T *sr_init(seqreader_buffer_t cache, __mram_ptr void *mram_addr, seqreader_t *reader) {
+static inline T *sr_init(seqreader_buffer_t cache, void __mram_ptr *mram, seqreader_t *reader) {
     reader->wram_cache = cache;
     reader->mram_addr = (uintptr_t)(1 << __DPU_MRAM_SIZE_LOG2);
 
-    uintptr_t target_addr = (uintptr_t)mram_addr;
+    uintptr_t target_addr = (uintptr_t)mram;
     uintptr_t current_addr = (uintptr_t)reader->mram_addr;
     uintptr_t wram_cache = (uintptr_t)reader->wram_cache;
     uintptr_t mram_offset = target_addr - current_addr;
@@ -176,7 +176,7 @@ T *sr_init(seqreader_buffer_t cache, __mram_ptr void *mram_addr, seqreader_t *re
  * 
  * @return The MRAM address of the given item.
 **/
-T __mram_ptr *sr_tell(void *ptr, seqreader_t *reader, uintptr_t mram) {
+static inline T __mram_ptr *sr_tell(void *ptr, seqreader_t *reader, uintptr_t mram) {
     (void)mram;
     return (__mram_ptr void *)((uintptr_t)reader->mram_addr + ((uintptr_t)ptr & PAGE_OFF_MASK));
 }
@@ -204,7 +204,7 @@ ptr = (T *)__builtin_dpu_seqread_get((uintptr_t)ptr, sizeof(T), reader, PAGE_SIZ
  * 
  * @return The WRAM buffer address of the first MRAM item.
 **/
-T *sr_init(seqreader_buffer_t cache, void __mram_ptr *mram, seqreader_t *reader) {
+static inline T *sr_init(seqreader_buffer_t cache, void __mram_ptr *mram, seqreader_t *reader) {
     return seqread_init(cache, mram, reader);
 }
 
@@ -217,7 +217,7 @@ T *sr_init(seqreader_buffer_t cache, void __mram_ptr *mram, seqreader_t *reader)
  * 
  * @return The MRAM address of the given item.
 **/
-T __mram_ptr *sr_tell(void *ptr, seqreader_t *reader, uintptr_t mram) {
+static inline T __mram_ptr *sr_tell(void *ptr, seqreader_t *reader, uintptr_t mram) {
     (void)mram;
     return seqread_tell(ptr, reader);
 }
