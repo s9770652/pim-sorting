@@ -85,7 +85,7 @@ struct Params input_params(int argc, char **argv) {
     p.lengths = "512";
     p.dist_type = 3;
     p.dist_param = 0;
-    p.n_reps = 3;
+    p.n_reps = 1;
     p.mode = 0;
 
     int opt;
