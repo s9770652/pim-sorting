@@ -60,8 +60,8 @@ extern seqreader_t sr[NR_TASKLETS][2];  // sequential readers used to read runs
  * @param out Whither to flush.
  * @param i The number of items currently in the cache.
 **/
-static void flush_cache_and_run(T const * const ptr, T __mram_ptr *from, T __mram_ptr const *to,
-        T __mram_ptr *out, size_t i) {
+static inline void flush_cache_and_run(T const * const ptr, T __mram_ptr *from,
+        T __mram_ptr const *to, T __mram_ptr *out, size_t i) {
     T * const cache = buffers[me()].cache;
     (void)ptr;
     /* Transfer cache to MRAM. */
@@ -101,7 +101,7 @@ static void flush_cache_and_run(T const * const ptr, T __mram_ptr *from, T __mra
  * @param to The MRAM address of the last item of the run.
  * @param out Whither to flush.
 **/
-static void flush_run(T __mram_ptr *from, T __mram_ptr const *to, T __mram_ptr *out) {
+static inline void flush_run(T __mram_ptr *from, T __mram_ptr const *to, T __mram_ptr *out) {
     T * const cache = buffers[me()].cache;
     /* Transfer from MRAM to MRAM. */
     size_t rem_size = MAX_TRANSFER_SIZE_TRIPLE;
@@ -192,7 +192,7 @@ out += MAX_FILL_LENGTH
  * @param ends The last items of the two runs.
  * @param out Whither the merged runs are written.
 **/
-static void merge(T *ptr[2], T __mram_ptr * const ends[2], T __mram_ptr *out,
+static inline void merge(T *ptr[2], T __mram_ptr * const ends[2], T __mram_ptr *out,
         seqreader_buffer_t wram[2]) {
     (void)wram;
     T * const cache = buffers[me()].cache;
