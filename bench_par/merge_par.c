@@ -28,8 +28,9 @@ BARRIER_INIT(omni_barrier, NR_TASKLETS);
 
 seqreader_t sr[NR_TASKLETS][2];  // sequential readers used to read runs
 bool flipped[NR_TASKLETS];  // Whether a write-back from the auxiliary array is (not) needed.
-mram_range from[2 * NR_TASKLETS];
+mram_range from[NR_TASKLETS][2];
 mram_range to[NR_TASKLETS];
+size_t borders[NR_TASKLETS];
 
 size_t binary_search(T const to_find, T __mram_ptr *array, size_t start, size_t end) {
     if (end <= start) return start;
@@ -46,21 +47,22 @@ size_t binary_search(T const to_find, T __mram_ptr *array, size_t start, size_t 
 
 // @todo: copy_run if flipped[-1] != flipped[0]
 static void merge_par(size_t l, size_t r) {
+    seqreader_buffer_t wram[2] = { buffers[me()].seq_1, buffers[me()].seq_2 };
     T __mram_ptr *in = (flipped[me()]) ? output : input;
     T __mram_ptr *out = (flipped[me()]) ? input : output;
 
     print_array(out, buffers[me()].cache, host_to_dpu.length, "Before sorted");
 
-    size_t mine = me() * 2, yours = (me() + 1) * 2;
-    from[mine].start = l, from[mine].end = r;
+    size_t mine = me(), yours = me() + 1;
+    from[mine][0].start = l, from[mine][0].end = r;
     if (me() == 0) {
         handshake_wait_for(me() + 1);
         mram_range *runs[2];  // 0: shorter; 1: longer
-        if ((from[mine].end - from[mine].start) <= (from[yours].end - from[yours].start)) {
-            runs[0] = &from[mine], runs[1] = &from[yours];
+        if ((from[mine][0].end - from[mine][0].start) <= (from[yours][0].end - from[yours][0].start)) {
+            runs[0] = &from[mine][0], runs[1] = &from[yours][0];
         }
         else {
-            runs[0] = &from[yours], runs[1] = &from[mine];
+            runs[0] = &from[yours][0], runs[1] = &from[mine][0];
         }
         size_t lens[2] = {
             runs[0]->end - runs[0]->start + 1,
@@ -73,7 +75,6 @@ static void merge_par(size_t l, size_t r) {
         size_t border = (pivot - runs[1]->start) + (cut_at - runs[0]->start);
         out[border] = in[pivot];
 
-        seqreader_buffer_t wram[2] = { buffers[me()].seq_1, buffers[me()].seq_2 };
         T __mram_ptr *ends[2] = { &in[cut_at - 1], &in[pivot - 1] };
         T *ptr[2] = {
             sr_init(buffers[me()].seq_1, &in[runs[0]->start], &sr[me()][0]),
@@ -87,21 +88,38 @@ static void merge_par(size_t l, size_t r) {
 
         merge_mram(ptr, ends, out, wram);
 
-        ends[0] = &in[runs[0]->end];
-        ends[1] = &in[runs[1]->end];
-        ptr[0] = sr_init(buffers[me()].seq_1, &in[cut_at], &sr[me()][0]);
-        ptr[1] = sr_init(buffers[me()].seq_2, &in[pivot + 1], &sr[me()][1]);
+        from[yours][0].start = cut_at;
+        from[yours][0].end = runs[0]->end;
+        from[yours][1].start = pivot + 1;
+        from[yours][1].end = runs[1]->end;
+        borders[yours] = border + 1;
 
-        printf("starts: %p (%u) %p (%u)\n", &in[cut_at], (uintptr_t)&in[cut_at] & 7, &in[pivot + 1], (uintptr_t)&in[pivot + 1] & 7);
-        printf("ends: %p (%u) %p (%u)\n", ends[0], (uintptr_t)ends[0] & 7, ends[1], (uintptr_t)ends[1] & 7);
-        printf("Gesamtlänge: %u (%u + %u)\n", ends[0] - &in[cut_at] + 1 + ends[1] - &in[pivot + 1] + 1, ends[0] - &in[cut_at] + 1, ends[1] - &in[pivot + 1] + 1);
+        handshake_notify();
 
-        merge_mram(ptr, ends, &out[border + 1], wram);
+        // ends[0] = &in[runs[0]->end];
+        // ends[1] = &in[runs[1]->end];
+        // ptr[0] = sr_init(buffers[me()].seq_1, &in[cut_at], &sr[me()][0]);
+        // ptr[1] = sr_init(buffers[me()].seq_2, &in[pivot + 1], &sr[me()][1]);
+
+        // printf("starts: %p (%u) %p (%u)\n", &in[cut_at], (uintptr_t)&in[cut_at] & 7, &in[pivot + 1], (uintptr_t)&in[pivot + 1] & 7);
+        // printf("ends: %p (%u) %p (%u)\n", ends[0], (uintptr_t)ends[0] & 7, ends[1], (uintptr_t)ends[1] & 7);
+        // printf("Gesamtlänge: %u (%u + %u)\n", ends[0] - &in[cut_at] + 1 + ends[1] - &in[pivot + 1] + 1, ends[0] - &in[cut_at] + 1, ends[1] - &in[pivot + 1] + 1);
+
+        // merge_mram(ptr, ends, &out[border + 1], wram);
     } else {
         handshake_notify();
+        handshake_wait_for(me() - 1);
+
+        T __mram_ptr *ends[2] = { &in[from[mine][0].end], &in[from[mine][1].end] };
+        T *ptr[2] = {
+            sr_init(buffers[me()].seq_1, &in[from[mine][0].start], &sr[me()][0]),
+            sr_init(buffers[me()].seq_2, &in[from[mine][1].start], &sr[me()][1]),
+        };
+        merge_mram(ptr, ends, &out[borders[mine]], wram);
     }
     flipped[me()] = !flipped[me()];
 
+    barrier_wait(&omni_barrier);
     print_array(out, buffers[me()].cache, host_to_dpu.length, "Sorted");
 }
 
@@ -110,7 +128,7 @@ static void merge_par_(T __mram_ptr * const start, T __mram_ptr * const end) {
     merge_sort_mram(start, end);
     print_array(output, buffers[me()].cache, host_to_dpu.length, "Starting runs");
 
-    merge_par(from[me()].start, from[me()].end - 1);
+    merge_par(from[me()][0].start, from[me()][0].end - 1);
 }
 
 union algo_to_test __host algos[] = {
@@ -147,7 +165,7 @@ int main(void) {
         me() * host_to_dpu.part_length,
         (me() == NR_TASKLETS - 1) ? host_to_dpu.offset : (me() + 1) * host_to_dpu.part_length,
     };
-    from[me()].start = range.start, from[me()].end = range.end;
+    from[me()][0].start = range.start, from[me()][0].end = range.end;
     sort_algo_mram * const algo = algos[host_to_dpu.algo_index].data.fct.mram;
     memset(&dpu_to_host, 0, sizeof dpu_to_host);
 
