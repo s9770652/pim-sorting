@@ -199,7 +199,7 @@ static inline void merge_mram_aligned(T *ptr[2], T __mram_ptr * const ends[2], T
     uintptr_t mram[2] = { sr[me()][0].mram_addr, sr[me()][1].mram_addr };
     if (*ends[0] <= *ends[1]) {
         T __mram_ptr * const early_end = ends[0] - UNROLL_FACTOR + 1;
-        while (sr_tell(ptr[0], &sr[me()][0], mram[0]) <= early_end) {
+        while ((intptr_t)sr_tell(ptr[0], &sr[me()][0], mram[0]) <= (intptr_t)early_end) {
             MERGE_WITH_CACHE_FLUSH({}, {});
         }
         if (sr_tell(ptr[0], &sr[me()][0], mram[0]) > ends[0]) {
@@ -224,7 +224,7 @@ static inline void merge_mram_aligned(T *ptr[2], T __mram_ptr * const ends[2], T
         }
     } else {
         T __mram_ptr * const early_end = ends[1] - UNROLL_FACTOR + 1;
-        while (sr_tell(ptr[1], &sr[me()][1], mram[1]) <= early_end) {
+        while ((intptr_t)sr_tell(ptr[1], &sr[me()][1], mram[1]) <= (intptr_t)early_end) {
             MERGE_WITH_CACHE_FLUSH({}, {});
         }
         if (sr_tell(ptr[1], &sr[me()][1], mram[1]) > ends[1]) {
