@@ -317,7 +317,7 @@ void merge_mram(T *ptr[2], T __mram_ptr * const ends[2], T __mram_ptr *out,
         }
     }
 #endif
-    if (*ends[0] <= *ends[1]) {
+    if (*ends[0] <= *ends[1]) {  // @todo: später herausnehmen und evtl. Parameter tauschen -> UNROLL_FACTOR größer
         T __mram_ptr * const early_end = ends[0] - UNROLL_FACTOR + 1;
         while (sr_tell(ptr[0], &sr[me()][0], mram[0]) <= early_end) {
             MERGE_WITH_CACHE_FLUSH({}, {});
