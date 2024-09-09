@@ -122,6 +122,68 @@ static __noinline void flush_cache_and_run_(T const * const ptr, T __mram_ptr *f
     }
 }
 
+/**
+ * @brief Copy the remainder of a run from the MRAM to the output.
+ * 
+ * @param from The MRAM address of the current item of the run.
+ * @param to The MRAM address of the last item of the run.
+ * @param out Whither to flush.
+**/
+static inline void flush_run_(T __mram_ptr *from, T __mram_ptr const *to, T __mram_ptr *out) {
+    T * const cache = buffers[me()].cache;
+    /* Transfer from MRAM to MRAM. */
+    // The last element which can be read via `mram_read`.
+    T __mram_ptr const * const to_aligned = ((uintptr_t)to & DMA_OFF_MASK) ? to : to - 1;
+    printf("to %p  to_aligned %p\n", to, to_aligned);
+    size_t rem_size = MAX_TRANSFER_SIZE_TRIPLE;  // size of what is loaded
+    size_t rem_length = MAX_TRANSFER_LENGTH_TRIPLE;  // length of what is loaded
+    if ((uintptr_t)from & DMA_OFF_MASK) {
+        size_t rem_size_shifted = rem_size - 2 * sizeof(T);  // size of what is stored
+        size_t rem_length_shifted = rem_size_shifted / sizeof(T);  // length of what is stored
+        from--;
+        while (from < to_aligned) {
+            if (from + rem_length_shifted > to_aligned) {
+                rem_size = (size_t)to_aligned - (size_t)from + 3 * sizeof(T);
+                rem_length = rem_size / sizeof(T);
+                rem_size_shifted = rem_size - 2 * sizeof(T);
+                rem_length_shifted = rem_size_shifted / sizeof(T);
+            }
+            mram_read(from, cache, rem_size);
+            printf("flushing shifted (from %p, rem_size %u, rem_len %u):\n", from, rem_size, rem_length);
+            print_single_line(cache, rem_length);
+            for (size_t i = 1; i < rem_length; i++) {
+                cache[i - 1] = cache[i];
+            }
+            mram_write(cache, out, rem_size_shifted);
+            printf("becomes (rem_length_shifted %u)\n", rem_length_shifted);
+            print_single_line(cache, rem_length_shifted);
+            from += rem_length_shifted;
+            out += rem_length_shifted;
+        };
+        if (from < to) {  // @todo replace with check on to and to_aligned
+            printf("Schwanz eigenhändisch\n");
+            *out = *to;
+        }
+    } else {
+        while (from < to_aligned) {
+            if (from + MAX_TRANSFER_LENGTH_TRIPLE > to_aligned) {
+                rem_size = (size_t)to_aligned - (size_t)from + sizeof(T);
+                rem_length = rem_size / sizeof(T);
+            }
+            mram_read(from, cache, rem_size);
+            mram_write(cache, out, rem_size);
+            printf("flushing normally (from %p, rem_size %u, rem_len %u):\n", from, rem_size, rem_length);
+            print_single_line(cache, rem_size >> DIV);
+            from += rem_length;
+            out += rem_length;
+        };
+        if (from == to) {
+            printf("Schwanz eigenhändisch\n");
+            *out = *to;
+        }
+    }
+}
+
 #elif UINT64
 
 /**
@@ -155,8 +217,6 @@ static __noinline void flush_cache_and_run_(T const * const ptr, T __mram_ptr *f
     } while (from <= to);
 }
 
-#endif  // UINT64
-
 /**
  * @brief Copy the remainder of a run from the MRAM to the output.
  * 
@@ -164,7 +224,7 @@ static __noinline void flush_cache_and_run_(T const * const ptr, T __mram_ptr *f
  * @param to The MRAM address of the last item of the run.
  * @param out Whither to flush.
 **/
-static inline void flush_run_(T __mram_ptr *from, T __mram_ptr const *to, T __mram_ptr *out) {  // @todo: Änderungen übertragen
+static inline void flush_run_(T __mram_ptr *from, T __mram_ptr const *to, T __mram_ptr *out) {
     T * const cache = buffers[me()].cache;
     /* Transfer from MRAM to MRAM. */
     size_t rem_size = MAX_TRANSFER_SIZE_TRIPLE;
@@ -180,6 +240,9 @@ static inline void flush_run_(T __mram_ptr *from, T __mram_ptr const *to, T __mr
         out += MAX_TRANSFER_LENGTH_TRIPLE;  // … after which it is not needed anymore, however.
     } while (from <= to);
 }
+
+#endif  // UINT64
+
 
 /**
  * @brief Merges the `MAX_FILL_LENGTH` least items in the current pair of runs.
