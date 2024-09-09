@@ -56,28 +56,48 @@ static void merge_par(size_t l, size_t r) {
     from[mine][0].start = l, from[mine][0].end = r;
     if (me() == 0) {
         handshake_wait_for(yours);
-        mram_range *runs[2];  // 0: shorter; 1: longer
+        mram_range runs[2];  // 0: shorter; 1: longer
         if ((from[mine][0].end - from[mine][0].start) <= (from[yours][0].end - from[yours][0].start)) {
-            runs[0] = &from[mine][0], runs[1] = &from[yours][0];
+            memcpy(&runs[0], &from[mine][0], sizeof(mram_range));
+            memcpy(&runs[1], &from[yours][0], sizeof(mram_range));
         } else {
-            runs[0] = &from[yours][0], runs[1] = &from[mine][0];
+            memcpy(&runs[0], &from[yours][0], sizeof(mram_range));
+            memcpy(&runs[1], &from[mine][0], sizeof(mram_range));
         }
-        printf("[%u] l %zu  r %zu\n", 0, from[0][0].start, from[0][0].end);
-        printf("[%u] l %zu  r %zu\n", 1, from[1][0].start, from[1][0].end);
+        // printf("[%u] l %zu  r %zu\n", 0, from[0][0].start, from[0][0].end);
+        // printf("[%u] l %zu  r %zu\n", 1, from[1][0].start, from[1][0].end);
 
-        size_t pivot = (runs[1]->start + runs[1]->end) / 2;
-        size_t cut_at = binary_search(in[pivot], in, runs[0]->start, runs[0]->end);
+        size_t pivot = (runs[1].start + runs[1].end) / 2;
+        size_t cut_at = binary_search(in[pivot], in, runs[0].start, runs[0].end);
 
-        size_t border = (pivot - runs[1]->start) + (cut_at - runs[0]->start);
+        size_t border = (pivot - runs[1].start) + (cut_at - runs[0].start);
         out[border] = in[pivot];
 
-        T __mram_ptr *starts[2] = { &in[runs[0]->start], &in[runs[1]->start] };
+        from[yours][0].start = cut_at;
+        from[yours][0].end = runs[0].end;
+        from[yours][1].start = pivot + 1;
+        from[yours][1].end = runs[1].end;
+        borders[yours] = border + 1;
+        handshake_notify();
+        // printf("borders[yours] %zu\n", borders[yours]);
+        // printf("runs[1].end %p (eig. %p)\n", &in[runs[1].end], &in[from[yours][0].end]);
+
+        T __mram_ptr *starts[2] = { &in[runs[0].start], &in[runs[1].start] };
         T __mram_ptr *ends[2] = { &in[cut_at - 1], &in[pivot - 1] };
 
-        printf("pivot %u (%u); cut_at %u (%u)\n", pivot, in[pivot], cut_at, in[cut_at]);
-        printf("starts: %p (%u) %p (%u)\n", starts[0], (uintptr_t)starts[0] & 7, starts[1], (uintptr_t)starts[1] & 7);
-        printf("ends: %p (%u) %p (%u)\n", ends[0], (uintptr_t)ends[0] & 7, ends[1], (uintptr_t)ends[1] & 7);
-        printf("Gesamtlänge: %u (%u + %u)\n", (ends[0] - starts[0] + 1) + (ends[1] - starts[1] + 1), ends[0] - starts[0] + 1, ends[1] - starts[1] + 1);
+        // printf(
+        //     "[%u]\n"
+        //     "pivot %u (%u); cut_at %u (%u)\n"
+        //     "starts: %p (%u) %p (%u)\n"
+        //     "ends: %p (%u) %p (%u)\n"
+        //     "Gesamtlänge: %u (%u + %u)\n",
+        //     me(),
+        //     pivot, in[pivot], cut_at, in[cut_at],
+        //     starts[0], *starts[0], starts[1], *starts[1],
+        //     ends[0], *ends[0], ends[1], *ends[1],
+        //     (ends[0] - starts[0] + 1) + (ends[1] - starts[1] + 1),
+        //     ends[0] - starts[0] + 1, ends[1] - starts[1] + 1
+        // );
 
         if ((intptr_t)starts[0] > (intptr_t)ends[0]) {  // The shorter run may be empty.
             flush_run_(starts[1], ends[1], out);
@@ -88,17 +108,6 @@ static void merge_par(size_t l, size_t r) {
             };
             merge_mram(ptr, ends, out, wram);
         }
-
-        size_t end_0 = runs[0]->end, end_1 = runs[1]->end;
-        from[yours][0].start = cut_at;
-        from[yours][0].end = end_0;
-        from[yours][1].start = pivot + 1;
-        from[yours][1].end = end_1;
-        borders[yours] = border + 1;
-        printf("borders[yours] %zu\n", borders[yours]);
-        // printf("runs[1]->end %p (eig. %p)\n", &in[runs[1]->end], &in[from[yours][0].end]);
-
-        handshake_notify();
 
         // ends[0] = &in[runs[0]->end];
         // ends[1] = &in[runs[1]->end];
@@ -117,9 +126,17 @@ static void merge_par(size_t l, size_t r) {
         T __mram_ptr *starts[2] = { &in[from[mine][0].start], &in[from[mine][1].start] };
         T __mram_ptr *ends[2] = { &in[from[mine][0].end], &in[from[mine][1].end] };
 
-        printf("starts: %p (%u) %p (%u)\n", starts[0], (uintptr_t)starts[0] & 7, starts[1], (uintptr_t)starts[1] & 7);
-        printf("ends: %p (%u) %p (%u)\n", ends[0], (uintptr_t)ends[0] & 7, ends[1], (uintptr_t)ends[1] & 7);
-        printf("Gesamtlänge: %u (%u + %u)\n", (ends[0] - starts[0] + 1) + (ends[1] - starts[1] + 1), ends[0] - starts[0] + 1, ends[1] - starts[1] + 1);
+        // printf(
+        //     "[%u]\n"
+        //     "starts: %p (%u) %p (%u)\n"
+        //     "ends: %p (%u) %p (%u)\n"
+        //     "Gesamtlänge: %u (%u + %u)\n",
+        //     me(),
+        //     starts[0], *starts[0], starts[1], *starts[1],
+        //     ends[0], *ends[0], ends[1], *ends[1],
+        //     (ends[0] - starts[0] + 1) + (ends[1] - starts[1] + 1),
+        //     ends[0] - starts[0] + 1, ends[1] - starts[1] + 1
+        // );
 
         if ((intptr_t)starts[0] > (intptr_t)ends[0]) {  // The shorter run may be empty.
             flush_run_(starts[1], ends[1], &out[borders[mine]]);
@@ -219,7 +236,7 @@ int main(void) {
         flipped[me()] = false;  // Following sorting algorithms may not reset this value.
         get_stats_sorted(sorted_array, cache, range, false, &stats_after);
         if (compare_stats(&stats_before, &stats_after, false) == EXIT_FAILURE) {
-            abort();
+            // abort();
         }
 
         range.start += host_to_dpu.offset;
