@@ -20,7 +20,7 @@
 #include "starting_runs.h"
 
 /// @brief How many items are merged in an unrolled fashion.
-#define UNROLL_FACTOR (2)
+#define UNROLL_FACTOR (4)
 /// @brief How many items the cache holds before they are written to the MRAM.
 #define MAX_FILL_LENGTH (MAX_TRANSFER_LENGTH_CACHE / UNROLL_FACTOR * UNROLL_FACTOR)
 /// @brief How many bytes the items the cache holds before they are written to the MRAM have.
@@ -68,8 +68,6 @@ static __noinline void flush_cache_and_run_(T const * const ptr, T __mram_ptr *f
 #endif
     mram_write(cache, out, i * sizeof(T));
     out += i;
-    // printf("cache:\n");
-    // print_single_line(cache, i);
 
     /* Transfer from MRAM to MRAM. */
     // The last element which can be read via `mram_read`.
@@ -83,20 +81,24 @@ static __noinline void flush_cache_and_run_(T const * const ptr, T __mram_ptr *f
         from--;  // From now on, `from` is already merged, `from + 1` is not.
         while (from < to_aligned - 1) {
             if (from + rem_length_shifted > to_aligned) {
-                rem_size = (size_t)to_aligned - (size_t)from + 3 * sizeof(T);
+                rem_size = (size_t)to_aligned - (size_t)from + sizeof(T);
                 rem_length = rem_size / sizeof(T);
                 rem_size_shifted = rem_size - 2 * sizeof(T);
                 rem_length_shifted = rem_size_shifted / sizeof(T);
             }
             mram_read(from, cache, rem_size);
-            // printf("flushing shifted (from %p, rem_size %u, rem_len %u):\n", from, rem_size, rem_length);
-            // print_single_line(cache, rem_length);
+            // if (me() == 6) {
+            //     printf("flushing shifted (from %p, rem_size %u, rem_len %u):\n", from, rem_size, rem_length);
+            //     print_single_line(cache, rem_length);
+            // }
             for (size_t i = 1; i < rem_length; i++) {
                 cache[i - 1] = cache[i];
             }
             mram_write(cache, out, rem_size_shifted);
-            // printf("becomes (rem_length_shifted %u)\n", rem_length_shifted);
-            // print_single_line(cache, rem_length_shifted);
+            // if (me() == 6) {
+            //     printf("becomes (rem_length_shifted %u)\n", rem_length_shifted);
+            //     print_single_line(cache, rem_length_shifted);
+            // }
             from += rem_length_shifted;
             out += rem_length_shifted;
         };
@@ -104,12 +106,9 @@ static __noinline void flush_cache_and_run_(T const * const ptr, T __mram_ptr *f
         //     printf("Schwanz (%u) eigenhändisch (from %u)\n", *to, *from);
         //     *out = *to;
         // }
-        if ((from + 1) <= to) {
+        while ((from + 1) <= to) {
             *out++ = *++from;
-            if ((from + 1) <= to)
-                *out++ = *++from;
         }
-
     } else {
         while (from < to_aligned) {
             if (from + MAX_TRANSFER_LENGTH_TRIPLE > to_aligned) {
@@ -123,9 +122,8 @@ static __noinline void flush_cache_and_run_(T const * const ptr, T __mram_ptr *f
             from += rem_length;
             out += rem_length;
         };
-        if (from == to) {
-            // printf("Schwanz eigenhändisch\n");
-            *out = *to;
+        while (from <= to) {
+            *out++ = *from++;
         }
     }
 }
@@ -151,18 +149,27 @@ static inline void flush_run_(T __mram_ptr *from, T __mram_ptr const *to, T __mr
         from--;  // From now on, `from` is already merged, `from + 1` is not.
         while (from < to_aligned - 1) {
             if (from + rem_length_shifted > to_aligned) {
-                rem_size = (size_t)to_aligned - (size_t)from + 3 * sizeof(T);
+                rem_size = (size_t)to_aligned - (size_t)from + sizeof(T);
                 rem_length = rem_size / sizeof(T);
                 rem_size_shifted = rem_size - 2 * sizeof(T);
                 rem_length_shifted = rem_size_shifted / sizeof(T);
             }
             mram_read(from, cache, rem_size);
+            // if (me() == 14) {
+            //     printf("to %p  to_aligned %p\n", to, to_aligned);
+            //     printf("flushing shifted (from %p, rem_size %u, rem_len %u):\n", from, rem_size, rem_length);
+            //     print_single_line(cache, rem_length);
+            // }
             // printf("flushing shifted (from %p, rem_size %u, rem_len %u):\n", from, rem_size, rem_length);
             // print_single_line(cache, rem_length);
             for (size_t i = 1; i < rem_length; i++) {
                 cache[i - 1] = cache[i];
             }
             mram_write(cache, out, rem_size_shifted);
+            // if (me() == 14) {
+            //     printf("becomes (rem_length_shifted %u)\n", rem_length_shifted);
+            //     print_single_line(cache, rem_length_shifted);
+            // }
             // printf("becomes (rem_length_shifted %u)\n", rem_length_shifted);
             // print_single_line(cache, rem_length_shifted);
             from += rem_length_shifted;
@@ -172,12 +179,9 @@ static inline void flush_run_(T __mram_ptr *from, T __mram_ptr const *to, T __mr
         //     printf("Schwanz (%u) eigenhändisch (from %u)\n", *to, *from);
         //     *out = *to;
         // }
-        if ((from + 1) <= to) {
+        while ((from + 1) <= to) {
             *out++ = *++from;
-            if ((from + 1) <= to)
-                *out++ = *++from;
         }
-
     } else {
         while (from < to_aligned) {
             if (from + MAX_TRANSFER_LENGTH_TRIPLE > to_aligned) {
@@ -191,9 +195,8 @@ static inline void flush_run_(T __mram_ptr *from, T __mram_ptr const *to, T __mr
             from += rem_length;
             out += rem_length;
         };
-        if (from == to) {
-            // printf("Schwanz eigenhändisch\n");
-            *out = *to;
+        while (from <= to) {
+            *out++ = *from++;
         }
     }
 }

@@ -33,7 +33,7 @@
 #endif  // MRAM_MERGE == HALF_SPACE
 
 /// @brief How many items are merged in an unrolled fashion.
-#define UNROLL_FACTOR (8)
+#define UNROLL_FACTOR (4)
 /// @brief How many items the cache holds before they are written to the MRAM.
 #define MAX_FILL_LENGTH (MAX_TRANSFER_LENGTH_CACHE / UNROLL_FACTOR * UNROLL_FACTOR)
 /// @brief How many bytes the items the cache holds before they are written to the MRAM have.

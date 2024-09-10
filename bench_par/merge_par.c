@@ -3,6 +3,7 @@
 
 #include <barrier.h>
 #include <defs.h>
+#include <dpuruntime.h>
 #include <handshake.h>
 #include <memmram_utils.h>
 #include <perfcounter.h>
@@ -29,7 +30,6 @@ BARRIER_INIT(omni_barrier, NR_TASKLETS);
 seqreader_t sr[NR_TASKLETS][2];  // sequential readers used to read runs
 bool flipped[NR_TASKLETS];  // Whether a write-back from the auxiliary array is (not) needed.
 mram_range from[NR_TASKLETS][2];
-mram_range to[NR_TASKLETS];
 size_t borders[NR_TASKLETS];
 
 size_t binary_search(T const to_find, T __mram_ptr *array, size_t start, size_t end) {
@@ -45,113 +45,163 @@ size_t binary_search(T const to_find, T __mram_ptr *array, size_t start, size_t 
     return right;
 }
 
-static void merge_par(size_t l, size_t r) {
+static void merge_par() {
     seqreader_buffer_t wram[2] = { buffers[me()].seq_1, buffers[me()].seq_2 };
-    T __mram_ptr *in = (flipped[me()]) ? output : input;
-    T __mram_ptr *out = (flipped[me()]) ? input : output;
 
     // print_array(out, buffers[me()].cache, host_to_dpu.length, "Before sorted");
 
-    size_t mine = me(), yours = (me() == 0) ? me() + 1 : me() - 1;
-    from[mine][0].start = l, from[mine][0].end = r;
-    if (me() == 0) {
-        handshake_wait_for(yours);
-        mram_range runs[2];  // 0: shorter; 1: longer
-        if ((from[mine][0].end - from[mine][0].start) <= (from[yours][0].end - from[yours][0].start)) {
-            memcpy(&runs[0], &from[mine][0], sizeof(mram_range));
-            memcpy(&runs[1], &from[yours][0], sizeof(mram_range));
+    // from[me()][0].start = l, from[me()][0].end = r;
+    unsigned char const trailing_zeros = (me() == 0) ? 32 : __builtin_ctz(me());
+    // printf("Für mich, %u, sind es %d Nullen.\n", me(), trailing_zeros);
+    for (sysname_t round = 1; (1 << round) <= NR_TASKLETS; round++) {
+        T __mram_ptr *in = (flipped[me()]) ? output : input;
+        T __mram_ptr *out = (flipped[me()]) ? input : output;
+        sysname_t I = me();
+        // Are the `sub_round` LSB are all zero?
+        if (!(I & ((1 << round) - 1))) {
+            // If so, I am a root tasklet and have to wait for the tasklets within my tree.
+            for (sysname_t i = 1; i < (1 << round); i++) {
+                // printf("Ich bin %u und warte auf %u.\n", I, I + i);
+                handshake_wait_for(I + i);
+            }
+            // printf("Ich, %u, bin Wurzel und hole mir den Lauf von %u.\n", me(), I | (1 << (round - 1)));
+            from[I][1] = from[I | (1 << (round - 1))][0];
         } else {
-            memcpy(&runs[0], &from[yours][0], sizeof(mram_range));
-            memcpy(&runs[1], &from[mine][0], sizeof(mram_range));
+            // If not, I am an inner tasklet and have to wait for my root to wake me up.
+            // printf("Ich bin %u und warte.\n", I);
+            handshake_notify();
+            __stop();
+            // printf("Ich bin %u und ward erweckt.\n", I);
         }
-        // printf("[%u] l %zu  r %zu\n", 0, from[0][0].start, from[0][0].end);
-        // printf("[%u] l %zu  r %zu\n", 1, from[1][0].start, from[1][0].end);
+        // I have been awoken and wake now sequentially the tasklets within my subtree,
+        // that is those with less zeroes in their LSB.
+        for (sysname_t sub_round = (trailing_zeros > round) ? round : trailing_zeros; sub_round >= 1; sub_round--) {
+            sysname_t ye = I ^ (1 << (sub_round - 1));
 
-        size_t pivot = (runs[1].start + runs[1].end) / 2;
-        size_t cut_at = binary_search(in[pivot], in, runs[0].start, runs[0].end);
+            mram_range runs[2];  // 0: shorter; 1: longer
+            if ((ptrdiff_t)(from[I][0].end - from[I][0].start) <= (ptrdiff_t)(from[I][1].end - from[I][1].start)) {
+                runs[0] = from[I][0];
+                runs[1] = from[I][1];
+            } else {
+                runs[0] = from[I][0];
+                runs[1] = from[I][1];
+            }
+            size_t pivot = (runs[1].start + runs[1].end) / 2;
+            size_t cut_at = binary_search(in[pivot], in, runs[0].start, runs[0].end);
+            size_t border = borders[I] + (pivot - runs[1].start) + (cut_at - runs[0].start);
+            out[border] = in[pivot];
+            // if (me() == 6) {
+            //     printf("!!!PIVOT (%u) zu %u bei %u!!!\n", in[pivot], out[border], border);
+            // }
 
-        size_t border = (pivot - runs[1].start) + (cut_at - runs[0].start);
-        out[border] = in[pivot];
+            from[ye][0].start = cut_at;
+            from[ye][0].end = runs[0].end;
+            from[ye][1].start = pivot + 1;
+            from[ye][1].end = runs[1].end;
+            borders[ye] = border + 1;
+            // printf(
+            //     "Bei mir, %u, gilt pivot = %u (%u) und cut_at = %u (%u).\n"
+            //     "Läufe: %u--%u; %u--%u\n",
+            //     I, pivot, in[pivot], cut_at, in[cut_at],
+            //     runs[0].start, runs[0].end, runs[1].start, runs[1].end
+            // );
+            // printf(
+            //     "Für %u setze ich, %u,\n"
+            //     "starts: %u (%u) %u (%u)\n"
+            //     "ends: %u (%u) %u (%u)\n"
+            //     "Gesamtlänge: %u (%u + %u)\n"
+            //     "Anfang bei %u\n\n",
+            //     ye, I,
+            //     from[ye][0].start, (from[ye][0].start > host_to_dpu.length) ? 99 : in[from[ye][0].start], from[ye][1].start, (from[ye][1].start > host_to_dpu.length) ? 99 : in[from[ye][1].start],
+            //     from[ye][0].end, (from[ye][0].end > host_to_dpu.length) ? 99 : in[from[ye][0].end], from[ye][1].end, (from[ye][1].end > host_to_dpu.length) ? 99 : in[from[ye][1].end],
+            //     (from[ye][0].end - from[ye][0].start + 1) + (from[ye][1].end - from[ye][1].start + 1), from[ye][0].end - from[ye][0].start + 1, from[ye][1].end - from[ye][1].start + 1,
+            //     borders[ye]
+            // );
+            // printf("Ich bin %u und wecke %u.\n", I, ye);
+            __resume(ye, "0");
 
-        from[yours][0].start = cut_at;
-        from[yours][0].end = runs[0].end;
-        from[yours][1].start = pivot + 1;
-        from[yours][1].end = runs[1].end;
-        borders[yours] = border + 1;
-        handshake_notify();
-        // printf("borders[yours] %zu\n", borders[yours]);
-        // printf("runs[1].end %p (eig. %p)\n", &in[runs[1].end], &in[from[yours][0].end]);
 
-        T __mram_ptr *starts[2] = { &in[runs[0].start], &in[runs[1].start] };
-        T __mram_ptr *ends[2] = { &in[cut_at - 1], &in[pivot - 1] };
+            from[I][0].start = runs[0].start;
+            from[I][0].end = cut_at - 1;
+            from[I][1].start = runs[1].start;
+            from[I][1].end = pivot - 1;
 
-        // printf(
-        //     "[%u]\n"
-        //     "pivot %u (%u); cut_at %u (%u)\n"
-        //     "starts: %p (%u) %p (%u)\n"
-        //     "ends: %p (%u) %p (%u)\n"
-        //     "Gesamtlänge: %u (%u + %u)\n",
-        //     me(),
-        //     pivot, in[pivot], cut_at, in[cut_at],
-        //     starts[0], *starts[0], starts[1], *starts[1],
-        //     ends[0], *ends[0], ends[1], *ends[1],
-        //     (ends[0] - starts[0] + 1) + (ends[1] - starts[1] + 1),
-        //     ends[0] - starts[0] + 1, ends[1] - starts[1] + 1
-        // );
-
+            // printf(
+            //     "Für mich, %u, setze ich\n"
+            //     "starts: %u (%u) %u (%u)\n"
+            //     "ends: %u (%u) %u (%u)\n"
+            //     "Gesamtlänge: %u (%u + %u)\n"
+            //     "Anfang bei %u\n\n",
+            //     I,
+            //     from[I][0].start, (from[I][0].start > host_to_dpu.length) ? 99 : in[from[I][0].start], from[I][1].start, (from[I][1].start > host_to_dpu.length) ? 99 : in[from[I][1].start],
+            //     from[I][0].end, (from[I][0].end > host_to_dpu.length) ? 99 : in[from[I][0].end], from[I][1].end, (from[I][1].end > host_to_dpu.length) ? 99 : in[from[I][1].end],
+            //     (from[I][0].end - from[I][0].start + 1) + (from[I][1].end - from[I][1].start + 1), from[I][0].end - from[I][0].start + 1, from[I][1].end - from[I][1].start + 1,
+            //     borders[I]
+            // );
+        }
+        // All tasklets within my subtree are awake, so I can process my two runs.
+        T __mram_ptr *starts[2] = { &in[from[I][0].start], &in[from[I][1].start] };
+        T __mram_ptr *ends[2] = { &in[from[I][0].end], &in[from[I][1].end] };
+        // if (round == 2)
+        //     printf(
+        //         "[%u]\n"
+        //         "starts: %p (%u) %p (%u)\n"
+        //         "ends: %p (%u) %p (%u)\n"
+        //         "Gesamtlänge: %u (%u + %u)\n"
+        //         "Anfang bei %u\n\n",
+        //         me(),
+        //         starts[0], *starts[0], starts[1], *starts[1],
+        //         ends[0], *ends[0], ends[1], *ends[1],
+        //         (ends[0] - starts[0] + 1) + (ends[1] - starts[1] + 1), ends[0] - starts[0] + 1, ends[1] - starts[1] + 1,
+        //         borders[I]
+        //     );
+        // if (me() == 6) printf("Pivot was %u %u %u.\n", out[226], out[227], out[228]);
         if ((intptr_t)starts[0] > (intptr_t)ends[0]) {  // The shorter run may be empty.
-            flush_run_(starts[1], ends[1], out);
+            size_t offset = 0;
+            if ((uintptr_t)&out[borders[I]] & DMA_OFF_MASK) {
+                out[borders[I]] = *starts[1];
+                offset = 1;
+            }
+            flush_run_(starts[1] + offset, ends[1], &out[borders[I] + offset]);
         } else {
             T *ptr[2] = {
-                sr_init(buffers[me()].seq_1, starts[0], &sr[me()][0]),
-                sr_init(buffers[me()].seq_2, starts[1], &sr[me()][1]),
+                sr_init(buffers[I].seq_1, starts[0], &sr[I][0]),
+                sr_init(buffers[I].seq_2, starts[1], &sr[I][1]),
             };
-            merge_mram(ptr, ends, out, wram);
+            merge_mram(ptr, ends, &out[borders[I]], wram);
         }
+        flipped[I] = !flipped[I];
 
-        // ends[0] = &in[runs[0]->end];
-        // ends[1] = &in[runs[1]->end];
-        // ptr[0] = sr_init(buffers[me()].seq_1, &in[cut_at], &sr[me()][0]);
-        // ptr[1] = sr_init(buffers[me()].seq_2, &in[pivot + 1], &sr[me()][1]);
-
-        // printf("starts: %p (%u) %p (%u)\n", &in[cut_at], (uintptr_t)&in[cut_at] & 7, &in[pivot + 1], (uintptr_t)&in[pivot + 1] & 7);
-        // printf("ends: %p (%u) %p (%u)\n", ends[0], (uintptr_t)ends[0] & 7, ends[1], (uintptr_t)ends[1] & 7);
-        // printf("Gesamtlänge: %u (%u + %u)\n", ends[0] - &in[cut_at] + 1 + ends[1] - &in[pivot + 1] + 1, ends[0] - &in[cut_at] + 1, ends[1] - &in[pivot + 1] + 1);
-
-        // merge_mram(ptr, ends, &out[border + 1], wram);
-    } else {
-        handshake_notify();
-        handshake_wait_for(yours);
-
-        T __mram_ptr *starts[2] = { &in[from[mine][0].start], &in[from[mine][1].start] };
-        T __mram_ptr *ends[2] = { &in[from[mine][0].end], &in[from[mine][1].end] };
+        // if (me() == 6) printf("Pivot is now %u %u %u.\n", out[226], out[227], out[228]);
 
         // printf(
-        //     "[%u]\n"
-        //     "starts: %p (%u) %p (%u)\n"
-        //     "ends: %p (%u) %p (%u)\n"
-        //     "Gesamtlänge: %u (%u + %u)\n",
-        //     me(),
-        //     starts[0], *starts[0], starts[1], *starts[1],
-        //     ends[0], *ends[0], ends[1], *ends[1],
-        //     (ends[0] - starts[0] + 1) + (ends[1] - starts[1] + 1),
-        //     ends[0] - starts[0] + 1, ends[1] - starts[1] + 1
+        //     "Ich, %u, bin vorübergehen fertig und prüfe auf Synchronisationsbedarf.\n"
+        //     "Wurzel: %u\n"
+        //     "Rechtestes Blatt: %u\n\n",
+        //     I,
+        //     !(I & ((1 << round) - 1)),
+        //     (I & ((1 << round) - 1)) == ((1 << round) - 1)
         // );
-
-        if ((intptr_t)starts[0] > (intptr_t)ends[0]) {  // The shorter run may be empty.
-            flush_run_(starts[1], ends[1], &out[borders[mine]]);
-        } else {
-            T *ptr[2] = {
-                sr_init(buffers[me()].seq_1, starts[0], &sr[me()][0]),
-                sr_init(buffers[me()].seq_2, starts[1], &sr[me()][1]),
-            };
-            merge_mram(ptr, ends, &out[borders[mine]], wram);
+        if (!(I & ((1 << round) - 1))) {
+            from[I][0].start = borders[I];
+            sysname_t rightmost_leaf = I | ((1 << round) - 1);
+            // printf("Ich, %u, warte auf %u zum Synchronisieren.\n", I, rightmost_leaf);
+            handshake_wait_for(rightmost_leaf);
+            size_t length = (from[rightmost_leaf][0].end - from[rightmost_leaf][0].start + 1) + (from[rightmost_leaf][1].end - from[rightmost_leaf][1].start + 1);
+            from[I][0].end = borders[rightmost_leaf] + length - 1;
+        } else if ((I & ((1 << round) - 1)) == ((1 << round) - 1)) {
+            // printf("Ich, %u, benachrichtige meine Wurzel bzgl. des Synchronisierens.\n", I);
+            handshake_notify();
         }
+
+        // size_t length = (from[I][0].end - from[I][0].start + 1) + (from[I][1].end - from[I][1].start + 1);
+        // from[I][0].start = borders[I], from[I][0].end = borders[I] + length - 1;
+
+        // barrier_wait(&omni_barrier);
+        // if (I == 0) printf("Runde %u vorbei!\n\n\n", round);
+        // print_array((flipped[I]) ? output : input, buffers[I].cache, host_to_dpu.length, "Current state");
+        // barrier_wait(&omni_barrier);
     }
-    flipped[me()] = !flipped[me()];
-
-    barrier_wait(&omni_barrier);
-    print_array(out, buffers[me()].cache, host_to_dpu.length, "Sorted");
 }
 
 static void merge_par_(T __mram_ptr * const start, T __mram_ptr * const end) {
@@ -170,9 +220,11 @@ static void merge_par_(T __mram_ptr * const start, T __mram_ptr * const end) {
         }
         handshake_notify();
     }
-    print_array((flipped[me()]) ? output : input, buffers[me()].cache, host_to_dpu.length, "Starting runs");
+    // print_array((flipped[me()]) ? output : input, buffers[me()].cache, host_to_dpu.length, "Starting runs");
+    // barrier_wait(&omni_barrier);
 
-    merge_par(from[me()][0].start, from[me()][0].end - 1);
+    borders[me()] = from[me()][0].start;
+    merge_par();
 }
 
 union algo_to_test __host algos[] = {
@@ -190,7 +242,7 @@ int main(void) {
     /* Set up dummy values if called via debugger. */
     if (me() == 0 && host_to_dpu.length == 0) {
         host_to_dpu.reps = 1;
-        host_to_dpu.length = 0x7004;  // 0x102
+        host_to_dpu.length = 0x4002;  // 0x102
         host_to_dpu.offset = DMA_ALIGNED(host_to_dpu.length * sizeof(T)) / sizeof(T);
         host_to_dpu.part_length = ALIGN(
             DIV_CEIL(host_to_dpu.length, NR_TASKLETS) * sizeof(T),
@@ -210,7 +262,7 @@ int main(void) {
         me() * host_to_dpu.part_length,
         (me() == NR_TASKLETS - 1) ? host_to_dpu.offset : (me() + 1) * host_to_dpu.part_length,
     };
-    from[me()][0].start = range.start, from[me()][0].end = range.end;
+    from[me()][0].start = range.start, from[me()][0].end = range.end - 1;
     sort_algo_mram * const algo = algos[host_to_dpu.algo_index].data.fct.mram;
     memset(&dpu_to_host, 0, sizeof dpu_to_host);
 
@@ -236,7 +288,7 @@ int main(void) {
         flipped[me()] = false;  // Following sorting algorithms may not reset this value.
         get_stats_sorted(sorted_array, cache, range, false, &stats_after);
         if (compare_stats(&stats_before, &stats_after, false) == EXIT_FAILURE) {
-            // abort();
+            abort();
         }
 
         range.start += host_to_dpu.offset;
