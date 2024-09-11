@@ -234,7 +234,9 @@ int main(int argc, char **argv) {
         memset(dpu_to_host, 0, sizeof(struct dpu_results[num_of_algos]));
         uint32_t const reps_per_launch = LOAD_INTO_MRAM / len;
         for (uint32_t rep = 0; rep < p.n_reps; rep += reps_per_launch) {
-            host_to_dpu.reps = (reps_per_launch > p.n_reps - rep) ? p.n_reps - rep : reps_per_launch;
+            host_to_dpu.reps = (reps_per_launch > (p.n_reps - rep)) ?
+                    p.n_reps - rep :
+                    reps_per_launch;
 
             for (uint32_t i = 0; i < host_to_dpu.reps; i++) {
                 generate_input_distribution(&input[i * offset], len, p.dist_type, p.dist_param);

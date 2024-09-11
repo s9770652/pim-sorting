@@ -160,7 +160,7 @@ bool compare_stats(array_stats const * const stats_1, array_stats const * const 
         bool const print_on_success) {
     if (me() != 0) return EXIT_SUCCESS;
     bool same_elements = stats_1->sum == stats_2->sum;
-    same_elements &= memcmp(stats_1->counts, stats_2->counts, NR_COUNTS * sizeof(counts[0][0])) == 0;
+    same_elements &= memcmp(stats_1->counts, stats_2->counts, NR_COUNTS*sizeof(counts[0][0])) == 0;
     if (!same_elements) {
         printf("[" ANSI_COLOR_RED "ERROR" ANSI_COLOR_RESET "] Elements have changed.\n");
         printf("\nSums: %lu ↔ %lu\nCounts: ", stats_1->sum, stats_2->sum);

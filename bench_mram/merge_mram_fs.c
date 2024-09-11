@@ -30,7 +30,7 @@ array_stats stats_before, stats_after;
 BARRIER_INIT(omni_barrier, NR_TASKLETS);
 
 seqreader_t sr[NR_TASKLETS][2];  // sequential readers used to read runs
-bool flipped[NR_TASKLETS];  // Whether a write-back from the auxiliary array is (not) needed.
+bool flipped[NR_TASKLETS];  // Whether `output` contains the latest sorted runs.
 
 static void merge_sort_full_space(T __mram_ptr * const start, T __mram_ptr * const end) {
     merge_sort_mram(start, end);

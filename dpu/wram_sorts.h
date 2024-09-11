@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief An implementation of the fastest WRAM QuickSort.
+ * @brief Sequential sorting of WRAM data through the fastest QuickSort.
 **/
 
 #ifndef _BASE_SORT_H_
@@ -10,8 +10,6 @@
 
 #include "common.h"
 #include "pivot.h"
-
-static __attribute__((unused)) T *call_stacks[NR_TASKLETS][40];  // call stack for iter. QuickSort
 
 /**
  * @brief An implementation of standard InsertionSort.
@@ -80,6 +78,8 @@ swap(i, right)
 #else  // UINT64
 
 #define __RECURSIVE__ (false)
+
+static T *call_stacks[NR_TASKLETS][40];  // call stack for iter. QuickSort
 
 // A “call” stack for holding the values of `left` and `right` is maintained.
 // Its memory must be reserved beforehand.

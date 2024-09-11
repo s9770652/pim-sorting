@@ -28,7 +28,7 @@ triple_buffers buffers[NR_TASKLETS];
 struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input (in debug mode)
 struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the pivot
 
-static bool flipped[NR_TASKLETS];  // Whether a write-back from the auxiliary array is (not) needed.
+static bool flipped[NR_TASKLETS];  // Whether `output` contains the latest sorted runs.
 
 #define FLUSH_BATCH_LENGTH (24)  // The number of elements flushed at once if possible.
 
@@ -72,7 +72,8 @@ static void insertion_sort_sentinel(T * const start, T * const end) {
  * @param end The last element of said array.
  * @param step The distance between any two elements compared.
 **/
-static __attribute__((unused)) void insertion_sort_with_steps_sentinel(T * const start, T * const end, size_t const step) {
+static __attribute__((unused)) void insertion_sort_with_steps_sentinel(T * const start,
+        T * const end, size_t const step) {
     T *curr, *i = start;
     while ((curr = (i += step)) <= end) {
         T const to_sort = *curr;

@@ -43,7 +43,8 @@ static void generate_sorted_distribution(T array[], size_t const length, T const
  * @param length How many numbers are to be generated.
  * @param smallest_value The value of the last element.
 **/
-static void generate_reversed_sorted_distribution(T array[], size_t const length, T const smallest_value) {
+static void generate_reversed_sorted_distribution(T array[], size_t const length,
+        T const smallest_value) {
     T const base_value = smallest_value + length - 1;
     for (size_t i = 0; i < length; i++) {
         array[i] = base_value - i;

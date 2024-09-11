@@ -45,25 +45,25 @@ typedef struct mram_range_ptr {
  * @param curr_size Set to the size of the current block, properly aligned for DMAs.
  * @param range Start and end of the tasklet’s range.
 **/
-#define LOOP_ON_MRAM(i, curr_length, curr_size, range)         \
-for (                                                          \
-    i = range.start,                                           \
-    curr_length = (i + MAX_TRANSFER_LENGTH_TRIPLE > range.end) \
-            ? range.end - i                                    \
-            : MAX_TRANSFER_LENGTH_TRIPLE,                      \
-    curr_size = (i + MAX_TRANSFER_LENGTH_TRIPLE > range.end)   \
-            ? DMA_ALIGNED(curr_length * sizeof(T))             \
-            : MAX_TRANSFER_SIZE_TRIPLE                         \
-    ;                                                          \
-    i < range.end                                              \
-    ;                                                          \
-    i += MAX_TRANSFER_LENGTH_TRIPLE,                           \
-    curr_length = (i + MAX_TRANSFER_LENGTH_TRIPLE > range.end) \
-            ? range.end - i                                    \
-            : MAX_TRANSFER_LENGTH_TRIPLE,                      \
-    curr_size = (i + MAX_TRANSFER_LENGTH_TRIPLE > range.end)   \
-            ? DMA_ALIGNED(curr_length * sizeof(T))             \
-            : MAX_TRANSFER_SIZE_TRIPLE                         \
+#define LOOP_ON_MRAM(i, curr_length, curr_size, range)           \
+for (                                                            \
+    i = range.start,                                             \
+    curr_length = (i + MAX_TRANSFER_LENGTH_TRIPLE > range.end) ? \
+            range.end - i :                                      \
+            MAX_TRANSFER_LENGTH_TRIPLE,                          \
+    curr_size = (i + MAX_TRANSFER_LENGTH_TRIPLE > range.end) ?   \
+            DMA_ALIGNED(curr_length * sizeof(T)) :               \
+            MAX_TRANSFER_SIZE_TRIPLE                             \
+    ;                                                            \
+    i < range.end                                                \
+    ;                                                            \
+    i += MAX_TRANSFER_LENGTH_TRIPLE,                             \
+    curr_length = (i + MAX_TRANSFER_LENGTH_TRIPLE > range.end) ? \
+            range.end - i :                                      \
+            MAX_TRANSFER_LENGTH_TRIPLE,                          \
+    curr_size = (i + MAX_TRANSFER_LENGTH_TRIPLE > range.end) ?   \
+            DMA_ALIGNED(curr_length * sizeof(T)) :               \
+            MAX_TRANSFER_SIZE_TRIPLE                             \
 )
 
 /**
@@ -78,22 +78,22 @@ for (                                                          \
 #define LOOP_ON_MRAM_BL(i, curr_length, curr_size, range, block_length) \
 for (                                                                   \
     i = range.start,                                                    \
-    curr_length = (i + (block_length) > range.end)                      \
-            ? range.end - i                                             \
-            : (block_length),                                           \
-    curr_size = (i + (block_length) > range.end)                        \
-            ? DMA_ALIGNED(curr_length * sizeof(T))                      \
-            : (block_length) * sizeof(T)                                \
+    curr_length = (i + (block_length) > range.end) ?                    \
+            range.end - i :                                             \
+            (block_length),                                             \
+    curr_size = (i + (block_length) > range.end) ?                      \
+            DMA_ALIGNED(curr_length * sizeof(T)) :                      \
+            (block_length) * sizeof(T)                                  \
     ;                                                                   \
     i < range.end                                                       \
     ;                                                                   \
     i += (block_length),                                                \
-    curr_length = (i + (block_length) > range.end)                      \
-            ? range.end - i                                             \
-            : (block_length),                                           \
-    curr_size = (i + (block_length) > range.end)                        \
-            ? DMA_ALIGNED(curr_length * sizeof(T))                      \
-            : (block_length) * sizeof(T)                                \
+    curr_length = (i + (block_length) > range.end) ?                    \
+            range.end - i :                                             \
+            (block_length),                                             \
+    curr_size = (i + (block_length) > range.end) ?                      \
+            DMA_ALIGNED(curr_length * sizeof(T)) :                      \
+            (block_length) * sizeof(T)                                  \
 )
 
 /**
@@ -105,29 +105,29 @@ for (                                                                   \
  * @param range Start and end of the tasklet’s range.
  * @param block_length Number of elements per block.
 **/
-#define LOOP_BACKWARDS_ON_MRAM_BL(i, curr_length, curr_size, range, block_length)   \
-for (                                                                               \
-    curr_length = ((intptr_t)(range.end - (block_length)) >= (intptr_t)range.start) \
-            ? (block_length)                                                        \
-            : range.end - range.start,                                              \
-    curr_size = ((intptr_t)(range.end - (block_length)) >= (intptr_t)range.start)   \
-            ? (block_length) * sizeof(T)                                            \
-            : DMA_ALIGNED(curr_length * sizeof(T)),                                 \
-    i = ((intptr_t)(range.end - (block_length)) >= (intptr_t)range.start)           \
-            ? range.end - (block_length)                                            \
-            : range.start                                                           \
-    ;                                                                               \
-    (intptr_t)curr_length > 0                                                       \
-    ;                                                                               \
-    curr_length = ((intptr_t)(i - (block_length)) >= (intptr_t)range.start)         \
-            ? (block_length)                                                        \
-            : i - range.start,                                                      \
-    curr_size = ((intptr_t)(i - (block_length)) >= (intptr_t)range.start)           \
-            ? (block_length) * sizeof(T)                                            \
-            : DMA_ALIGNED(curr_length * sizeof(T)),                                 \
-    i = ((intptr_t)(i - (block_length)) >= (intptr_t)range.start)                   \
-            ? i - (block_length)                                                    \
-            : range.start                                                           \
+#define LOOP_BACKWARDS_ON_MRAM_BL(i, curr_length, curr_size, range, block_length)     \
+for (                                                                                 \
+    curr_length = ((intptr_t)(range.end - (block_length)) >= (intptr_t)range.start) ? \
+            (block_length) :                                                          \
+            range.end - range.start,                                                  \
+    curr_size = ((intptr_t)(range.end - (block_length)) >= (intptr_t)range.start) ?   \
+            (block_length) * sizeof(T) :                                              \
+            DMA_ALIGNED(curr_length * sizeof(T)),                                     \
+    i = ((intptr_t)(range.end - (block_length)) >= (intptr_t)range.start) ?           \
+            range.end - (block_length) :                                              \
+            range.start                                                               \
+    ;                                                                                 \
+    (intptr_t)curr_length > 0                                                         \
+    ;                                                                                 \
+    curr_length = ((intptr_t)(i - (block_length)) >= (intptr_t)range.start) ?         \
+            (block_length) :                                                          \
+            i - range.start,                                                          \
+    curr_size = ((intptr_t)(i - (block_length)) >= (intptr_t)range.start) ?           \
+            (block_length) * sizeof(T) :                                              \
+            DMA_ALIGNED(curr_length * sizeof(T)),                                     \
+    i = ((intptr_t)(i - (block_length)) >= (intptr_t)range.start) ?                   \
+            i - (block_length) :                                                      \
+            range.start                                                               \
 )
 
 #endif  // _MRAM_LOOP_H_

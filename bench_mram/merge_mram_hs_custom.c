@@ -282,9 +282,9 @@ static void merge_sort_half_space(T __mram_ptr * const start, T __mram_ptr * con
             run_1_end -= 2 * run_length, run_2_end -= 2 * run_length
         ) {
             // Copy the current run …
-            T __mram_ptr *run_1_start = ((intptr_t)(run_1_end - run_length + 1) > (intptr_t)start)
-                    ? run_1_end - run_length + 1
-                    : start;
+            T __mram_ptr *run_1_start = ((intptr_t)(run_1_end - run_length + 1) > (intptr_t)start) ?
+                    run_1_end - run_length + 1 :
+                    start;
             copy_run(run_1_start, run_1_end, out);
             // … and merge the copy with the next run.
             reset_reader(&readers[0], out, out + (run_1_end - run_1_start));
