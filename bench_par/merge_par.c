@@ -1,3 +1,7 @@
+/**
+ * @file
+ * @brief Parallel MergeSort based on Cormen et al. ‘Algorithmen – Eine Einführung’, 4th ed.
+**/
 #include <stdlib.h>
 #include <string.h>
 
@@ -28,10 +32,21 @@ array_stats stats_before, stats_after;
 BARRIER_INIT(omni_barrier, NR_TASKLETS);
 
 seqreader_t sr[NR_TASKLETS][2];  // sequential readers used to read runs
-bool flipped[NR_TASKLETS];  // Whether a write-back from the auxiliary array is (not) needed.
+bool flipped[NR_TASKLETS];  // Whether `output` contains the latest sorted runs.
 mram_range from[NR_TASKLETS][2];
 size_t borders[NR_TASKLETS];
 
+/**
+ * @brief Finds the lowest index 𝘪 ∈ [`start`, `end`] such that `to_find` < `array[𝘪]`.
+ * If the array is empty, `start` is returned. If `to_find` ≦ `array[start]`, `start` is returned.
+ * 
+ * @param to_find The element for which to find the next greater element.
+ * @param array The array where to search for the next greater element.
+ * @param start The index of the first element to consider.
+ * @param end The index of the last element to consider.
+ * 
+ * @return The index of the next greater element or, if none exists, `start`.
+**/
 size_t binary_search(T const to_find, T __mram_ptr *array, size_t start, size_t end) {
     if (end <= start) return start;
     size_t left = start, right = end + 1;
@@ -45,41 +60,41 @@ size_t binary_search(T const to_find, T __mram_ptr *array, size_t start, size_t 
     return right;
 }
 
-static void merge_par() {
-    seqreader_buffer_t wram[2] = { buffers[me()].seq_1, buffers[me()].seq_2 };
-
-    // print_array(out, buffers[me()].cache, host_to_dpu.length, "Before sorted");
-
-    // from[me()][0].start = l, from[me()][0].end = r;
+/**
+ * @brief Given `NR_TASKLETS` sorted MRAM runs, stored in from[…][0],
+ * this function performs a parallel MergeSort based on a scheme by Cormen et al.
+**/
+static __attribute__((unused)) void merge_par() {
+    seqreader_buffer_t const wram[2] = { buffers[me()].seq_1, buffers[me()].seq_2 };
     unsigned char const trailing_zeros = (me() == 0) ? 32 : __builtin_ctz(me());
-    // printf("Für mich, %u, sind es %d Nullen.\n", me(), trailing_zeros);
     for (sysname_t round = 1; (1 << round) <= NR_TASKLETS; round++) {
-        T __mram_ptr *in = (flipped[me()]) ? output : input;
-        T __mram_ptr *out = (flipped[me()]) ? input : output;
+        T __mram_ptr * const in = (flipped[me()]) ? output : input;
+        T __mram_ptr * const out = (flipped[me()]) ? input : output;
         sysname_t I = me();
         // Are the `sub_round` LSB are all zero?
         if (!(I & ((1 << round) - 1))) {
             // If so, I am a root tasklet and have to wait for the tasklets within my tree.
             for (sysname_t i = 1; i < (1 << round); i++) {
-                // printf("Ich bin %u und warte auf %u.\n", I, I + i);
                 handshake_wait_for(I + i);
             }
-            // printf("Ich, %u, bin Wurzel und hole mir den Lauf von %u.\n", me(), I | (1 << (round - 1)));
             from[I][1] = from[I | (1 << (round - 1))][0];
         } else {
             // If not, I am an inner tasklet and have to wait for my root to wake me up.
-            // printf("Ich bin %u und warte.\n", I);
             handshake_notify();
             __stop();
-            // printf("Ich bin %u und ward erweckt.\n", I);
         }
         // I have been awoken and wake now sequentially the tasklets within my subtree,
         // that is those with less zeroes in their LSB.
-        for (sysname_t sub_round = (trailing_zeros > round) ? round : trailing_zeros; sub_round >= 1; sub_round--) {
-            sysname_t ye = I ^ (1 << (sub_round - 1));
-
+        for (
+            sysname_t sub_round = (trailing_zeros > round) ? round : trailing_zeros;
+            sub_round >= 1;
+            sub_round--
+        ) {
+            sysname_t thou = I ^ (1 << (sub_round - 1));
+            // Calculating the division points.
             mram_range runs[2];  // 0: shorter; 1: longer
-            if ((ptrdiff_t)(from[I][0].end - from[I][0].start) <= (ptrdiff_t)(from[I][1].end - from[I][1].start)) {
+            if ((ptrdiff_t)(from[I][0].end - from[I][0].start) <=
+                    (ptrdiff_t)(from[I][1].end - from[I][1].start)) {
                 runs[0] = from[I][0];
                 runs[1] = from[I][1];
             } else {
@@ -90,79 +105,29 @@ static void merge_par() {
             size_t cut_at = binary_search(in[pivot], in, runs[0].start, runs[0].end);
             size_t border = borders[I] + (pivot - runs[1].start) + (cut_at - runs[0].start);
             out[border] = in[pivot];
-            // if (me() == 6) {
-            //     printf("!!!PIVOT (%u) zu %u bei %u!!!\n", in[pivot], out[border], border);
-            // }
-
-            from[ye][0].start = cut_at;
-            from[ye][0].end = runs[0].end;
-            from[ye][1].start = pivot + 1;
-            from[ye][1].end = runs[1].end;
-            borders[ye] = border + 1;
-            // printf(
-            //     "Bei mir, %u, gilt pivot = %u (%u) und cut_at = %u (%u).\n"
-            //     "Läufe: %u--%u; %u--%u\n",
-            //     I, pivot, in[pivot], cut_at, in[cut_at],
-            //     runs[0].start, runs[0].end, runs[1].start, runs[1].end
-            // );
-            // printf(
-            //     "Für %u setze ich, %u,\n"
-            //     "starts: %u (%u) %u (%u)\n"
-            //     "ends: %u (%u) %u (%u)\n"
-            //     "Gesamtlänge: %u (%u + %u)\n"
-            //     "Anfang bei %u\n\n",
-            //     ye, I,
-            //     from[ye][0].start, (from[ye][0].start > host_to_dpu.length) ? 99 : in[from[ye][0].start], from[ye][1].start, (from[ye][1].start > host_to_dpu.length) ? 99 : in[from[ye][1].start],
-            //     from[ye][0].end, (from[ye][0].end > host_to_dpu.length) ? 99 : in[from[ye][0].end], from[ye][1].end, (from[ye][1].end > host_to_dpu.length) ? 99 : in[from[ye][1].end],
-            //     (from[ye][0].end - from[ye][0].start + 1) + (from[ye][1].end - from[ye][1].start + 1), from[ye][0].end - from[ye][0].start + 1, from[ye][1].end - from[ye][1].start + 1,
-            //     borders[ye]
-            // );
-            // printf("Ich bin %u und wecke %u.\n", I, ye);
-            __resume(ye, "0");
-
-
+            // Telling thee thy sections and awakening thee.
+            from[thou][0].start = cut_at;
+            from[thou][0].end = runs[0].end;
+            from[thou][1].start = pivot + 1;
+            from[thou][1].end = runs[1].end;
+            borders[thou] = border + 1;
+            __resume(thou, "0");
+            // Saving mine own sections for either further division or for sorting, finally.
             from[I][0].start = runs[0].start;
             from[I][0].end = cut_at - 1;
             from[I][1].start = runs[1].start;
             from[I][1].end = pivot - 1;
-
-            // printf(
-            //     "Für mich, %u, setze ich\n"
-            //     "starts: %u (%u) %u (%u)\n"
-            //     "ends: %u (%u) %u (%u)\n"
-            //     "Gesamtlänge: %u (%u + %u)\n"
-            //     "Anfang bei %u\n\n",
-            //     I,
-            //     from[I][0].start, (from[I][0].start > host_to_dpu.length) ? 99 : in[from[I][0].start], from[I][1].start, (from[I][1].start > host_to_dpu.length) ? 99 : in[from[I][1].start],
-            //     from[I][0].end, (from[I][0].end > host_to_dpu.length) ? 99 : in[from[I][0].end], from[I][1].end, (from[I][1].end > host_to_dpu.length) ? 99 : in[from[I][1].end],
-            //     (from[I][0].end - from[I][0].start + 1) + (from[I][1].end - from[I][1].start + 1), from[I][0].end - from[I][0].start + 1, from[I][1].end - from[I][1].start + 1,
-            //     borders[I]
-            // );
         }
         // All tasklets within my subtree are awake, so I can process my two runs.
-        T __mram_ptr *starts[2] = { &in[from[I][0].start], &in[from[I][1].start] };
-        T __mram_ptr *ends[2] = { &in[from[I][0].end], &in[from[I][1].end] };
-        // if (round == 2)
-        //     printf(
-        //         "[%u]\n"
-        //         "starts: %p (%u) %p (%u)\n"
-        //         "ends: %p (%u) %p (%u)\n"
-        //         "Gesamtlänge: %u (%u + %u)\n"
-        //         "Anfang bei %u\n\n",
-        //         me(),
-        //         starts[0], *starts[0], starts[1], *starts[1],
-        //         ends[0], *ends[0], ends[1], *ends[1],
-        //         (ends[0] - starts[0] + 1) + (ends[1] - starts[1] + 1), ends[0] - starts[0] + 1, ends[1] - starts[1] + 1,
-        //         borders[I]
-        //     );
-        // if (me() == 6) printf("Pivot was %u %u %u.\n", out[226], out[227], out[228]);
+        T __mram_ptr * const starts[2] = { &in[from[I][0].start], &in[from[I][1].start] };
+        T __mram_ptr * const ends[2] = { &in[from[I][0].end], &in[from[I][1].end] };
         if ((intptr_t)starts[0] > (intptr_t)ends[0]) {  // The shorter run may be empty.
             size_t offset = 0;
             if ((uintptr_t)&out[borders[I]] & DMA_OFF_MASK) {
                 out[borders[I]] = *starts[1];
                 offset = 1;
             }
-            flush_run_(starts[1] + offset, ends[1], &out[borders[I] + offset]);
+            flush_run(starts[1] + offset, ends[1], &out[borders[I] + offset]);
         } else {
             T *ptr[2] = {
                 sr_init(buffers[I].seq_1, starts[0], &sr[I][0]),
@@ -171,42 +136,31 @@ static void merge_par() {
             merge_mram(ptr, ends, &out[borders[I]], wram);
         }
         flipped[I] = !flipped[I];
-
-        // if (me() == 6) printf("Pivot is now %u %u %u.\n", out[226], out[227], out[228]);
-
-        // printf(
-        //     "Ich, %u, bin vorübergehen fertig und prüfe auf Synchronisationsbedarf.\n"
-        //     "Wurzel: %u\n"
-        //     "Rechtestes Blatt: %u\n\n",
-        //     I,
-        //     !(I & ((1 << round) - 1)),
-        //     (I & ((1 << round) - 1)) == ((1 << round) - 1)
-        // );
-        if (!(I & ((1 << round) - 1))) {
+        // Now, I need to calculate the boundaries of the sorted run of my subtree.
+        // The root wrote to the head, the rightmost leaf to the tail.
+        if (!(I & ((1 << round) - 1))) {  // Am I the root?
             from[I][0].start = borders[I];
-            sysname_t rightmost_leaf = I | ((1 << round) - 1);
-            // printf("Ich, %u, warte auf %u zum Synchronisieren.\n", I, rightmost_leaf);
+            sysname_t const rightmost_leaf = I | ((1 << round) - 1);
             handshake_wait_for(rightmost_leaf);
-            size_t length = (from[rightmost_leaf][0].end - from[rightmost_leaf][0].start + 1) + (from[rightmost_leaf][1].end - from[rightmost_leaf][1].start + 1);
+            size_t const length = from[rightmost_leaf][0].end - from[rightmost_leaf][0].start + 1 +
+                    from[rightmost_leaf][1].end - from[rightmost_leaf][1].start + 1;
             from[I][0].end = borders[rightmost_leaf] + length - 1;
-        } else if ((I & ((1 << round) - 1)) == ((1 << round) - 1)) {
-            // printf("Ich, %u, benachrichtige meine Wurzel bzgl. des Synchronisierens.\n", I);
+        } else if ((I & ((1 << round) - 1)) == ((1 << round) - 1)) {  // Am I the rightmost leaf?
             handshake_notify();
         }
-
-        // size_t length = (from[I][0].end - from[I][0].start + 1) + (from[I][1].end - from[I][1].start + 1);
-        // from[I][0].start = borders[I], from[I][0].end = borders[I] + length - 1;
-
-        // barrier_wait(&omni_barrier);
-        // if (I == 0) printf("Runde %u vorbei!\n\n\n", round);
-        // print_array((flipped[I]) ? output : input, buffers[I].cache, host_to_dpu.length, "Current state");
-        // barrier_wait(&omni_barrier);
     }
 }
 
-static void merge_par_(T __mram_ptr * const start, T __mram_ptr * const end) {
-    // print_array(input, buffers[me()].cache, host_to_dpu.length, "Input");
+/**
+ * @brief Forms `NR_TASKLETS` starting runs, ensures that everything is within the same array and,
+ * then, merges in parallel.
+ * 
+ * @param start The first element to sort by the calling tasklet.
+ * @param end The last element to sort by the calling tasklet.
+**/
+static void merge_sort_par(T __mram_ptr * const start, T __mram_ptr * const end) {
     merge_sort_mram(start, end);
+#if (NR_TASKLETS > 1)
     if (me() == NR_TASKLETS - 2) {
         handshake_notify();
         handshake_wait_for(me() + 1);
@@ -220,15 +174,13 @@ static void merge_par_(T __mram_ptr * const start, T __mram_ptr * const end) {
         }
         handshake_notify();
     }
-    // print_array((flipped[me()]) ? output : input, buffers[me()].cache, host_to_dpu.length, "Starting runs");
-    // barrier_wait(&omni_barrier);
-
     borders[me()] = from[me()][0].start;
     merge_par();
+#endif  // NR_TASKLETS > 1
 }
 
 union algo_to_test __host algos[] = {
-    {{ "MergePar", { .mram = merge_par_ } }},
+    {{ "MergePar", { .mram = merge_sort_par } }},
 };
 size_t __host num_of_algos = sizeof algos / sizeof algos[0];
 
@@ -242,7 +194,7 @@ int main(void) {
     /* Set up dummy values if called via debugger. */
     if (me() == 0 && host_to_dpu.length == 0) {
         host_to_dpu.reps = 1;
-        host_to_dpu.length = 0x4002;  // 0x102
+        host_to_dpu.length = 0x800000;
         host_to_dpu.offset = DMA_ALIGNED(host_to_dpu.length * sizeof(T)) / sizeof(T);
         host_to_dpu.part_length = ALIGN(
             DIV_CEIL(host_to_dpu.length, NR_TASKLETS) * sizeof(T),
@@ -253,7 +205,6 @@ int main(void) {
         input_rngs[me()] = seed_xs(host_to_dpu.basic_seed + me());
         mram_range range = { 0, host_to_dpu.length * host_to_dpu.reps };
         generate_uniform_distribution_mram(input, cache, &range, 8);
-        // generate_reverse_sorted_distribution_mram(input, cache, &range);
     }
     barrier_wait(&omni_barrier);
 
@@ -277,15 +228,15 @@ int main(void) {
         if (me() == 0)
             new_time = perfcounter_get();
         algo(&input[range.start], &input[range.end - 1]);
+        barrier_wait(&omni_barrier);
         if (me() == 0) {
             new_time = perfcounter_get() - new_time - CALL_OVERHEAD;
             dpu_to_host.firsts += new_time;
             dpu_to_host.seconds += new_time * new_time;
         }
-        barrier_wait(&omni_barrier);
 
         T __mram_ptr *sorted_array = (flipped[me()]) ? output : input;
-        flipped[me()] = false;  // Following sorting algorithms may not reset this value.
+        flipped[me()] = false;
         get_stats_sorted(sorted_array, cache, range, false, &stats_after);
         if (compare_stats(&stats_before, &stats_after, false) == EXIT_FAILURE) {
             abort();

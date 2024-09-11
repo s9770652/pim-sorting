@@ -9,8 +9,8 @@ __dirs := ${shell mkdir -p ${BUILD_DIR} ${OBJ_DIR}/${HOST_DIR} ${OBJ_DIR}/${BENC
 
 # Compilation constants.
 TYPE ?= UINT32
-CACHE_SIZE ?= 2048
-SEQREAD_CACHE_SIZE ?= 256
+CACHE_SIZE ?= 504
+SEQREAD_CACHE_SIZE ?= 512
 NR_DPUS ?= 1
 NR_TASKLETS ?= 1
 PERF ?= 1

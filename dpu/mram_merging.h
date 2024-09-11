@@ -1,9 +1,8 @@
 /**
  * @file
  * @brief Merging two given MRAM runs using straight readers.
- * 
- * Offers the flag `MRAM_MERGE` to switch between full-space and half-space merging.
- * The proper output location must still be provided manually, of course.
+ * Neither the sizes of the runs nor their addresses nor the output location
+ * have to be multiples of 8.
 **/
 
 #ifndef _MRAM_MERGING_H_
@@ -20,7 +19,7 @@
 #include "starting_runs.h"
 
 /// @brief How many items are merged in an unrolled fashion.
-#define UNROLL_FACTOR (4)
+#define UNROLL_FACTOR (8)
 /// @brief How many items the cache holds before they are written to the MRAM.
 #define MAX_FILL_LENGTH (MAX_TRANSFER_LENGTH_CACHE / UNROLL_FACTOR * UNROLL_FACTOR)
 /// @brief How many bytes the items the cache holds before they are written to the MRAM have.
@@ -38,41 +37,16 @@ extern seqreader_t sr[NR_TASKLETS][2];  // sequential readers used to read runs
 #if UINT32
 
 /**
- * @brief Write whatever is still in the cache to the MRAM.
- * If the given run is not depleted, copy its remainder to the output.
+ * @brief Copy the remainder of a run from the MRAM to the output.
  * 
- * @param ptr The current buffer item of the run.
  * @param from The MRAM address of the current item of the run.
  * @param to The MRAM address of the last item of the run.
  * @param out Whither to flush.
- * @param i The number of items currently in the cache.
 **/
-static __noinline void flush_cache_and_run_(T const * const ptr, T __mram_ptr *from,
-        T __mram_ptr const *to, T __mram_ptr *out, size_t i) {
+static inline void flush_run(T __mram_ptr *from, T __mram_ptr const *to, T __mram_ptr *out) {
     T * const cache = buffers[me()].cache;
-    (void)ptr;
-    /* Transfer cache to MRAM. */
-#ifdef UINT32
-    if (i & 1) {  // Is there need for alignment?
-        // This is easily possible since the non-depleted run must have at least one more item.
-        cache[i++] = *ptr;
-        if (from >= to) {
-            // printf("cache:\n");
-            // print_single_line(cache, i);
-            mram_write(cache, out, i * sizeof(T));
-            return;
-        }
-        from++;
-        // printf("Gepaddet mit %zu!\n", *ptr);
-    }
-#endif
-    mram_write(cache, out, i * sizeof(T));
-    out += i;
-
-    /* Transfer from MRAM to MRAM. */
     // The last element which can be read via `mram_read`.
     T __mram_ptr const * const to_aligned = ((uintptr_t)to & DMA_OFF_MASK) ? to : to - 1;
-    // printf("to %p  to_aligned %p\n", to, to_aligned);
     size_t rem_size = MAX_TRANSFER_SIZE_TRIPLE;  // size of what is loaded
     size_t rem_length = MAX_TRANSFER_LENGTH_TRIPLE;  // length of what is loaded
     if ((uintptr_t)from & DMA_OFF_MASK) {
@@ -87,25 +61,16 @@ static __noinline void flush_cache_and_run_(T const * const ptr, T __mram_ptr *f
                 rem_length_shifted = rem_size_shifted / sizeof(T);
             }
             mram_read(from, cache, rem_size);
-            // if (me() == 6) {
-            //     printf("flushing shifted (from %p, rem_size %u, rem_len %u):\n", from, rem_size, rem_length);
-            //     print_single_line(cache, rem_length);
-            // }
-            for (size_t i = 1; i < rem_length; i++) {
+            // `rem_length` is always even and the last two elements are not transferred.
+            // Therefore, a step size of 2 covers everything needed.
+            for (size_t i = 1; i < rem_length_shifted; i += 2) {
                 cache[i - 1] = cache[i];
+                cache[i] = cache[i + 1];
             }
             mram_write(cache, out, rem_size_shifted);
-            // if (me() == 6) {
-            //     printf("becomes (rem_length_shifted %u)\n", rem_length_shifted);
-            //     print_single_line(cache, rem_length_shifted);
-            // }
             from += rem_length_shifted;
             out += rem_length_shifted;
         };
-        // if (from < to) {  // @todo replace with check on to and to_aligned
-        //     printf("Schwanz (%u) eigenhändisch (from %u)\n", *to, *from);
-        //     *out = *to;
-        // }
         while ((from + 1) <= to) {
             *out++ = *++from;
         }
@@ -117,8 +82,6 @@ static __noinline void flush_cache_and_run_(T const * const ptr, T __mram_ptr *f
             }
             mram_read(from, cache, rem_size);
             mram_write(cache, out, rem_size);
-            // printf("flushing normally (from %p, rem_size %u, rem_len %u):\n", from, rem_size, rem_length);
-            // print_single_line(cache, rem_size >> DIV);
             from += rem_length;
             out += rem_length;
         };
@@ -129,76 +92,30 @@ static __noinline void flush_cache_and_run_(T const * const ptr, T __mram_ptr *f
 }
 
 /**
- * @brief Copy the remainder of a run from the MRAM to the output.
+ * @brief Write whatever is still in the cache to the MRAM.
+ * If the given run is not depleted, copy its remainder to the output.
  * 
+ * @param ptr The current buffer item of the run.
  * @param from The MRAM address of the current item of the run.
  * @param to The MRAM address of the last item of the run.
  * @param out Whither to flush.
+ * @param i The number of items currently in the cache.
 **/
-static inline void flush_run_(T __mram_ptr *from, T __mram_ptr const *to, T __mram_ptr *out) {
+static __noinline void flush_cache_and_run(T const * const ptr, T __mram_ptr *from,
+        T __mram_ptr const *to, T __mram_ptr *out, size_t i) {
     T * const cache = buffers[me()].cache;
-    /* Transfer from MRAM to MRAM. */
-    // The last element which can be read via `mram_read`.
-    T __mram_ptr const * const to_aligned = ((uintptr_t)to & DMA_OFF_MASK) ? to : to - 1;
-    // printf("to %p  to_aligned %p\n", to, to_aligned);
-    size_t rem_size = MAX_TRANSFER_SIZE_TRIPLE;  // size of what is loaded
-    size_t rem_length = MAX_TRANSFER_LENGTH_TRIPLE;  // length of what is loaded
-    if ((uintptr_t)from & DMA_OFF_MASK) {
-        size_t rem_size_shifted = rem_size - 2 * sizeof(T);  // size of what is stored
-        size_t rem_length_shifted = rem_size_shifted / sizeof(T);  // length of what is stored
-        from--;  // From now on, `from` is already merged, `from + 1` is not.
-        while (from < to_aligned - 1) {
-            if (from + rem_length_shifted > to_aligned) {
-                rem_size = (size_t)to_aligned - (size_t)from + sizeof(T);
-                rem_length = rem_size / sizeof(T);
-                rem_size_shifted = rem_size - 2 * sizeof(T);
-                rem_length_shifted = rem_size_shifted / sizeof(T);
-            }
-            mram_read(from, cache, rem_size);
-            // if (me() == 14) {
-            //     printf("to %p  to_aligned %p\n", to, to_aligned);
-            //     printf("flushing shifted (from %p, rem_size %u, rem_len %u):\n", from, rem_size, rem_length);
-            //     print_single_line(cache, rem_length);
-            // }
-            // printf("flushing shifted (from %p, rem_size %u, rem_len %u):\n", from, rem_size, rem_length);
-            // print_single_line(cache, rem_length);
-            for (size_t i = 1; i < rem_length; i++) {
-                cache[i - 1] = cache[i];
-            }
-            mram_write(cache, out, rem_size_shifted);
-            // if (me() == 14) {
-            //     printf("becomes (rem_length_shifted %u)\n", rem_length_shifted);
-            //     print_single_line(cache, rem_length_shifted);
-            // }
-            // printf("becomes (rem_length_shifted %u)\n", rem_length_shifted);
-            // print_single_line(cache, rem_length_shifted);
-            from += rem_length_shifted;
-            out += rem_length_shifted;
-        };
-        // if (from < to) {  // @todo replace with check on to and to_aligned
-        //     printf("Schwanz (%u) eigenhändisch (from %u)\n", *to, *from);
-        //     *out = *to;
-        // }
-        while ((from + 1) <= to) {
-            *out++ = *++from;
+    (void)ptr;
+    if (i & 1) {  // Is there need for alignment?
+        // This is easily possible since the non-depleted run must have at least one more item.
+        cache[i++] = *ptr;
+        if (from >= to) {
+            mram_write(cache, out, i * sizeof(T));
+            return;
         }
-    } else {
-        while (from < to_aligned) {
-            if (from + MAX_TRANSFER_LENGTH_TRIPLE > to_aligned) {
-                rem_size = (size_t)to_aligned - (size_t)from + sizeof(T);
-                rem_length = rem_size / sizeof(T);
-            }
-            mram_read(from, cache, rem_size);
-            mram_write(cache, out, rem_size);
-            // printf("flushing normally (from %p, rem_size %u, rem_len %u):\n", from, rem_size, rem_length);
-            // print_single_line(cache, rem_size >> DIV);
-            from += rem_length;
-            out += rem_length;
-        };
-        while (from <= to) {
-            *out++ = *from++;
-        }
+        from++;
     }
+    mram_write(cache, out, i * sizeof(T));
+    flush_run(from, to, out + i);
 }
 
 #elif UINT64
@@ -213,25 +130,12 @@ static inline void flush_run_(T __mram_ptr *from, T __mram_ptr const *to, T __mr
  * @param out Whither to flush.
  * @param i The number of items currently in the cache.
 **/
-static __noinline void flush_cache_and_run_(T const * const ptr, T __mram_ptr *from,
+static __noinline void flush_cache_and_run(T const * const ptr, T __mram_ptr *from,
         T __mram_ptr const *to, T __mram_ptr *out, size_t i) {
     T * const cache = buffers[me()].cache;
     (void)ptr;
-    /* Transfer cache to MRAM. */
     mram_write(cache, out, i * sizeof(T));
-    out += i;
-
-    /* Transfer from MRAM to MRAM. */
-    size_t rem_size = MAX_TRANSFER_SIZE_TRIPLE;
-    do {
-        if (from + MAX_TRANSFER_LENGTH_TRIPLE > to) {
-            rem_size = (size_t)to - (size_t)from + sizeof(T);
-        }
-        mram_read(from, cache, rem_size);
-        mram_write(cache, out, rem_size);
-        from += MAX_TRANSFER_LENGTH_TRIPLE;  // Value may be wrong for the last transfer …
-        out += MAX_TRANSFER_LENGTH_TRIPLE;  // … after which it is not needed anymore, however.
-    } while (from <= to);
+    flush_run(from, to, out + i);
 }
 
 /**
@@ -241,9 +145,8 @@ static __noinline void flush_cache_and_run_(T const * const ptr, T __mram_ptr *f
  * @param to The MRAM address of the last item of the run.
  * @param out Whither to flush.
 **/
-static inline void flush_run_(T __mram_ptr *from, T __mram_ptr const *to, T __mram_ptr *out) {
+static inline void flush_run(T __mram_ptr *from, T __mram_ptr const *to, T __mram_ptr *out) {
     T * const cache = buffers[me()].cache;
-    /* Transfer from MRAM to MRAM. */
     size_t rem_size = MAX_TRANSFER_SIZE_TRIPLE;
     do {
         // Thanks to the dummy values, even for numbers smaller than `DMA_ALIGNMENT` bytes,
@@ -317,7 +220,7 @@ out += MAX_FILL_LENGTH
  * @param out Whither the merged runs are written.
 **/
 void merge_mram(T *ptr[2], T __mram_ptr * const ends[2], T __mram_ptr *out,
-        seqreader_buffer_t wram[2]) {
+        seqreader_buffer_t const wram[2]) {
     (void)wram;
     T * const cache = buffers[me()].cache;
     size_t i = 0;
@@ -336,7 +239,7 @@ void merge_mram(T *ptr[2], T __mram_ptr * const ends[2], T __mram_ptr *out,
         }
     }
 #endif
-    if (*ends[0] <= *ends[1]) {  // @todo: später herausnehmen und evtl. Parameter tauschen -> UNROLL_FACTOR größer
+    if (*ends[0] <= *ends[1]) {
         T __mram_ptr * const early_end = ends[0] - UNROLL_FACTOR + 1;
         while ((intptr_t)sr_tell(ptr[0], &sr[me()][0], mram[0]) <= (intptr_t)early_end) {
             MERGE_WITH_CACHE_FLUSH({}, {});
@@ -349,13 +252,13 @@ void merge_mram(T *ptr[2], T __mram_ptr * const ends[2], T __mram_ptr *out,
                 mram_write(cache, out, i * sizeof(T));
                 out += i;
             }
-            flush_run_(sr_tell(ptr[1], &sr[me()][1], mram[1]), ends[1], out);
+            flush_run(sr_tell(ptr[1], &sr[me()][1], mram[1]), ends[1], out);
             return;
         }
         while (true) {
             MERGE_WITH_CACHE_FLUSH(
                 if (sr_tell(ptr[0], &sr[me()][0], mram[0]) >= ends[0]) {
-                    flush_cache_and_run_(
+                    flush_cache_and_run(
                         ptr[1],
                         sr_tell(ptr[1], &sr[me()][1], mram[1]),
                         ends[1],
@@ -377,14 +280,14 @@ void merge_mram(T *ptr[2], T __mram_ptr * const ends[2], T __mram_ptr *out,
                 mram_write(cache, out, i * sizeof(T));
                 out += i;
             }
-            flush_run_(sr_tell(ptr[0], &sr[me()][0], mram[0]), ends[0], out);
+            flush_run(sr_tell(ptr[0], &sr[me()][0], mram[0]), ends[0], out);
             return;
         }
         while (true) {
             MERGE_WITH_CACHE_FLUSH(
                 {},
                 if (sr_tell(ptr[1], &sr[me()][1], mram[1]) >= ends[1]) {
-                    flush_cache_and_run_(
+                    flush_cache_and_run(
                         ptr[0],
                         sr_tell(ptr[0], &sr[me()][0], mram[0]),
                         ends[0],

@@ -7,22 +7,17 @@
 #define MRAM_MERGE FULL_SPACE
 #include "mram_merging_aligned.h"
 
-extern bool flipped[NR_TASKLETS];
-extern T output[];  // `__mram_…` not needed here.
+extern T __mram_ptr output[];
 
-/**
- * @brief An MRAM implementation of full-space MergeSort.
- * 
- * @param start The first item of the MRAM array to sort.
- * @param end The last item of said array.
-**/
+extern bool flipped[NR_TASKLETS];  // Whether `output` contains the latest sorted runs.
+
 void merge_sort_mram(T __mram_ptr * const start, T __mram_ptr * const end) {
     /* Starting runs. */
     form_starting_runs(start, end);
 
     /* Merging. */
-    seqreader_buffer_t wram[2] = { buffers[me()].seq_1, buffers[me()].seq_2 };
-    T __mram_ptr *in, *until, *out;  // Runs from `in` to `until` are merged and stored in front of `out`.
+    seqreader_buffer_t const wram[2] = { buffers[me()].seq_1, buffers[me()].seq_2 };
+    T __mram_ptr *in, *until, *out;  // Runs from `in` to `until` are merged and stored at `out`.
     bool flip = false;  // Used to determine the initial positions of `in`, `out`, and `until`.
     size_t const n = end - start + 1;
     for (size_t run_length = STARTING_RUN_LENGTH; run_length < n; run_length *= 2) {
@@ -49,8 +44,8 @@ void merge_sort_mram(T __mram_ptr * const start, T __mram_ptr * const end) {
             }
             T __mram_ptr * const ends[2] = { run_1_end, run_1_end + run_length };
             T *ptr[2] = {
-                sr_init(buffers[me()].seq_1, run_1_start, &sr[me()][0]),
-                sr_init(buffers[me()].seq_2, run_1_end + 1, &sr[me()][1]),
+                sr_init_aligned(buffers[me()].seq_1, run_1_start, &sr[me()][0]),
+                sr_init_aligned(buffers[me()].seq_2, run_1_end + 1, &sr[me()][1]),
             };
             merge_mram_aligned(ptr, ends, out, wram);
         }
