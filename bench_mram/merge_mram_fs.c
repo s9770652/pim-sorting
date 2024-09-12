@@ -53,10 +53,8 @@ int main(void) {
         host_to_dpu.reps = 1;
         host_to_dpu.length = 0x1000;
         host_to_dpu.offset = DMA_ALIGNED(host_to_dpu.length * sizeof(T)) / sizeof(T);
-        host_to_dpu.part_length = ALIGN(
-            DIV_CEIL(host_to_dpu.length, NR_TASKLETS) * sizeof(T),
-            16
-        ) / sizeof(T);
+        host_to_dpu.part_length =
+                DMA_ALIGNED(DIV_CEIL(host_to_dpu.length, NR_TASKLETS) * sizeof(T)) / sizeof(T);
         host_to_dpu.basic_seed = 0b1011100111010;
         host_to_dpu.algo_index = 0;
         input_rngs[me()] = seed_xs(host_to_dpu.basic_seed + me());

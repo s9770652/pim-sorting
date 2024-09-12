@@ -228,8 +228,7 @@ int main(int argc, char **argv) {
         }
         host_to_dpu.length = len;
         host_to_dpu.offset = offset;
-        // 16 = 8 * 2 → halving this number gives max. size of first runs (half-space MergeSorts)
-        host_to_dpu.part_length = ALIGN(DIV_CEIL(len, NR_TASKLETS) * sizeof(T), 16) / sizeof(T);
+        host_to_dpu.part_length = DMA_ALIGNED(DIV_CEIL(len, NR_TASKLETS) * sizeof(T)) / sizeof(T);
 
         memset(dpu_to_host, 0, sizeof(struct dpu_results[num_of_algos]));
         uint32_t const reps_per_launch = LOAD_INTO_MRAM / len;
