@@ -286,20 +286,15 @@ int main(void) {
     if (me() != 0) return EXIT_SUCCESS;
 
     /* Set up buffers. */
-    size_t num_of_sentinels = 16;  // 17 is the maximum step, 1 is already present.
+    size_t const num_of_sentinels = DMA_ALIGNED(17 * sizeof(T)) / sizeof(T);
     assert(host_to_dpu.length + num_of_sentinels <= TRIPLE_BUFFER_LENGTH);
     if (buffers[me()].cache == NULL) {  // Only allocate on the first launch.
         allocate_triple_buffer(&buffers[me()]);
         /* Add additional sentinel values. */
         for (size_t i = 0; i < num_of_sentinels; i++)
             buffers[me()].cache[i] = T_MIN;
-        buffers[me()].cache += num_of_sentinels;
-        assert(
-            (uintptr_t)buffers[me()].cache == DMA_ALIGNED((uintptr_t)buffers[me()].cache) 
-            && "Cache address not aligned for DMAs!"
-        );
     }
-    T * const cache = buffers[me()].cache;
+    T * const cache = buffers[me()].cache + num_of_sentinels;
 
     /* Set up dummy values if called via debugger. */
     if (host_to_dpu.length == 0) {

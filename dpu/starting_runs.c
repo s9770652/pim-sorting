@@ -2,7 +2,8 @@
 #include "wram_sorts.h"
 
 void form_starting_runs(T __mram_ptr * const start, T __mram_ptr * const end) {
-    T * const cache = buffers[me()].cache;
+    T * const cache = buffers[me()].cache + SENTINELS_NUMS;
+    cache[-1] = T_MIN;
     T __mram_ptr *i;
     size_t curr_length, curr_size;
     mram_range_ptr range = { start, end + 1 };

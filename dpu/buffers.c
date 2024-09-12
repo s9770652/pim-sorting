@@ -56,20 +56,17 @@ void allocate_triple_buffer(triple_buffers *buffers) {
     ATOMIC_BIT_ACQUIRE(__heap_pointer);
 
     // Initialise a local cache to store one MRAM block.
-    // In front of the cache is a sentinel value, useful for sorting and checking the order.
-    size_t const sentinel_size = DMA_ALIGNED(sizeof(T));
-    T *cache_pointer = mem_alloc_nolock(CACHE_SIZE + sentinel_size) + sentinel_size;
-    *(cache_pointer - 1) = T_MIN;
+    T *cache = mem_alloc_nolock(CACHE_SIZE);
 
     // Initialise the buffers for the two sequential readers.
     uintptr_t heap_pointer = (uintptr_t)__HEAP_POINTER;
-    uintptr_t pointer = (heap_pointer + PAGE_OFF_MASK) & PAGE_IDX_MASK;
-    size_t size = pointer + 2 * PAGE_ALLOC_SIZE - heap_pointer;  // `2 *` added
+    uintptr_t seqs = (heap_pointer + PAGE_OFF_MASK) & PAGE_IDX_MASK;
+    size_t size = seqs + 2 * PAGE_ALLOC_SIZE - heap_pointer;
     mem_alloc_nolock(size);
 
     ATOMIC_BIT_RELEASE(__heap_pointer);
 
-    buffers->cache = cache_pointer;
-    buffers->seq_1 = pointer;
-    buffers->seq_2 = pointer + PAGE_ALLOC_SIZE;
+    buffers->cache = cache;
+    buffers->seq_1 = seqs;
+    buffers->seq_2 = seqs + PAGE_ALLOC_SIZE;
 }

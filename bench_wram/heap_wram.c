@@ -319,8 +319,9 @@ int main(void) {
     assert(host_to_dpu.length <= TRIPLE_BUFFER_LENGTH);
     if (buffers[me()].cache == NULL) {  // Only allocate on the first launch.
         allocate_triple_buffer(&buffers[me()]);
+        buffers[me()].cache[SENTINELS_NUMS - 1] = T_MIN;
     }
-    T * const cache = buffers[me()].cache;
+    T * const cache = buffers[me()].cache + SENTINELS_NUMS;
 
     /* Set up dummy values if called via debugger. */
     if (host_to_dpu.length == 0) {

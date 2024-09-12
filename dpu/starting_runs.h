@@ -14,7 +14,7 @@
 #include "mram_loop.h"
 
 /// @brief The number of items in the starting runs.
-#define STARTING_RUN_LENGTH (MIN(TRIPLE_BUFFER_LENGTH, 512))
+#define STARTING_RUN_LENGTH (MIN(TRIPLE_BUFFER_LENGTH - SENTINELS_NUMS, 512))
 /// @brief The number of bytes a starting run takes.
 #define STARTING_RUN_SIZE (STARTING_RUN_LENGTH << DIV)
 static_assert(
@@ -22,7 +22,7 @@ static_assert(
     "The size of starting runs must be properly aligned for DMAs!"
 );
 static_assert(
-    STARTING_RUN_SIZE <= TRIPLE_BUFFER_SIZE,
+    STARTING_RUN_SIZE <= (TRIPLE_BUFFER_SIZE + SENTINELS_SIZE),
     "The starting runs are sorted entirely in WRAM and, thus, must fit in there!"
 );
 

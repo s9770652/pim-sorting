@@ -106,17 +106,21 @@ void get_stats_sorted(T __mram_ptr const * const array, T * const cache, mram_ra
     T prev = (me() == 0) ? T_MIN : array[range.start-1];
     // Calculate statistics and check order.
     size_t i, curr_length, curr_size;
-    LOOP_ON_MRAM(i, curr_length, curr_size, range) {
+    LOOP_ON_MRAM_BL(i, curr_length, curr_size, range, MAX_TRANSFER_LENGTH_TRIPLE - SENTINELS_NUMS) {
         mram_read(&array[i], cache, curr_size);
-        unsorted[me()] |= prev > cache[0];
-        for (size_t j = 0; j < curr_length; j++) {
+        unsorted[me()] |= (prev > cache[0]);
+        sums[me()] += cache[0];
+        if (cache[0] < NR_COUNTS) {
+            counts[me()][cache[0]]++;
+        }
+        for (size_t j = 1; j < curr_length; j++) {
             sums[me()] += cache[j];
             if (cache[j] < NR_COUNTS) {
                 counts[me()][cache[j]]++;
             }
-            unsorted[me()] |= cache[j-1] > cache[j];  // `j-1` possible due to the sentinel value
+            unsorted[me()] |= (cache[j-1] > cache[j]);
         }
-        prev = cache[MAX_TRANSFER_LENGTH_TRIPLE-1];
+        prev = cache[MAX_TRANSFER_LENGTH_TRIPLE - SENTINELS_NUMS - 1];
     }
     barrier_wait(&checking_barrier);
     accumulate_stats(dummy, result);
@@ -146,12 +150,16 @@ void get_stats_sorted_wram(T const array[], size_t const length, array_stats *re
     }
     unsorted[me()] = false;
     // Calculate statistics and check order.
-    for (size_t j = 0; j < length; j++) {
+    sums[me()] += array[0];
+    if (array[0] < NR_COUNTS) {
+        counts[me()][array[0]]++;
+    }
+    for (size_t j = 1; j < length; j++) {
         sums[me()] += array[j];
         if (array[j] < NR_COUNTS) {
             counts[me()][array[j]]++;
         }
-        unsorted[me()] |= array[j-1] > array[j];  // `j-1` possible due to the sentinel value
+        unsorted[me()] |= (array[j-1] > array[j]);
     }
     accumulate_stats(false, result);
 }
@@ -159,8 +167,9 @@ void get_stats_sorted_wram(T const array[], size_t const length, array_stats *re
 bool compare_stats(array_stats const * const stats_1, array_stats const * const stats_2,
         bool const print_on_success) {
     if (me() != 0) return EXIT_SUCCESS;
-    bool same_elements = stats_1->sum == stats_2->sum;
-    same_elements &= memcmp(stats_1->counts, stats_2->counts, NR_COUNTS*sizeof(counts[0][0])) == 0;
+    bool same_elements = (stats_1->sum == stats_2->sum);
+    same_elements &=
+            (memcmp(stats_1->counts, stats_2->counts, NR_COUNTS*sizeof(counts[0][0])) == 0);
     if (!same_elements) {
         printf("[" ANSI_COLOR_RED "ERROR" ANSI_COLOR_RESET "] Elements have changed.\n");
         printf("\nSums: %lu ↔ %lu\nCounts: ", stats_1->sum, stats_2->sum);

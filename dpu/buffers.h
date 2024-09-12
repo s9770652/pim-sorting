@@ -33,6 +33,10 @@
 #define MAX_TRANSFER_SIZE_CACHE (((CACHE_SIZE > 2048) ? 2048 : CACHE_SIZE) & ~DMA_OFF_MASK)
 /// @brief The maximum number of elements transferable at once between MRAM and the cache.
 #define MAX_TRANSFER_LENGTH_CACHE (MAX_TRANSFER_SIZE_CACHE >> DIV)
+/// @brief How much space is needed by sentinels.
+#define SENTINELS_SIZE (DMA_ALIGNED(1 << DIV))
+/// @brief How many sentinels there are (e.g. 2 for 32-bit integers, 1 for 64-bit integers).
+#define SENTINELS_NUMS (SENTINELS_SIZE >> DIV)
 
 /**
  * @brief Holds the WRAM addresses of one general-purpose buffer and two sequential-read buffers.
@@ -50,7 +54,6 @@ typedef struct triple_buffers {
 
 /**
  * @brief Allocates contiguous memory for general-purpose buffer and two sequential-reader buffers.
- * Also sets a sentinel value for the general-purpose buffer.
  * @note It is advisable not to call `mem_alloc`
  * as long as not all tasklets have allocated their triple buffer.
  * Otherwise, the rounding this function does can lead to siginificant waste of memory space.
