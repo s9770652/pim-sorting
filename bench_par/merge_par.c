@@ -48,7 +48,7 @@ size_t borders[NR_TASKLETS];
  * @return The index of the next greater element or, if none exists, `start`.
 **/
 size_t binary_search(T const to_find, T __mram_ptr *array, size_t start, size_t end) {
-    if (end <= start) return start;
+    if (end < start) return start;
     size_t left = start, right = end + 1;
     while (left < right) {
         size_t const middle = (left + right) / 2;  // No overflow due to the small MRAM.
