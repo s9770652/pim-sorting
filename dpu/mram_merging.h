@@ -121,24 +121,6 @@ static __noinline void flush_cache_and_run(T const * const ptr, T __mram_ptr *fr
 #elif UINT64
 
 /**
- * @brief Write whatever is still in the cache to the MRAM.
- * If the given run is not depleted, copy its remainder to the output.
- * 
- * @param ptr The current buffer item of the run.
- * @param from The MRAM address of the current item of the run.
- * @param to The MRAM address of the last item of the run.
- * @param out Whither to flush.
- * @param i The number of items currently in the cache.
-**/
-static __noinline void flush_cache_and_run(T const * const ptr, T __mram_ptr *from,
-        T __mram_ptr const *to, T __mram_ptr *out, size_t i) {
-    T * const cache = buffers[me()].cache;
-    (void)ptr;
-    mram_write(cache, out, i * sizeof(T));
-    flush_run(from, to, out + i);
-}
-
-/**
  * @brief Copy the remainder of a run from the MRAM to the output.
  * 
  * @param from The MRAM address of the current item of the run.
@@ -161,8 +143,25 @@ static inline void flush_run(T __mram_ptr *from, T __mram_ptr const *to, T __mra
     } while (from <= to);
 }
 
-#endif  // UINT64
+/**
+ * @brief Write whatever is still in the cache to the MRAM.
+ * If the given run is not depleted, copy its remainder to the output.
+ * 
+ * @param ptr The current buffer item of the run.
+ * @param from The MRAM address of the current item of the run.
+ * @param to The MRAM address of the last item of the run.
+ * @param out Whither to flush.
+ * @param i The number of items currently in the cache.
+**/
+static __noinline void flush_cache_and_run(T const * const ptr, T __mram_ptr *from,
+        T __mram_ptr const *to, T __mram_ptr *out, size_t i) {
+    T * const cache = buffers[me()].cache;
+    (void)ptr;
+    mram_write(cache, out, i * sizeof(T));
+    flush_run(from, to, out + i);
+}
 
+#endif  // UINT64
 
 /**
  * @brief Merges the `MAX_FILL_LENGTH` least items in the current pair of runs.
