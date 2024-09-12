@@ -26,6 +26,7 @@ triple_buffers buffers[NR_TASKLETS];
 struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input (in debug mode)
 struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the pivot
 array_stats stats_before, stats_after;
+time times[NR_TASKLETS];
 
 BARRIER_INIT(omni_barrier, NR_TASKLETS);
 
@@ -112,16 +113,17 @@ int main(void) {
 
         barrier_wait(&omni_barrier);
         perfcounter_config(COUNT_CYCLES, true);
-        time new_time;
-        if (me() == 0)
-            new_time = perfcounter_get();
+        time new_time = perfcounter_get();
         algo(&input[range.start], &input[range.end - 1]);
-        if (me() == 0) {
-            new_time = perfcounter_get() - new_time - CALL_OVERHEAD;
-            dpu_to_host.firsts += new_time;
-            dpu_to_host.seconds += new_time * new_time;
-        }
+        new_time = perfcounter_get() - new_time - CALL_OVERHEAD;
+        times[me()] = new_time;
         barrier_wait(&omni_barrier);
+        if (me() == 0) {
+            for (size_t i = 1; i < NR_TASKLETS; i++)
+                times[0] += times[i];
+            dpu_to_host.firsts += times[0];
+            dpu_to_host.seconds += times[0] * times[0];
+        }
 
         get_stats_sorted(input, cache, range, false, &stats_after);
         if (compare_stats(&stats_before, &stats_after, false) == EXIT_FAILURE) {
