@@ -164,6 +164,7 @@ __asm__ volatile(                                            \
 
 /**
  * @brief Equivalent to `seqread_init`.
+ * No difference to `sr_init`.
  * 
  * @param cache The WRAM buffer of the sequential reader.
  * @param mram The first MRAM address to read.
@@ -171,7 +172,8 @@ __asm__ volatile(                                            \
  * 
  * @return The WRAM buffer address of the first MRAM item.
 **/
-static inline T *sr_init(seqreader_buffer_t cache, void __mram_ptr *mram, seqreader_t *reader) {
+static inline T *sr_init_aligned(seqreader_buffer_t cache, void __mram_ptr *mram,
+        seqreader_t *reader) {
     reader->wram_cache = cache;
     reader->mram_addr = (uintptr_t)(1 << __DPU_MRAM_SIZE_LOG2);
 
@@ -186,6 +188,20 @@ static inline T *sr_init(seqreader_buffer_t cache, void __mram_ptr *mram, seqrea
         reader->mram_addr = target_addr_idx_page;
     }
     return (T *)(mram_offset + wram_cache);
+}
+
+/**
+ * @brief Equivalent to `seqread_init`.
+ * No difference to `sr_init_aligned`.
+ * 
+ * @param cache The WRAM buffer of the sequential reader.
+ * @param mram The first MRAM address to read.
+ * @param reader The reader to initialise.
+ * 
+ * @return The WRAM buffer address of the first MRAM item.
+**/
+static inline T *sr_init(seqreader_buffer_t cache, void __mram_ptr *mram, seqreader_t *reader) {
+    return sr_init_aligned(cache, mram, reader);
 }
 
 /**
@@ -218,6 +234,22 @@ ptr = (T *)__builtin_dpu_seqread_get((uintptr_t)ptr, sizeof(T), reader, PAGE_SIZ
 
 /**
  * @brief Equivalent to `seqread_init`.
+ * No difference to `sr_init`.
+ * 
+ * @param cache The WRAM buffer of the sequential reader.
+ * @param mram The first MRAM address to read.
+ * @param reader The reader to initialise.
+ * 
+ * @return The WRAM buffer address of the first MRAM item.
+**/
+static inline T *sr_init_aligned(seqreader_buffer_t cache, void __mram_ptr *mram,
+        seqreader_t *reader) {
+    return seqread_init(cache, mram, reader);
+}
+
+/**
+ * @brief Equivalent to `seqread_init`.
+ * No difference to `sr_init_aligned`.
  * 
  * @param cache The WRAM buffer of the sequential reader.
  * @param mram The first MRAM address to read.
