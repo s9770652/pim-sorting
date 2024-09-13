@@ -2,7 +2,7 @@
 
 b=7
 r=10
-n="0x7FFF7"
+n=0x1FFFE00
 
 main_folder=scripts/merge_mram
 mkdir -p ${main_folder}
@@ -27,7 +27,7 @@ do
                 dists=("sorted" "reverse" "almost" "uniform" "zipf" "normal")
                 for dist in "${!dists[@]}";
                 do
-                    bin/host -b ${b} -r ${r} -t ${dist} -n ${nr_tasklets * n} | tee ${folder}/${dists[${dist}]}.txt
+                    bin/host -b ${b} -r ${r} -t ${dist} -n $((n / type * 8)) | tee ${folder}/${dists[${dist}]}.txt
                 done
             done
         done
