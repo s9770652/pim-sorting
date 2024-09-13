@@ -14,7 +14,7 @@
 #include "mram_loop.h"
 
 /// @brief The number of items in the starting runs.
-#define STARTING_RUN_LENGTH (MIN(TRIPLE_BUFFER_LENGTH - SENTINELS_NUMS, 512))
+#define STARTING_RUN_LENGTH (TRIPLE_BUFFER_LENGTH - SENTINELS_NUMS)
 /// @brief The number of bytes a starting run takes.
 #define STARTING_RUN_SIZE (STARTING_RUN_LENGTH << DIV)
 static_assert(
