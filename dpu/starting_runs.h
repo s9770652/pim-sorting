@@ -22,7 +22,7 @@ static_assert(
     "The size of starting runs must be properly aligned for DMAs!"
 );
 static_assert(
-    STARTING_RUN_SIZE <= (TRIPLE_BUFFER_SIZE + SENTINELS_SIZE),
+    STARTING_RUN_SIZE <= (TRIPLE_BUFFER_SIZE - SENTINELS_SIZE),
     "The starting runs are sorted entirely in WRAM and, thus, must fit in there!"
 );
 
