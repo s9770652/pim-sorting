@@ -44,8 +44,8 @@ void merge_sort_mram(T __mram_ptr * const start, T __mram_ptr * const end) {
             }
             T __mram_ptr * const ends[2] = { run_1_end, run_1_end + run_length };
             T *ptr[2] = {
-                sr_init_aligned(buffers[me()].seq_1, run_1_start, &sr[me()][0]),
-                sr_init_aligned(buffers[me()].seq_2, run_1_end + 1, &sr[me()][1]),
+                sr_init(buffers[me()].seq_1, run_1_start, &sr[me()][0]),
+                sr_init(buffers[me()].seq_2, run_1_end + 1, &sr[me()][1]),
             };
             merge_mram_aligned(ptr, ends, out, wram);
         }
