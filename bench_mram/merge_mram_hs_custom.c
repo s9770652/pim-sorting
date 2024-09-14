@@ -95,38 +95,6 @@ static void flush_cache_and_run(struct reader * const reader, T __mram_ptr *out,
 }
 
 /**
- * @brief Copy the remainder of a run to the output.
- * 
- * @param reader A reader on the run.
- * @param out Whither to flush.
-**/
-static void flush_run(struct reader * const reader, T __mram_ptr *out) {
-    T * const cache = buffers[me()].cache;
-    T __mram_ptr *from = get_reader_mram_address(reader);
-
-    size_t const rem_length = MIN(reader->last_item, reader->buffer_end) - reader->ptr + 1;
-    if (rem_length != 0) {
-        mram_write(reader->ptr, out, rem_length * sizeof(T));
-        from += rem_length;
-        out += rem_length;
-    }
-
-    /* Transfer from MRAM to MRAM. */
-    size_t rem_size = MAX_TRANSFER_SIZE_TRIPLE;
-    while (from <= reader->to) {
-        // Thanks to the dummy values, even for numbers smaller than `DMA_ALIGNMENT` bytes,
-        // there is no need to round the size up.
-        if (from + MAX_TRANSFER_LENGTH_TRIPLE > reader->to) {
-            rem_size = (size_t)reader->to - (size_t)from + sizeof(T);
-        }
-        mram_read(from, cache, rem_size);
-        mram_write(cache, out, rem_size);
-        from += MAX_TRANSFER_LENGTH_TRIPLE;  // Value may be wrong for the last transfer …
-        out += MAX_TRANSFER_LENGTH_TRIPLE;  // … after which it is not needed anymore, however.
-    };
-}
-
-/**
  * @brief Write whatever is still in the cache to the MRAM.
  * 
  * @param reader A reader on the run.
@@ -216,16 +184,8 @@ static void merge_half_space(struct reader readers[2], T __mram_ptr *out) {
     T * const cache = buffers[me()].cache;
     size_t i = 0;
     if (*readers[0].to <= *readers[1].to) {
-        while (items_left_in_reader(&readers[0]) >= UNROLL_FACTOR) {
+        while (items_left_in_reader(&readers[0]) > UNROLL_FACTOR) {
             MERGE_WITH_CACHE_FLUSH({}, {});
-        }
-        if (was_last_item_read(&readers[0])) {
-            // The previous loop was executend an even number of times.
-            // Since the first run is emptied and had a DMA-aligned length,
-            // `i * sizeof(T)` must also be DMA-aligned.
-            if (i != 0)
-                mram_write(cache, out, i * sizeof(T));
-            return;
         }
         while (true) {
             MERGE_WITH_CACHE_FLUSH(
@@ -237,16 +197,8 @@ static void merge_half_space(struct reader readers[2], T __mram_ptr *out) {
             );
         }
     } else {
-        while (items_left_in_reader(&readers[1]) >= UNROLL_FACTOR) {
+        while (items_left_in_reader(&readers[1]) > UNROLL_FACTOR) {
             MERGE_WITH_CACHE_FLUSH({}, {});
-        }
-        if (was_last_item_read(&readers[1])) {
-            if (i != 0) {
-                mram_write(cache, out, i * sizeof(T));
-                out += i;
-            }
-            flush_run(&readers[0], out);
-            return;
         }
         while (true) {
             MERGE_WITH_CACHE_FLUSH(

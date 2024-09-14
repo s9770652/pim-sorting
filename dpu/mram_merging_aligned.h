@@ -84,7 +84,7 @@ static inline void flush_run_aligned(T __mram_ptr *from, T __mram_ptr const *to,
         T __mram_ptr *out) {
     T * const cache = buffers[me()].cache;
     size_t rem_size = MAX_TRANSFER_SIZE_TRIPLE;
-    do {
+    while (from <= to) {
         // Thanks to the dummy values, even for numbers smaller than `DMA_ALIGNMENT` bytes,
         // there is no need to round the size up.
         if (from + MAX_TRANSFER_LENGTH_TRIPLE > to) {
@@ -94,7 +94,7 @@ static inline void flush_run_aligned(T __mram_ptr *from, T __mram_ptr const *to,
         mram_write(cache, out, rem_size);
         from += MAX_TRANSFER_LENGTH_TRIPLE;  // Value may be wrong for the last transfer …
         out += MAX_TRANSFER_LENGTH_TRIPLE;  // … after which it is not needed anymore, however.
-    } while (from <= to);
+    };
 }
 
 /**
@@ -190,19 +190,8 @@ static inline void merge_mram_aligned(T *ptr[2], T __mram_ptr * const ends[2], T
     uintptr_t mram[2] = { sr[me()][0].mram_addr, sr[me()][1].mram_addr };
     if (*ends[0] <= *ends[1]) {
         T __mram_ptr * const early_end = ends[0] - UNROLL_FACTOR + 1;
-        while ((intptr_t)sr_tell(ptr[0], &sr[me()][0], mram[0]) <= (intptr_t)early_end) {
+        while ((intptr_t)sr_tell(ptr[0], &sr[me()][0], mram[0]) < (intptr_t)early_end) {
             MERGE_WITH_CACHE_FLUSH({}, {});
-        }
-        if (sr_tell(ptr[0], &sr[me()][0], mram[0]) > ends[0]) {
-            // The previous loop was executend an even number of times.
-            // Since the first run is emptied and had a DMA-aligned length,
-            // `i * sizeof(T)` must also be DMA-aligned.
-            if (i != 0) {
-                mram_write(cache, out, i * sizeof(T));
-                out += i;
-            }
-            FLUSH_AFTER_TIER_1();
-            return;
         }
         while (true) {
             MERGE_WITH_CACHE_FLUSH(
@@ -215,16 +204,8 @@ static inline void merge_mram_aligned(T *ptr[2], T __mram_ptr * const ends[2], T
         }
     } else {
         T __mram_ptr * const early_end = ends[1] - UNROLL_FACTOR + 1;
-        while ((intptr_t)sr_tell(ptr[1], &sr[me()][1], mram[1]) <= (intptr_t)early_end) {
+        while ((intptr_t)sr_tell(ptr[1], &sr[me()][1], mram[1]) < (intptr_t)early_end) {
             MERGE_WITH_CACHE_FLUSH({}, {});
-        }
-        if (sr_tell(ptr[1], &sr[me()][1], mram[1]) > ends[1]) {
-            if (i != 0) {
-                mram_write(cache, out, i * sizeof(T));
-                out += i;
-            }
-            flush_run_aligned(sr_tell(ptr[0], &sr[me()][0], mram[0]), ends[0], out);
-            return;
         }
         while (true) {
             MERGE_WITH_CACHE_FLUSH(
