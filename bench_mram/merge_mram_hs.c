@@ -120,7 +120,7 @@ int main(void) {
         barrier_wait(&omni_barrier);
         if (me() == 0) {
             for (size_t i = 1; i < NR_TASKLETS; i++)
-                times[0] += times[i];
+                times[0] = (times[i] > times[0]) ? times[i] : times[0];
             dpu_to_host.firsts += times[0];
             dpu_to_host.seconds += times[0] * times[0];
         }
