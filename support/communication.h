@@ -42,7 +42,7 @@
 /// Their size must be divisible by `DMA_ALIGNMENT`.
 /// @note The total size is slightly below 32 MiB to ensure that a DMA of a sequential reader
 /// near the end does not access nonexistent data.
-#define LOAD_INTO_MRAM ((1024 * 1024 * 32 - SEQREAD_CACHE_SIZE) >> DIV)
+#define LOAD_INTO_MRAM ((1024 * 1024 * 32) >> DIV)
 #endif
 
 #if ((LOAD_INTO_MRAM << DIV) != DMA_ALIGNED(LOAD_INTO_MRAM << DIV))
