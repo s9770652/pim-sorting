@@ -30,7 +30,7 @@ typedef uint64_t T;
 #define ANSI_COLOR_RESET   "\x1b[0m"
 
 /// @brief Computes `n` ÷ `m` rounded up.
-#define DIV_CEIL(n, m) (((n) - 1) / (m) + 1)
+#define DIV_CEIL(n, m) ((n) + (m) - 1) / (m)
 
 /// @brief The straight sequential reader uses the full buffer.
 #define READ_OPT 1
