@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Provides mathematical function for usage by DPUs.
+ * @brief Provides mathematical functions for usage by DPUs.
 **/
 
 #ifndef _DPU_MATH_H_
