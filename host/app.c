@@ -280,7 +280,7 @@ int main(int argc, char **argv) {
 
             for (uint32_t id = 0; id < num_of_algos; id++) {
                 host_to_dpu.algo_index = id;
-                test(&set, &host_to_dpu, &dpu_to_host[id], p.mode < 8);
+                test(&set, &host_to_dpu, &dpu_to_host[id], p.mode < 7);
             }
             host_to_dpu.basic_seed += host_to_dpu.reps * NR_TASKLETS;
         }

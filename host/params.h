@@ -68,15 +68,14 @@ static void show_param_meanings(void) {
 static void show_modes(void) {
     fprintf(stderr,
         "Benchmark Ids:"
-        "\n     0   None/Run normal sorting program (default)"
-        "\n     1   Base sorting algorithms (WRAM)"
-        "\n     2   QuickSorts (WRAM)"
-        "\n     3   MergeSorts (WRAM)"
-        "\n     4   HeapSorts (WRAM)"
-        "\n     5   MergeSort (MRAM, half-space, straight reader)"
-        "\n     6   MergeSort (MRAM, half-space, custom reader)"
-        "\n     7   MergeSort (MRAM, full-space, straight reader)"
-        "\n     8   MergeSort (parallel)"
+        "\n     0   Base sorting algorithms (WRAM)"
+        "\n     1   QuickSorts (WRAM)"
+        "\n     2   MergeSorts (WRAM)"
+        "\n     3   HeapSorts (WRAM)"
+        "\n     4   MergeSort (MRAM, half-space, straight reader)"
+        "\n     5   MergeSort (MRAM, half-space, custom reader)"
+        "\n     6   MergeSort (MRAM, full-space, straight reader)"
+        "\n     7   MergeSort (parallel) [default]"
         "\n"
     );
 }
@@ -87,7 +86,7 @@ struct Params input_params(int argc, char **argv) {
     p.dist_type = 3;
     p.dist_param = 0;
     p.n_reps = 1;
-    p.mode = 0;
+    p.mode = 7;
 
     int opt;
     while ((opt = getopt(argc, argv, "hn:t:p:w:r:b:")) >= 0) {

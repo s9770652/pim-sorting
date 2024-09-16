@@ -13,7 +13,6 @@ CACHE_SIZE ?= 1024
 SEQREAD_CACHE_SIZE ?= 512
 NR_DPUS ?= 1
 NR_TASKLETS ?= 1
-PERF ?= 1
 CHECK_SANITY ?= 1
 
 QUICK_THRESHOLD ?= 18
@@ -35,25 +34,22 @@ comma := ,
 empty :=
 space := ${empty} ${empty}
 BENCHMARKS := small_wram quick_wram merge_wram heap_wram merge_mram_hs merge_mram_hs_custom merge_mram_fs merge_par
-BINARIES := ${patsubst %,./${BUILD_DIR}/%,sorting ${BENCHMARKS}}
+BINARIES := ${patsubst %,./${BUILD_DIR}/%,${BENCHMARKS}}
 BINARIES := ${subst ${space},${comma},${BINARIES}}
 
 # The actual binaries to build.
 HOST_TARGET := ${BUILD_DIR}/host
-SORTING_TARGET := ${BUILD_DIR}/sorting
 BENCHMARK_TARGETS := ${patsubst %,${BUILD_DIR}/%,${BENCHMARKS}}
 
 # On which source files the binaries depend.
 COMMON_INCLUDES := support
 HOST_SRC := ${wildcard ${HOST_DIR}/*.c}
-DPU_SRC := ${filter-out %/task.c, ${wildcard ${DPU_DIR}/*.c}}
-SORTING_SRC := ${DPU_DIR}/task.c
+DPU_SRC := ${wildcard ${DPU_DIR}/*.c}
 BENCHMARK_SRC :=
 
 # The object files build from each of the source files.
 HOST_OBJ := ${patsubst ${HOST_DIR}/%.c,${OBJ_DIR}/${HOST_DIR}/%.o,${HOST_SRC}}
 DPU_OBJ := ${patsubst ${DPU_DIR}/%.c,${OBJ_DIR}/${DPU_DIR}/%.o,${DPU_SRC}}
-SORTING_OBJ := ${patsubst ${DPU_DIR}/%.c,${OBJ_DIR}/${DPU_DIR}/%.o,${SORTING_SRC}}
 BENCHMARK_OBJ := ${patsubst ${BENCHMARK_DIR}/%.c,${OBJ_DIR}/${BENCHMARK_DIR}/%.o,${BENCHMARK_SRC}}
 
 # The compilation flags.
@@ -79,11 +75,9 @@ DPU_FLAGS := ${COMMON_FLAGS} -O3 \
 	-D${TYPE} \
 	-DSEQREAD_CACHE_SIZE=${SEQREAD_CACHE_SIZE} \
 	-D${PIVOT} \
-	-DPERF=${PERF} \
 	-DCHECK_SANITY=${CHECK_SANITY} \
 	-DSTRAIGHT_READER=${STRAIGHT_READER} \
 	-DSTABLE=${STABLE}
-SORTING_FLAGS := ${DPU_FLAGS} -DSTACK_SIZE_DEFAULT=600
 BENCHMARK_FLAGS := ${DPU_FLAGS} -Idpu -DSTACK_SIZE_DEFAULT=600 \
 	-DPARTITION_PRIO=${PARTITION_PRIO} \
 	-DQUICK_THRESHOLD=${QUICK_THRESHOLD} \
@@ -93,7 +87,7 @@ BENCHMARK_FLAGS := ${DPU_FLAGS} -Idpu -DSTACK_SIZE_DEFAULT=600 \
 .PHONY: all clean run
 .PRECIOUS: ${OBJ_DIR}/${BENCHMARK_DIR}/%.o
 
-all: ${CONF} ${HOST_TARGET} ${SORTING_TARGET} ${BENCHMARK_TARGETS}
+all: ${CONF} ${HOST_TARGET} ${BENCHMARK_TARGETS}
 
 clean:
 	${RM} -r ${BUILD_DIR}
@@ -110,9 +104,6 @@ ${CONF}:
 ${HOST_TARGET}: ${HOST_OBJ} ${COMMON_INCLUDES}
 	${CC} -o $@ ${HOST_OBJ} ${HOST_FLAGS}
 
-${SORTING_TARGET}: ${SORTING_OBJ} ${DPU_OBJ} ${COMMON_INCLUDES}
-	dpu-upmem-dpurte-clang ${SORTING_FLAGS} -o $@ ${SORTING_OBJ} ${DPU_OBJ}
-
 ${BUILD_DIR}/%: ${OBJ_DIR}/${BENCHMARK_DIR}/%.o ${BENCHMARK_OBJ} ${DPU_OBJ} ${COMMON_INCLUDES}
 	dpu-upmem-dpurte-clang ${BENCHMARK_FLAGS} -o $@ $< ${BENCHMARK_OBJ} ${DPU_OBJ}
 
@@ -120,7 +111,7 @@ ${OBJ_DIR}/${HOST_DIR}/%.o: ${HOST_DIR}/%.c
 	${CC} -c -o $@ $< ${HOST_FLAGS}
 
 ${OBJ_DIR}/${DPU_DIR}/%.o: ${DPU_DIR}/%.c
-	dpu-upmem-dpurte-clang ${SORTING_FLAGS} -c -o $@ $<
+	dpu-upmem-dpurte-clang ${DPU_FLAGS} -c -o $@ $<
 
 ${OBJ_DIR}/${BENCHMARK_DIR}/%.o: ${BENCHMARK_DIR}/%.c
 	dpu-upmem-dpurte-clang ${BENCHMARK_FLAGS} -c -o $@ $<
