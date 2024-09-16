@@ -28,7 +28,7 @@ triple_buffers buffers[NR_TASKLETS];
 struct xorshift input_rngs[NR_TASKLETS];  // RNG state for generating the input (in debug mode)
 struct xorshift_offset pivot_rngs[NR_TASKLETS];  // RNG state for choosing the pivot
 array_stats stats_before, stats_after;
-time times[NR_TASKLETS];
+dpu_time times[NR_TASKLETS];
 
 BARRIER_INIT(omni_barrier, NR_TASKLETS);
 
@@ -65,7 +65,7 @@ size_t binary_search(T const to_find, T __mram_ptr *array, size_t start, size_t 
  * @brief Given `NR_TASKLETS` sorted MRAM runs, stored in from[…][0],
  * this function performs a parallel MergeSort based on a scheme by Cormen et al.
 **/
-static __attribute__((unused)) void merge_par() {
+static __attribute__((unused)) void merge_par(void) {
     seqreader_buffer_t const wram[2] = { buffers[me()].seq_1, buffers[me()].seq_2 };
     unsigned char const trailing_zeros = (me() == 0) ? 32 : __builtin_ctz(me());
     for (sysname_t round = 1; (1 << round) <= NR_TASKLETS; round++) {
@@ -91,7 +91,7 @@ static __attribute__((unused)) void merge_par() {
             sub_round >= 1;
             sub_round--
         ) {
-            sysname_t thou = I ^ (1 << (sub_round - 1));
+            sysname_t const thou = I ^ (1 << (sub_round - 1));
             // Calculating the division points.
             mram_range runs[2];  // 0: shorter; 1: longer
             if ((ptrdiff_t)(from[I][0].end - from[I][0].start) <=
@@ -103,9 +103,14 @@ static __attribute__((unused)) void merge_par() {
                 runs[1] = from[I][1];
             }
             size_t pivot = (runs[1].start + runs[1].end) / 2;
-            size_t cut_at = binary_search(in[pivot], in, runs[0].start, runs[0].end);
-            size_t border = borders[I] + (pivot - runs[1].start) + (cut_at - runs[0].start);
-            out[border] = in[pivot];
+            T const pivot_value = in[pivot];
+#if STABLE
+            if (in[pivot - 1] == pivot_value)  // Are there even duplicates to find?
+                pivot = binary_search(pivot_value, in, runs[1].start, pivot - 1);
+#endif
+            size_t const cut_at = binary_search(pivot_value, in, runs[0].start, runs[0].end);
+            size_t const border = borders[I] + (pivot - runs[1].start) + (cut_at - runs[0].start);
+            out[border] = pivot_value;
             // Telling thee thy sections and awakening thee.
             from[thou][0].start = cut_at;
             from[thou][0].end = runs[0].end;
@@ -223,9 +228,9 @@ int main(void) {
 
         barrier_wait(&omni_barrier);
         perfcounter_config(COUNT_CYCLES, true);
-        time new_time = perfcounter_get();
+        dpu_time new_time = perfcounter_get();
         algo(&input[range.start], &input[range.end - 1]);
-        new_time = perfcounter_get() - new_time - CALL_OVERHEAD;
+        new_time = perfcounter_get() - new_time - CALL_OVERHEAD_CYCLES;
         times[me()] = new_time;
         barrier_wait(&omni_barrier);
         if (me() == 0) {

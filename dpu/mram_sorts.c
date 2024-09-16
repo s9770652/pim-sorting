@@ -18,7 +18,7 @@ void merge_sort_mram(T __mram_ptr * const start, T __mram_ptr * const end) {
     /* Merging. */
     seqreader_buffer_t const wram[2] = { buffers[me()].seq_1, buffers[me()].seq_2 };
     T __mram_ptr *in, *until, *out;  // Runs from `in` to `until` are merged and stored at `out`.
-    bool flip = false;  // Used to determine the initial positions of `in`, `out`, and `until`.
+    bool flip = flipped[me()];  // Used to determine the initial positions of `in`, `out`, and `until`.
     size_t const n = end - start + 1;
     for (size_t run_length = STARTING_RUN_LENGTH; run_length < n; run_length *= 2) {
         // Set the positions to read from and write to.

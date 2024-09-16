@@ -25,7 +25,7 @@
 #error `DMA_ALIGNMENT` is not 8 anymore! Change the makeshift definitions for the host accordingly!
 #endif
 
-#endif
+#endif  // DMA_ALIGNMENT
 
 #ifndef __mram_ptr  // Ignore this identifier on the host.
 #define __mram_ptr
@@ -33,17 +33,21 @@
 
 /* Defining elements common to both the host and the DPUs. */
 
-#if CHECK_SANITY  // Checkers print so the available MRAM is smaller.
+#if (CHECK_SANITY)  // Checkers print so the available MRAM is smaller.
+
 /// @brief The maximum number of elements loaded into MRAM.
 /// Their size must be divisible by `DMA_ALIGNMENT`.
 #define LOAD_INTO_MRAM ((1024 * 1024 * 31) >> DIV)
-#else
+
+#else  // CHECK_SANITY
+
 /// @brief The maximum number of elements loaded into MRAM.
 /// Their size must be divisible by `DMA_ALIGNMENT`.
 /// @note The total size is slightly below 32 MiB to ensure that a DMA of a sequential reader
 /// near the end does not access nonexistent data.
 #define LOAD_INTO_MRAM ((1024 * 1024 * 32) >> DIV)
-#endif
+
+#endif  // CHECK_SANITY
 
 #if ((LOAD_INTO_MRAM << DIV) != DMA_ALIGNED(LOAD_INTO_MRAM << DIV))
 #error The size of elements to load into MRAM must be divisible by `DMA_ALIGNMENT`.
@@ -80,14 +84,14 @@ struct dpu_arguments {
 
 /// @brief The data type holding the performance counter count.
 /// This is needed since `perfcounter_t` is only available on a DPU.
-typedef uint64_t time;
+typedef uint64_t dpu_time;
 
 /// @brief Information sent from the DPU to the host.
 struct dpu_results {
     /// @brief The sum of the measured times.
-    time firsts;
+    dpu_time firsts;
     /// @brief The sum of the squares of the measured times.
-    time seconds;
+    dpu_time seconds;
 };
 
 /// @brief A sorting algorithm and its name.
@@ -107,7 +111,10 @@ union algo_to_test {
     char padding[24];
 };
 
-/// @brief The experimentally determined overhead of calling a sorting function.
-#define CALL_OVERHEAD (144)
+/// @brief The experimentally determined overhead of calling a sorting function in cycles.
+#define CALL_OVERHEAD_CYCLES (144)
+/// @brief The experimentally determined overhead of calling a sorting function (n=0x800000)
+/// in nanoseconds.
+#define CALL_OVERHEAD_NS (304330)
 
 #endif  // _COMMUNICATION_H_

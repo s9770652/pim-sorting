@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include <dpu.h>
 #include <dpu_log.h>
@@ -24,6 +25,27 @@
 #if (NR_TASKLETS <= 0 || NR_TASKLETS > 16)
 #error The number of tasklets must be between 1 and 16!
 #endif
+
+/**
+ * @brief Calculates the difference between two given times.
+ * @author Jonathan Leffler
+ * @cite https://stackoverflow.com/a/53708448
+ * 
+ * @param t1 First time.
+ * @param t2 Second time.
+ * @param td Time difference.
+**/
+void sub_timespec(struct timespec t1, struct timespec t2, struct timespec * const td) {
+    td->tv_nsec = t2.tv_nsec - t1.tv_nsec;
+    td->tv_sec = t2.tv_sec - t1.tv_sec;
+    if ((td->tv_sec > 0) && (td->tv_nsec < 0)) {
+        td->tv_nsec += 1e9;
+        td->tv_sec--;
+    } else if ((td->tv_sec < 0) && (td->tv_nsec > 0)) {
+        td->tv_nsec -= 1e9;
+        td->tv_sec++;
+    }
+}
 
 /**
  * @brief Frees an allocated set of DPUs.
@@ -104,17 +126,28 @@ static uint32_t *get_lengths(char lengths[], size_t nr_of_lengths) {
  * @param dpu_to_host What the DPU has sent so far.
 **/
 static void test(struct dpu_set_t *set, struct dpu_arguments *host_to_dpu,
-        struct dpu_results *dpu_to_host) {
+        struct dpu_results *dpu_to_host, bool measure_cycles) {
     struct dpu_set_t dpu;
     struct dpu_results new_result;
+    struct timespec start, finish;
     DPU_FOREACH(*set, dpu) {
         DPU_ASSERT(dpu_copy_to(dpu, "host_to_dpu", 0, host_to_dpu, sizeof *host_to_dpu));
+        timespec_get(&start, TIME_UTC);
         DPU_ASSERT(dpu_launch(*set, DPU_SYNCHRONOUS));
+        timespec_get(&finish, TIME_UTC);
         DPU_ASSERT(dpu_copy_from(dpu, "dpu_to_host", 0, &new_result, sizeof new_result));
         // DPU_ASSERT(dpu_log_read(dpu, stdout));
     }
-    dpu_to_host->firsts += new_result.firsts;
-    dpu_to_host->seconds += new_result.seconds;
+    if (measure_cycles) {
+        dpu_to_host->firsts += new_result.firsts;
+        dpu_to_host->seconds += new_result.seconds;
+    } else {
+        struct timespec delta = {};
+        sub_timespec(start, finish, &delta);
+        time_t measurement = (delta.tv_nsec + delta.tv_sec * 1e9) - CALL_OVERHEAD_NS;
+        dpu_to_host->firsts += measurement;
+        dpu_to_host->seconds += measurement * measurement;
+    }
 }
 
 /**
@@ -125,7 +158,7 @@ static void test(struct dpu_set_t *set, struct dpu_arguments *host_to_dpu,
  * 
  * @return The mean time.
 **/
-static time get_mean_of_time(time const zeroth, time const first) {
+static dpu_time get_mean_of_time(dpu_time const zeroth, dpu_time const first) {
     return first / zeroth;
 }
 
@@ -138,7 +171,7 @@ static time get_mean_of_time(time const zeroth, time const first) {
  * 
  * @return The standard deviation.
 **/
-static time get_std_of_time(time const zeroth, time const first, time second) {
+static dpu_time get_std_of_time(dpu_time const zeroth, dpu_time const first, dpu_time second) {
     if (zeroth == 1) return 0;
     return sqrt((zeroth * second - first * first) / (zeroth * (zeroth - 1)));
 }
@@ -155,7 +188,8 @@ static void print_header(union algo_to_test const algos[], size_t const num_of_a
         struct Params *params) {
     printf(
         "# reps=%u, dist name=%s, dist param=%"T_QUALIFIER", TYPE=%s, CACHE_SIZE=%d, "
-        "SEQREAD_CACHE_SIZE=%d, NR_TASKLETS=%d, CALL_OVERHEAD=%u\n# %s\n",
+        "SEQREAD_CACHE_SIZE=%d, NR_TASKLETS=%d, CALL_OVERHEAD_CYCLES=%u, "
+        "CALL_OVERHEAD_NS=%d\n# %s\n",
         params->n_reps,
         get_dist_name(params->dist_type),
         params->dist_param,
@@ -163,7 +197,8 @@ static void print_header(union algo_to_test const algos[], size_t const num_of_a
         CACHE_SIZE,
         SEQREAD_CACHE_SIZE,
         NR_TASKLETS,
-        CALL_OVERHEAD,
+        CALL_OVERHEAD_CYCLES,
+        CALL_OVERHEAD_NS,
         TABLE_HEADER
     );
     printf("n");
@@ -181,12 +216,12 @@ static void print_header(union algo_to_test const algos[], size_t const num_of_a
  * @param reps How often each test was repeated.
  * @param dpu_to_host The results as measured by the DPUs.
 **/
-static void print_measurements(size_t const num_of_algos, size_t const length, time const reps,
+static void print_measurements(size_t const num_of_algos, size_t const length, dpu_time const reps,
         struct dpu_results dpu_to_host[]) {
     printf("%-4zd", length);
     for (size_t id = 0; id < num_of_algos; id++) {
-        time mean = get_mean_of_time(reps, dpu_to_host[id].firsts);
-        time std = get_std_of_time(reps, dpu_to_host[id].firsts, dpu_to_host[id].seconds);
+        dpu_time mean = get_mean_of_time(reps, dpu_to_host[id].firsts);
+        dpu_time std = get_std_of_time(reps, dpu_to_host[id].firsts, dpu_to_host[id].seconds);
         printf("\t%7lu %5lu", mean, std);
     }
     printf("\n");
@@ -245,7 +280,7 @@ int main(int argc, char **argv) {
 
             for (uint32_t id = 0; id < num_of_algos; id++) {
                 host_to_dpu.algo_index = id;
-                test(&set, &host_to_dpu, &dpu_to_host[id]);
+                test(&set, &host_to_dpu, &dpu_to_host[id], p.mode < 8);
             }
             host_to_dpu.basic_seed += host_to_dpu.reps * NR_TASKLETS;
         }

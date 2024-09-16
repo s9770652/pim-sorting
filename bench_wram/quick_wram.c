@@ -424,9 +424,9 @@ int main(void) {
         get_stats_unsorted_wram(cache, host_to_dpu.length, &stats_before);
 
         perfcounter_config(COUNT_CYCLES, true);
-        time new_time = perfcounter_get();
+        dpu_time new_time = perfcounter_get();
         algo(start, end);
-        new_time = perfcounter_get() - new_time - CALL_OVERHEAD;
+        new_time = perfcounter_get() - new_time - CALL_OVERHEAD_CYCLES;
         dpu_to_host.firsts += new_time;
         dpu_to_host.seconds += new_time * new_time;
 
