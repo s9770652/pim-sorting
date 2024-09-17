@@ -292,8 +292,8 @@ swap(i, right)
 // Obviously, ending the current QuickSort is done via `return`.
 #define QUICK_STOP() return
 
-#define QUICK_CALL_LEFT() quick_sort_wram(left, i - 1)
-#define QUICK_CALL_RIGHT() quick_sort_wram(i + 1, right)
+#define QUICK_CALL_LEFT() wram_sort(left, i - 1)
+#define QUICK_CALL_RIGHT() wram_sort(i + 1, right)
 
 #else  // UINT64
 
