@@ -158,6 +158,7 @@ void generate_input_distribution(T array[], size_t const length, enum dist const
     case sorted: generate_sorted_distribution(array, length, param); break;
     case reverse: generate_reversed_sorted_distribution(array, length, param); break;
     case almost: generate_almost_sorted_distribution(array, length, param); break;
+    case zeroone: generate_uniform_distribution(array, length, 2); break;
     case uniform: generate_uniform_distribution(array, length, param); break;
     case zipf: generate_zipf_distribution(array, length); break;
     case normal: generate_normal_distribution(array, length, param); break;

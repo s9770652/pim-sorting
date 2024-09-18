@@ -41,11 +41,12 @@ static void show_distributions(void) {
     fprintf(stderr,
         "Distribution Types:"
         "\n     0   Sorted"
-        "\n     1   Reverse"
-        "\n     2   AlmostSorted"
-        "\n     3   Uniform"
-        "\n     4   Zipf"
-        "\n     5   Normal"
+        "\n     1   Reverse Sorted"
+        "\n     2   Almost Sorted"
+        "\n     4   Zero-One"
+        "\n     5   Uniform"
+        "\n     6   Zipf"
+        "\n     7   Normal"
         "\n"
     );
 }
@@ -53,12 +54,13 @@ static void show_distributions(void) {
 static void show_param_meanings(void) {
     fprintf(stderr,
         "Parameter Meanings:"
-        "\n     Sorted:         value of the first element (i.e. the smallest) [default: 0]"
-        "\n     Reverse:        value of the last element (i.e. the smallest) [default: 0]"
-        "\n     AlmostSorted:   number of swaps [default: √𝘯]"
-        "\n     Uniform:        upper bound (exclusive) of range to draw from [default: maximum]"
-        "\n     Zipf:           /"
-        "\n     Normal:         standard deviation [default: 𝘯/8]"
+        "\n     Sorted:           value of the first element (i.e. the smallest) [default: 0]"
+        "\n     Reverse Sorted:   value of the last element (i.e. the smallest) [default: 0]"
+        "\n     Almost Sorted:    number of swaps [default: √𝘯]"
+        "\n     Zero-One:         /"
+        "\n     Uniform:          upper bound (exclusive) of range to draw from [default: maximum]"
+        "\n     Zipf:             /"
+        "\n     Normal:           standard deviation [default: 𝘯/8]"
         "\n"
         "\nNon-zero default values internally equal zero as well."
         "\n"

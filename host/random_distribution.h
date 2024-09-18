@@ -10,7 +10,7 @@
 
 #include "common.h"
 
-enum dist { sorted, reverse, almost, uniform, zipf, normal, nr_of_dists };
+enum dist { sorted, reverse, almost, zeroone, uniform, zipf, normal, nr_of_dists };
 
 /**
  * @brief Generates a sequence of numbers according to some random distribution.
@@ -34,6 +34,7 @@ static inline char *get_dist_name(enum dist type) {
     case sorted: return "sorted";
     case reverse: return "reverse";
     case almost: return "almost";
+    case zeroone: return "zero-one";
     case uniform: return "uniform";
     case zipf: return "Zipf";
     case normal: return "normal";
