@@ -27,7 +27,6 @@ do
             dists=("sorted" "reverse" "almost" "zeroone" "uniform" "zipf")
             for dist in "${!dists[@]}";
             do
-                dist=3
                 bin/host -b ${b} -r ${r} -t ${dist} -n $((n / type * 32)) | tee ${folder}/${dists[${dist}]}.txt
             done
         done
