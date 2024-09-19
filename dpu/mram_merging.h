@@ -12,6 +12,7 @@
 #include <stdbool.h>
 
 #include <defs.h>
+#include <mram_unaligned.h>
 
 #include "buffers.h"
 #include "common.h"
@@ -35,6 +36,17 @@ extern triple_buffers buffers[NR_TASKLETS];
 extern seqreader_t sr[NR_TASKLETS][2];  // sequential readers used to read runs
 
 #if UINT32
+
+/**
+ * @brief Write a single integer to the MRAM in a thread-safe way.
+ * @note This is a function, not a macro, so increments can be used as normal.
+ * 
+ * @param dest Whither to write.
+ * @param val What to write.
+**/
+static inline void atomic_write(T __mram_ptr *dest, T val) {
+    *dest = val;
+}
 
 /**
  * @brief Copy the remainder of a run from the MRAM to the output.
@@ -72,7 +84,7 @@ static inline void flush_run(T __mram_ptr *from, T __mram_ptr const *to, T __mra
             out += rem_length_shifted;
         };
         while ((from + 1) <= to) {
-            *out++ = *++from;
+            atomic_write(out++, *++from);
         }
     } else {
         while (from < to_aligned) {
@@ -86,7 +98,7 @@ static inline void flush_run(T __mram_ptr *from, T __mram_ptr const *to, T __mra
             out += rem_length;
         };
         while (from <= to) {
-            *out++ = *from++;
+            atomic_write(out++, *from++);
         }
     }
 }
@@ -119,6 +131,18 @@ static __noinline void flush_cache_and_run(T const * const ptr, T __mram_ptr *fr
 }
 
 #elif UINT64
+
+/**
+ * @brief Write a single integer to the MRAM in a thread-safe way.
+ * @note This is a function, not a macro, so increments can be used as normal.
+ * @internal With 64-bit elements, there is no need for virtual mutexes.
+ * 
+ * @param dest Whither to write.
+ * @param val What to write.
+**/
+static inline void atomic_write(T __mram_ptr *dest, T val) {
+    *dest = val;
+}
 
 /**
  * @brief Copy the remainder of a run from the MRAM to the output.
@@ -228,11 +252,11 @@ void merge_mram(T *ptr[2], T __mram_ptr * const ends[2], T __mram_ptr *out,
 #if UINT32  // `out` may not be DMA-aligned, so an item is transferred singularly.
     if ((uintptr_t)out & DMA_OFF_MASK) {
         if (val[0] <= val[1]) {
-            *out++ = val[0];
+            atomic_write(out++, val[0]);
             SR_GET(ptr[0], &sr[me()][0], mram[0], wram[0]);
             val[0] = *ptr[0];
         } else {
-            *out++ = val[1];
+            atomic_write(out++, val[1]);
             SR_GET(ptr[1], &sr[me()][1], mram[1], wram[1]);
             val[1] = *ptr[1];
         }

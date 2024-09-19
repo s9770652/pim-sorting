@@ -174,10 +174,12 @@ static __attribute__((unused)) void merge_par(void) {
         T __mram_ptr * const ends[2] = { &in[from[I][0].end], &in[from[I][1].end] };
         if ((intptr_t)starts[0] > (intptr_t)ends[0]) {  // The shorter run may be empty.
             size_t offset = 0;
+#if UINT32
             if ((uintptr_t)&out[borders[I]] & DMA_OFF_MASK) {
-                out[borders[I]] = *starts[1];
+                atomic_write(&out[borders[I]], *starts[1]);
                 offset = 1;
             }
+#endif
             flush_run(starts[1] + offset, ends[1], &out[borders[I] + offset]);
         } else {
             T *ptr[2] = {
