@@ -34,6 +34,7 @@ static void insertion_sort_wram(T * const start, T * const end) {
 #if (STABLE)
 
 #define __MERGE_THRESHOLD__ (14)
+#define __UNROLL_FACTOR__ (24)
 
 /**
  * @brief Creating the starting runs for MergeSort.
@@ -50,21 +51,21 @@ for (T *t = end; t > start; t -= __MERGE_THRESHOLD__) {                         
 
 /**
  * @brief Copies a given range of values to some sepcified buffer.
- * The copying is done using batches of length `24`:
- * If there are at least `24` many elements to copy, they are copied at once.
- * This way, the loop overhead is cut by about a `24`th in good cases.
+ * The copying is done using batches of length `__UNROLL_FACTOR__`:
+ * If there are at least `__UNROLL_FACTOR__` many elements to copy, they are copied at once.
+ * This way, the loop overhead is cut by about a `__UNROLL_FACTOR__`th in good cases.
  * 
  * @param in The first element to copy.
  * @param until The last element to copy.
  * @param out Whither to place the first element to copy.
 **/
 static inline void flush_batch_wram(T *in, T *until, T *out) {
-    while (in + 24 - 1 <= until) {
+    while (in + __UNROLL_FACTOR__ - 1 <= until) {
         #pragma unroll
-        for (size_t k = 0; k < 24; k++)
+        for (size_t k = 0; k < __UNROLL_FACTOR__; k++)
             *(out + k) = *(in + k);
-        out += 24;
-        in += 24;
+        out += __UNROLL_FACTOR__;
+        in += __UNROLL_FACTOR__;
     }
     while (in <= until) {
         *out++ = *in++;
