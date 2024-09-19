@@ -38,17 +38,17 @@ mram_range from[NR_TASKLETS][2];
 size_t borders[NR_TASKLETS];
 
 /**
- * @brief Finds the lowest index 𝘪 ∈ [`start`, `end`] such that `to_find` < `array[𝘪]`.
+ * @brief Finds the *greatest* index 𝘪 ∈ [`start`, `end`] such that `array[𝘪 – 1]` < `to_find`.
  * If the array is empty, `start` is returned. If `to_find` ≦ `array[start]`, `start` is returned.
  * 
- * @param to_find The element for which to find the next greater element.
- * @param array The array where to search for the next greater element.
+ * @param to_find The element for which to find the next less element.
+ * @param array The array where to search for the next less element.
  * @param start The index of the first element to consider.
  * @param end The index of the last element to consider.
  * 
- * @return The index of the next greater element or, if none exists, `start`.
+ * @return The index of the next less element or, if none exists, `start`.
 **/
-size_t binary_search(T const to_find, T __mram_ptr *array, size_t start, size_t end) {
+size_t binary_search_strict(T const to_find, T __mram_ptr *array, size_t start, size_t end) {
     if (end < start) return start;
     size_t left = start, right = end + 1;
     while (left < right) {
@@ -59,6 +59,51 @@ size_t binary_search(T const to_find, T __mram_ptr *array, size_t start, size_t 
             left = middle + 1;
     }
     return right;
+}
+
+/**
+ * @brief Finds *some* index 𝘪 ∈ [`start`, `end`] such that `array[𝘪]` ≦ `to_find`.
+ * If the array is empty, `start` is returned. If `to_find` ≦ `array[start]`, `start` is returned.
+ * 
+ * @param to_find The element for which to find a less element.
+ * @param array The array where to search for a less element.
+ * @param start The index of the first element to consider.
+ * @param end The index of the last element to consider.
+ * 
+ * @return The index of a less element or, if none exists, `start`.
+**/
+size_t binary_search_loose(T const to_find, T __mram_ptr *array, size_t start, size_t end) {
+    if (end < start) return start;
+    size_t left = start, right = end + 1;
+    while (left < right) {
+        size_t const middle = (left + right) / 2;  // No overflow due to the small MRAM.
+        if (to_find == array[middle])
+            return middle;
+        else if (to_find < array[middle])
+            right = middle;
+        else
+            left = middle + 1;
+        if (right - left <= 32) break;
+    }
+    return right;
+}
+
+/**
+ * @brief A strict binary search if `STABLE` is set to `true`, and a loose one elsewise.
+ * 
+ * @param to_find The element for which to find some less element.
+ * @param array The array where to search for some less element.
+ * @param start The index of the first element to consider.
+ * @param end The index of the last element to consider.
+ * 
+ * @return The index of some less element or, if none exists, `start`.
+**/
+size_t binary_search(T const to_find, T __mram_ptr *array, size_t start, size_t end) {
+#if (STABLE)
+    return binary_search_strict(to_find, array, start, end);
+#else
+    return binary_search_loose(to_find, array, start, end);
+#endif
 }
 
 /**
