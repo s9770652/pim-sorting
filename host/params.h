@@ -43,10 +43,10 @@ static void show_distributions(void) {
         "\n     0   Sorted"
         "\n     1   Reverse Sorted"
         "\n     2   Almost Sorted"
-        "\n     4   Zero-One"
-        "\n     5   Uniform"
-        "\n     6   Zipf"
-        "\n     7   Normal"
+        "\n     3   Zero-One"
+        "\n     4   Uniform"
+        "\n     5   Zipf"
+        "\n     6   Normal"
         "\n"
     );
 }
@@ -85,7 +85,7 @@ static void show_modes(void) {
 struct Params input_params(int argc, char **argv) {
     struct Params p;
     p.lengths = "512";
-    p.dist_type = 3;
+    p.dist_type = 4;
     p.dist_param = 0;
     p.n_reps = 1;
     p.mode = 7;
