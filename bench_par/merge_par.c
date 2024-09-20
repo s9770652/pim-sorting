@@ -82,7 +82,6 @@ size_t binary_search_loose(T const to_find, T __mram_ptr *array, size_t start, s
             right = middle;
         else
             left = middle + 1;
-        if (right - left <= 32) break;
     }
     return right;
 }
