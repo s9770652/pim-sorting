@@ -142,8 +142,8 @@ static __attribute__((unused)) void merge_par(void) {
                 runs[0] = from[I][0];
                 runs[1] = from[I][1];
             } else {
-                runs[0] = from[I][0];
-                runs[1] = from[I][1];
+                runs[0] = from[I][1];
+                runs[1] = from[I][0];
             }
             size_t pivot = (runs[1].start + runs[1].end) / 2;
             T const pivot_value = in[pivot];
