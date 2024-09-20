@@ -7,7 +7,6 @@
 
 #include <barrier.h>
 #include <defs.h>
-#include <dpuruntime.h>
 #include <handshake.h>
 #include <memmram_utils.h>
 #include <perfcounter.h>
@@ -127,7 +126,7 @@ static __attribute__((unused)) void merge_par(void) {
         } else {
             // If not, I am an inner tasklet and have to wait for my root to wake me up.
             handshake_notify();
-            __stop();
+            handshake_notify();
         }
         // I have been awoken and wake now sequentially the tasklets within my subtree,
         // that is those with less zeroes in their LSB.
@@ -162,7 +161,7 @@ static __attribute__((unused)) void merge_par(void) {
             from[thou][1].start = pivot + 1;
             from[thou][1].end = runs[1].end;
             borders[thou] = border + 1;
-            __resume(thou, "0");
+            handshake_wait_for(thou);
             // Saving mine own sections for either further division or for sorting, finally.
             from[I][0].start = runs[0].start;
             from[I][0].end = cut_at - 1;
@@ -247,7 +246,7 @@ int main(void) {
     /* Set up dummy values if called via debugger. */
     if (me() == 0 && host_to_dpu.length == 0) {
         host_to_dpu.reps = 1;
-        host_to_dpu.length = 0x800000;
+        host_to_dpu.length = 0x700000;
         host_to_dpu.offset = DMA_ALIGNED(host_to_dpu.length * sizeof(T)) / sizeof(T);
         host_to_dpu.part_length =
                 DMA_ALIGNED(DIV_CEIL(host_to_dpu.length, NR_TASKLETS) * sizeof(T)) / sizeof(T);
