@@ -119,13 +119,13 @@ static __attribute__((unused)) void merge_par(void) {
         if (!(I & ((1 << round) - 1))) {
             // If so, I am a root tasklet and have to wait for the tasklets within my tree.
             for (sysname_t i = 1; i < (1 << round); i++) {
-                handshake_wait_for(I + i);
+                handshake_wait_for(I + i);  // “Successor, are you done with merging?”
             }
             from[I][1] = from[I | (1 << (round - 1))][0];
         } else {
             // If not, I am an inner tasklet and have to wait for my root to wake me up.
-            handshake_notify();
-            handshake_notify();
+            handshake_notify();  // “Root, I am done with merging!”
+            handshake_notify();  // “Root, wake me up when you are done with partitioning!”
         }
         // I have been awoken and wake now sequentially the tasklets within my subtree,
         // that is those with less zeroes in their LSB.
