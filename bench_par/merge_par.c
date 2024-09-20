@@ -191,8 +191,8 @@ static __attribute__((unused)) void merge_par(void) {
             }
 #endif  // STABLE
             T *ptr[2] = {
-                sr_init(buffers[I].seq_1, starts[0], &sr[I][0]),
-                sr_init(buffers[I].seq_2, starts[1], &sr[I][1]),
+                sr_init(wram[0], starts[0], &sr[I][0]),
+                sr_init(wram[1], starts[1], &sr[I][1]),
             };
             merge_mram(ptr, ends, &out[borders[I]], wram);
         }
