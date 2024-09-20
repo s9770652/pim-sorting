@@ -168,8 +168,8 @@ static __attribute__((unused)) void merge_par(void) {
             from[I][1].end = pivot - 1;
         }
         // All tasklets within my subtree are awake, so I can process my two runs.
-        T __mram_ptr * const starts[2] = { &in[from[I][0].start], &in[from[I][1].start] };
-        T __mram_ptr * const ends[2] = { &in[from[I][0].end], &in[from[I][1].end] };
+        T __mram_ptr *starts[2] = { &in[from[I][0].start], &in[from[I][1].start] };
+        T __mram_ptr *ends[2] = { &in[from[I][0].end], &in[from[I][1].end] };
         if ((intptr_t)starts[0] > (intptr_t)ends[0]) {  // The shorter run may be empty.
             size_t offset = 0;
 #if UINT32
@@ -177,9 +177,19 @@ static __attribute__((unused)) void merge_par(void) {
                 atomic_write(&out[borders[I]], *starts[1]);
                 offset = 1;
             }
-#endif
+#endif  // UINT32
             flush_run(starts[1] + offset, ends[1], &out[borders[I] + offset]);
         } else {
+#if STABLE
+            if (starts[0] > starts[1]) {
+                T __mram_ptr *temp = starts[0];
+                starts[0] = starts[1];
+                starts[1] = temp;
+                temp = ends[0];
+                ends[0] = ends[1];
+                ends[1] = temp;
+            }
+#endif  // STABLE
             T *ptr[2] = {
                 sr_init(buffers[I].seq_1, starts[0], &sr[I][0]),
                 sr_init(buffers[I].seq_2, starts[1], &sr[I][1]),
