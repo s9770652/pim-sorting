@@ -98,7 +98,7 @@ run: all
 
 # Rules.
 ${CONF}:
-	${RM} ${call conf_filename,*,*}
+	${RM} ${call conf_filename,*,*,*,*,*}
 	touch ${CONF}
 
 ${HOST_TARGET}: ${HOST_OBJ} ${COMMON_INCLUDES}
