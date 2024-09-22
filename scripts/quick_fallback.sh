@@ -32,6 +32,6 @@ do
         rm obj/bench_*/quick_wram.o bin/quick_wram obj/host/app.o
         eval "QUICK_THRESHOLD=${threshold} TYPE=UINT${type} RECURSIVE=${recursive} ${cmd}"
 
-        bin/host -b ${b} -r ${r} -t 3 -n ${n} | tee ${folder}/${threshold}.txt
+        bin/host -b ${b} -r ${r} -t 4 -n ${n} | tee ${folder}/${threshold}.txt
     done
 done

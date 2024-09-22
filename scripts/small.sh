@@ -19,7 +19,7 @@ do
     folder=${main_folder}/uint${type}
     mkdir -p "${folder}"
 
-    dists=("sorted" "reverse" "almost" "uniform" "zipf" "normal")
+    dists=("sorted" "reverse" "almost" "zeroone" "uniform" "zipf")
     for dist in "${!dists[@]}";
     do
         bin/host -b ${b} -r ${r} -t ${dist} -n ${n} | tee "${folder}/${dists[${dist}]}.txt"

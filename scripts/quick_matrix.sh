@@ -39,10 +39,10 @@ do
                 rm obj/bench_*/quick_wram.o bin/quick_wram obj/host/app.o
                 eval "RECURSIVE=${way} PIVOT=${pivot} PARTITION_PRIO=${prio} TYPE=UINT${type} ${cmd}"
 
-                dists=("sorted" "reverse" "almost" "uniform" "zipf" "normal")
+                dists=("sorted" "reverse" "almost" "zeroone" "uniform" "zipf")
                 for dist in "${!dists[@]}";
                 do
-                    if [ ${pivot} = "LAST" ] && [ ${dist} -lt 3 ];
+                    if [ ${pivot} = "LAST" ] && [ ${dist} -lt 4 ];
                     then
                         continue
                     fi
