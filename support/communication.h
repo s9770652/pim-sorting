@@ -112,9 +112,6 @@ union algo_to_test {
 };
 
 /// @brief The experimentally determined overhead of calling a sorting function in cycles.
-#define CALL_OVERHEAD_CYCLES (144)
-/// @brief The experimentally determined overhead of calling a sorting function (n=0x800000)
-/// in nanoseconds.
-#define CALL_OVERHEAD_NS (304330)
+#define CALL_OVERHEAD (144)
 
 #endif  // _COMMUNICATION_H_

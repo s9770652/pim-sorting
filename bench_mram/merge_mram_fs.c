@@ -81,7 +81,7 @@ int main(void) {
         perfcounter_config(COUNT_CYCLES, true);
         dpu_time new_time = perfcounter_get();
         algo(&input[range.start], &input[range.end - 1]);
-        new_time = perfcounter_get() - new_time - CALL_OVERHEAD_CYCLES;
+        new_time = perfcounter_get() - new_time - CALL_OVERHEAD;
         times[me()] = new_time;
         barrier_wait(&omni_barrier);
         if (me() == 0) {

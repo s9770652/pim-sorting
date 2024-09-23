@@ -426,7 +426,7 @@ int main(void) {
         perfcounter_config(COUNT_CYCLES, true);
         dpu_time new_time = perfcounter_get();
         algo(start, end);
-        new_time = perfcounter_get() - new_time - CALL_OVERHEAD_CYCLES;
+        new_time = perfcounter_get() - new_time - CALL_OVERHEAD;
         dpu_to_host.firsts += new_time;
         dpu_to_host.seconds += new_time * new_time;
 

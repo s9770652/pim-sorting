@@ -285,12 +285,12 @@ int main(void) {
         perfcounter_config(COUNT_CYCLES, true);
         dpu_time new_time = perfcounter_get();
         algo(&input[range.start], &input[range.end - 1]);
-        new_time = perfcounter_get() - new_time - CALL_OVERHEAD_CYCLES;
+        new_time = perfcounter_get() - new_time - CALL_OVERHEAD;
         times[me()] = new_time;
         barrier_wait(&omni_barrier);
         if (me() == 0) {
             for (size_t i = 1; i < NR_TASKLETS; i++)
-                times[0] += times[i];
+                times[0] = (times[i] > times[0]) ? times[i] : times[0];
             dpu_to_host.firsts += times[0];
             dpu_to_host.seconds += times[0] * times[0];
         }
