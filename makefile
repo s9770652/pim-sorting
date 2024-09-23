@@ -21,7 +21,7 @@ PARTITION_PRIO ?= RIGHT
 RECURSIVE ?= false
 MERGE_THRESHOLD ?= 14
 STRAIGHT_READER ?= READ_OPT
-STABLE ?= true
+STABLE ?= false
 
 # A file whose name reflects the set constants.
 define conf_filename
