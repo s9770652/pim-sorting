@@ -13,7 +13,7 @@ mkdir -p ${main_folder}
 for nr_tasklets in 1 2 4 8 16
 do
     tasklets_folder=${main_folder}/NR_TASKLETS=${nr_tasklets}
-    for stable in false true
+    for stable in false
     do
         stable_folder=${tasklets_folder}/STABLE=${stable}
         for type in 32 64
